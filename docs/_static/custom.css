@@ -1,0 +1,34 @@
+ol, ul {
+	margin-left: -2rem;
+}
+
+.class dt{
+	padding-left: 0.5em;
+	padding-right: 0.5em;
+	background-color: #E0DEFF;
+	border-top: solid 3px #a29bfe;
+}
+
+.method dt{
+	background-color: #F4F3FF;
+	border-top: solid 0px;
+	border-left: solid 3px #C0BBFF;
+}
+
+.sig-param{
+	color: #7f8c8d;
+}
+
+.property{
+	color: #B25CC7;
+}
+
+.sig-object{
+	color: #4674E1;
+}
+
+.viewcode-link{
+	color: #FF8265;
+}
+
+/* Default color?: #E84393 */
