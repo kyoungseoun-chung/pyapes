@@ -3,7 +3,6 @@
 import warnings
 from typing import Any
 from typing import Optional
-from typing import Union
 
 import torch
 
@@ -176,7 +175,6 @@ def fvm_div(var_i: Variables, var_j: Variables) -> list[Flux]:
 
     # Dimension check for the input Variables.
     if var_i != var_j:
-        from pyABC.tools.errors import SizeDoesNotMatchError
 
         msg = (
             "Two variables have different dimensions!\n"
@@ -184,7 +182,7 @@ def fvm_div(var_i: Variables, var_j: Variables) -> list[Flux]:
             f"- var_j: NX({var_j.NX}), DX({var_j.DX}) "
         )
 
-        raise SizeDoesNotMatchError(msg)
+        raise ValueError(msg)
 
     f_return = []
 

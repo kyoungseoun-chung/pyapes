@@ -67,10 +67,8 @@ class Variables:
         self.type = self.type.lower()
 
         if self.type not in VARIABLE_TYPES:
-            from pyABC.tools.errors import WrongInputError
-
             msg = f"Unsupported variable type! (self.type)"
-            raise WrongInputError(msg)
+            raise TypeError(msg)
 
         # Set VAR. If device is "cuda", use torch.Tensor else, np.ndarray
         if self.dim > 1:

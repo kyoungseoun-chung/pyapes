@@ -127,14 +127,12 @@ class Patch:
     def __post_init__(self):
 
         if len(self.config) != 3:
-            from pyABC.tools.errors import SizeDoesNotMatchError
-
             msg = (
                 "Seems like you are missing some configurations.\n"
                 "It should have name, type, geometry.\n"
                 f"Given config: {self.config}"
             )
-            raise SizeDoesNotMatchError(msg)
+            raise ValueError(msg)
 
         # Get name and type
         self.name = self.config["name"].lower()
@@ -170,10 +168,8 @@ class ImmersedBody:
         self.name = self.config["name"].lower()
         self.type = self.config["type"].lower()
 
-        from pyABC.tools.errors import FeatureNotImplementedError
-
         msg = "ImmersedBody is not implemented!!"
-        raise FeatureNotImplementedError(msg)
+        raise NotImplementedError(msg)
 
 
 BC_OBJECT_FACTORY = {
@@ -364,10 +360,8 @@ class Dirichlet(BC):
                     * self.bc_flux_dir
                 )
         else:
-            from pyABC.tools.errors import SizeDoesNotMatchError
-
             msg = f"Invalid amount of BCs given! len(self.bc_val) = {len(self.bc_val)}"
-            raise SizeDoesNotMatchError(msg)
+            raise ValueError(msg)
 
         return flux
 
@@ -445,7 +439,7 @@ class Neumann(BC):
             from pyABC.tools.errors import SizeDoesNotMatchError
 
             msg = f"Invalid amount of BCs given! len(self.bc_val) = {len(self.bc_val)}"
-            raise SizeDoesNotMatchError(msg)
+            raise ValueError(msg)
 
         return flux
 
@@ -580,13 +574,11 @@ def create_patch_mask(
 
     if len_bc != len_obj:
 
-        from pyABC.tools.errors import SizeDoesNotMatchError
-
         msg = (
             f"A number of objects ({len_obj}) does not match with "
             f"A number of BC defined ({len_bc})!"
         )
-        raise SizeDoesNotMatchError(msg)
+        raise ValueError(msg)
 
     mask_to_save = dict()
 
@@ -620,9 +612,7 @@ def create_patch_mask(
             mask = torch.from_numpy(mask).to(device)
         else:
             # <<< FUTURE PLAN
-            from pyABC.tools.errors import FeatureNotImplementedError
-
-            raise FeatureNotImplementedError("ImmersedBody BC")
+            raise NotImplementedError("ImmersedBody BC")
 
         # Save as sub dictionary
         # Should id be face dir?

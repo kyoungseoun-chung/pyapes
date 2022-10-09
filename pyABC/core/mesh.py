@@ -6,8 +6,6 @@ import rich.repr
 import torch
 
 from pyABC.core.fields import Variables
-from pyABC.tools.errors import SizeDoesNotMatchError
-from pyABC.tools.errors import WrongInputError
 from pyABC.tools.progress import RichPBar
 from pyABC.tools.utils import Container
 from pyABC.tools.utils import getsize
@@ -63,7 +61,7 @@ class Mesh:
                 f"Unsupported device is given: {self.device}. "
                 f"Should be one of {DEVICE_AVAILABLE}!"
             )
-            raise WrongInputError(msg)
+            raise ValueError(msg)
 
         self.lx = np.asarray(self.LX_max, dtype=np.float64) - np.asarray(
             self.LX_min, dtype=np.float64
@@ -158,7 +156,7 @@ class Mesh:
                     f"Unsupported object type! (given: {obj_type}). "
                     f"Should be one of {list(BC_OBJECT_FACTORY.keys())}"
                 )
-                WrongInputError(msg)
+                raise TypeError(msg)
 
             desc_mod = f"MESH: {obj_type} | {id}"
             pbar.set_description(desc_mod)
@@ -192,7 +190,7 @@ class Mesh:
                     f"({len(self.objs)})"
                 )
 
-                raise SizeDoesNotMatchError(msg)
+                raise ValueError(msg)
 
             self.vars[var_name] = Variables(
                 var_name,
@@ -224,7 +222,7 @@ class Mesh:
             return self.vars[name]
         else:
 
-            raise WrongInputError(f"Wrong variable name is given! {name}")
+            raise ValueError(f"Wrong variable name is given! {name}")
 
     def __rich_repr__(self) -> rich.repr.Result:
 
