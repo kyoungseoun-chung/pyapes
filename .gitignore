@@ -148,3 +148,4 @@ cython_debug/
 # Legacy files
 pyABC/legacy
 tests/test_data/
+tests/legacy/
