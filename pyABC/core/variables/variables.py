@@ -19,7 +19,9 @@ class Field:
     name: str
     dim: int
     mesh: Mesh
-    bc_config: Optional[dict[str, Optional[list[dict[str, Union[float, str]]]]]]
+    bc_config: Optional[
+        dict[str, Optional[list[dict[str, Union[float, str]]]]]
+    ]
     init_val: Optional[Union[int, float]] = None
     object_interp: bool = False
 

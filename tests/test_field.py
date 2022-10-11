@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Test mesh"""
-from typing import Optional, Union
+from typing import Optional
+from typing import Union
+
 import pytest
-from pyABC.core.geometry import Box
-from pyABC.core.mesh import Mesh
 import torch
 from torch import Tensor
+
+from pyABC.core.geometry import Box
+from pyABC.core.mesh import Mesh
 
 
 def create_test_field_bcs(
