@@ -49,6 +49,16 @@ class Field:
         self.set_bcs_and_masks()
 
     @property
+    def dx(self) -> Tensor:
+
+        return self.mesh.dx
+
+    @property
+    def nx(self) -> Tensor:
+
+        return self.mesh.nx
+
+    @property
     def VAR(self) -> Tensor:
         """Return working variable."""
         return self._VAR
@@ -78,7 +88,7 @@ class Field:
 
         return torch.sum(self.VAR, dim=dim)
 
-    def set_tensor_by_idx(
+    def set_var_tensor(
         self, val: Tensor, insert: Optional[int] = None
     ) -> None:
         """Set variable with a given Tensor.

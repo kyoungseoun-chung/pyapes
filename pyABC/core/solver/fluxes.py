@@ -7,46 +7,11 @@ import numpy as np
 import numpy.typing as npt
 import torch
 
+from pyABC.core.geometry.basis import FaceDir
+from pyABC.core.geometry.basis import NormalDir
+
 # Cubic cell
 N_FACE = 6
-
-
-class FaceDir(Enum):
-    w = 0
-    e = 1
-    n = 2
-    s = 3
-    f = 4
-    b = 5
-
-
-class Order:
-    def __call__(self, f: str):
-        return getattr(self, f)
-
-
-class _DimOrder(Order):
-    """Data index: Z - 2, Y - 1, X - 0"""
-
-    w = 2
-    e = 2
-    n = 0
-    s = 0
-    f = 1
-    b = 1
-
-
-class _NormalDir(Order):
-    w = -1
-    e = 1
-    n = 1
-    s = -1
-    f = 1
-    b = -1
-
-
-NormalDir = _NormalDir()
-DimOrder = _DimOrder()
 
 
 class Flux:

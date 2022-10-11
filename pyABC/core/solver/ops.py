@@ -7,13 +7,14 @@ from typing import Union
 
 import torch
 
-from pyABC.core.fields import Variables
-from pyABC.solver.fdm import Laplacian as FDM_Laplacian
-from pyABC.solver.fluxes import Flux
-from pyABC.solver.fvm import Ddt as FVM_Ddt
-from pyABC.solver.fvm import Div as FVM_Div
-from pyABC.solver.fvm import Grad as FVM_Grad
-from pyABC.solver.fvm import Laplacian as FVM_Laplacian
+from pyABC.core.solver.fdm import Discretizer as FDM_Discretizer
+from pyABC.core.solver.fdm import Laplacian as FDM_Laplacian
+from pyABC.core.solver.fluxes import Flux
+from pyABC.core.solver.fvm import Ddt as FVM_Ddt
+from pyABC.core.solver.fvm import Div as FVM_Div
+from pyABC.core.solver.fvm import Grad as FVM_Grad
+from pyABC.core.solver.fvm import Laplacian as FVM_Laplacian
+from pyABC.core.variables import Field
 
 
 @dataclass
@@ -26,17 +27,16 @@ class FVC:
 
     laplacian: FDM_Laplacian = FDM_Laplacian()
 
-    def solve(self, op: Variables) -> Variables:
-        """This do nothing. Just to avoid any confusion.
+    def set_eq(self, eq: FDM_Discretizer) -> Any:
+        """Assign variable to this object."""
 
-        For example:
-            >>> # Belows are identical
-            >>> fvc.solve(fvc.laplacian(var) == rhs)
-            >>> (fvc.laplacian(var) == rhs)
+        self.ops = eq
 
-        """
+        return self
 
-        return op
+    def solve(self) -> Field:
+
+        return self.ops.solve()
 
 
 @dataclass
@@ -61,7 +61,7 @@ class FVM:
     div: FVM_Div = FVM_Div()
     laplacian: FVM_Laplacian = FVM_Laplacian()
 
-    def set_eq(self, eq: Flux, dt_var: Variables) -> None:
+    def set_eq(self, eq: Flux, dt_var: Field) -> None:
         """Construct PDE to solve.
         (Acutally just store data for future self.solve function call)
 
@@ -76,21 +76,13 @@ class FVM:
         # Discretized fluxes
         self.eq = eq
 
-    def solve(self, op: Flux) -> Variables:
+    def solve(self, op: Flux) -> Field:
 
-        self.var.VAR = op.sum - self.rhs
-
-        return self.var
+        raise NotImplementedError
 
     def __eq__(self, rhs: Union[torch.Tensor, float]) -> Any:
 
-        if type(rhs) == float:
-
-            self.rhs = torch.zeros_like(self.var.VAR) + float
-
-        self.rhs = rhs
-
-        return self
+        raise NotImplementedError
 
 
 @dataclass

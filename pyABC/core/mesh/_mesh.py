@@ -135,8 +135,8 @@ class Mesh:
         return self._dx
 
     @property
-    def nx(self) -> list[int]:
-        return self._nx.tolist()
+    def nx(self) -> Tensor:
+        return self._nx
 
     @property
     def lower(self) -> Tensor:

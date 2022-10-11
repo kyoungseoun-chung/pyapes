@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Basis of geometries."""
+from enum import Enum
 from typing import Any
 
 
@@ -39,6 +40,15 @@ class _NormalDir(Order):
     s = -1
     f = 1
     b = -1
+
+
+class FaceDir(Enum):
+    w = 0
+    e = 1
+    n = 2
+    s = 3
+    f = 4
+    b = 5
 
 
 NormalDir = _NormalDir()
