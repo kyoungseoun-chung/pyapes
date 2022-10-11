@@ -1,4 +1,4 @@
-# THIS LIBRARY IS CURRENTLY BROKEN!! IT IS PRE-ALPHA STAGE! 
+# THIS LIBRARY IS CURRENTLY BROKEN!! IT IS PRE-ALPHA STAGE!
 # Python Awesome Basic Calculus: pyABC
 
 <img src="pyABC/assets/logo.png" width="150"/>

@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 from copy import copy
 from dataclasses import dataclass
-from typing import Any, Optional, Union
-from pyABC.core.mesh import Mesh, field_patch_mask
+from typing import Any
+from typing import Optional
+from typing import Union
 
 import torch
 from torch import Tensor
+
+from pyABC.core.boundaries import BC_TYPE_FACTORY
+from pyABC.core.mesh import field_patch_mask
+from pyABC.core.mesh import Mesh
 
 
 @dataclass
@@ -131,12 +136,12 @@ class Field:
 
                 # Need a way to syncronize the bcs and mask!
                 self.bcs.append(
-                    FIELD_BC_TYPE_FACTORY[bc["bc_type"]](
+                    BC_TYPE_FACTORY[bc["bc_type"]](
                         "domain",
                         bc_id=obj["name"],
                         bc_obj=bc["bc_obj"],
                         bc_val=bc["bc_val"],
-                        bc_var_name=self.v_name,
+                        bc_var_name=self.name,
                         bc_face=obj["geometry"]["face"],
                         dtype=self.mesh.dtype,
                         device=self.mesh.device,

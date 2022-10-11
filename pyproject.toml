@@ -1,11 +1,9 @@
 [tool.pytest.ini_options]
-filterwarnings = [
-    "ignore::DeprecationWarning:tensorboard[.*]",
-]
+filterwarnings = ["ignore::DeprecationWarning:tensorboard[.*]"]
 
 [tool.poetry]
 name = "pyabc"
-version = "0.1.0"
+version = "0.0.0"
 description = "Python Awesome Basic Calculus (PDE solver)"
 authors = ["Kyoungseoun Chung <kchung@student.ethz.ch>"]
 

@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-from typing import Optional, Union
+from typing import Optional
+from typing import Union
 
 import torch
 from torch import Tensor
 
-from pyABC.core.geometry import Geometry, GeoTypeIdentifier
-from pyABC.core.backend import (
-    DType,
-    TorchDevice,
-    DTYPE_DOUBLE,
-    DTYPE_SINGLE,
-    TORCH_DEVICE,
-)
+from pyABC.core.backend import DType
+from pyABC.core.backend import DTYPE_DOUBLE
+from pyABC.core.backend import DTYPE_SINGLE
+from pyABC.core.backend import TORCH_DEVICE
+from pyABC.core.backend import TorchDevice
+from pyABC.core.geometry import Geometry
+from pyABC.core.geometry import GeoTypeIdentifier
 
 
 class Mesh:
@@ -157,3 +157,93 @@ class Mesh:
     def is_cuda(self) -> bool:
         """True if cuda is available."""
         return self.device == torch.device("cuda")
+
+
+def field_patch_mask(mesh: Mesh) -> tuple[dict, dict]:
+    """Create a mask from the objects (self.mesh.objs).
+
+    Warning:
+        - Currently only works for the Patch. For the :py:class:`InnerObject`,
+          need separate treatment later
+
+    Returns
+        Created mask dictionary. Dictionary key is obj.id.
+
+    """
+    x = mesh.x
+    dx = mesh.dx
+    nx = mesh.nx
+    dim = mesh.dim
+
+    domain = mesh.domain.config
+    obstacle = mesh.obstacle
+
+    dtype = mesh.dtype
+    device = mesh.device
+
+    mask_to_save = dict()
+    obj_mask_sep = dict()
+
+    # Loop over patch objects
+    for obj in domain:
+
+        mask = torch.zeros(*nx, dtype=dtype.bool, device=device)
+        mask = get_patch_mask(x, dx, obj, mask, dim)
+
+        # Save as sub dictionary
+        # Should id be face dir?
+        mask_to_save["Domain-" + obj["name"]] = mask
+
+    if obstacle is not None:
+
+        raise NotImplementedError(
+            "field_path_mask: inner obstacle is not supported yet!"
+        )
+
+    return mask_to_save, obj_mask_sep
+
+
+def get_patch_mask(
+    x: list[Tensor],
+    dx: Tensor,
+    obj: dict,
+    mask: Tensor,
+    dim: int,
+) -> Tensor:
+    """Get patch mask."""
+
+    _nx = torch.zeros(dim, dtype=torch.long)
+    _ix = torch.zeros_like(_nx)
+
+    x_p = obj["geometry"]["x_p"]
+    e_x = obj["geometry"]["e_x"]
+
+    for i in range(dim):
+        x_p[i] = x[i][torch.argmin(abs(x[i] - x_p[i]))]
+        _nx[i] = torch.ceil(e_x[i] / dx[i]).type(torch.long) + 1
+        _ix[i] = torch.argmin(abs(x[i] - x_p[i]))
+
+    mask = _assign_mask(mask, _ix, _nx, dim)
+
+    return mask
+
+
+def _assign_mask(mask: Tensor, ix: Tensor, nx: Tensor, dim: int) -> Tensor:
+
+    if dim == 1:
+        mask[
+            ix[0] : ix[0] + nx[0],
+        ] = True
+    elif dim == 2:
+        mask[
+            ix[0] : ix[0] + nx[0],
+            ix[1] : ix[1] + nx[1],
+        ] = True
+    else:
+        mask[
+            ix[0] : ix[0] + nx[0],
+            ix[1] : ix[1] + nx[1],
+            ix[2] : ix[2] + nx[2],
+        ] = True
+
+    return mask
