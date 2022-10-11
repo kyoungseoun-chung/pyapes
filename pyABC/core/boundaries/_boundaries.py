@@ -16,7 +16,6 @@ from typing import Union
 import torch
 from torch import Tensor
 
-from ._boundaries import BC
 from pyABC.core.backend import DType
 from pyABC.core.geometry.basis import DimOrder
 from pyABC.core.geometry.basis import NormalDir

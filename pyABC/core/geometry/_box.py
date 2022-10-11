@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Box geometry."""
 #!/usr/bin/env python3
-from pyABC.core.geometry import Geometry
+from pyABC.core.geometry.basis import Geometry
 
 
 BOX_DIM = [1, 2, 3]

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from copy import copy
+import copy
 from dataclasses import dataclass
 from typing import Any
 from typing import Optional
@@ -19,8 +19,8 @@ class Field:
     name: str
     dim: int
     mesh: Mesh
-    bc_config: Optional[dict[str, dict[str, float]]]
-    init_val: Optional[Union[int, float]]
+    bc_config: Optional[dict[str, Optional[list[dict[str, Union[float, str]]]]]]
+    init_val: Optional[Union[int, float]] = None
     object_interp: bool = False
 
     def __post_init__(self):
@@ -60,6 +60,47 @@ class Field:
 
         return copy.deepcopy(self)
 
+    @property
+    def size(self) -> torch.Size:
+        """Return self.VAR size. Return time is torch.Size which is subclass of
+        `tuple`."""
+
+        return self.VAR.size()
+
+    def sum(self, dim: int = 0) -> Tensor:
+        """Sum variable.
+
+        Args:
+            dim: dimesnion of the tensor to apply the sum operation. Defaults to 0.
+        """
+
+        return torch.sum(self.VAR, dim=dim)
+
+    def set_tensor_by_idx(
+        self, val: Tensor, insert: Optional[int] = None
+    ) -> None:
+        """Set variable with a given Tensor.
+
+        Examples:
+            >>> field = Field(...)
+            >>> field.set_var_tensor(torch.rand(10, 10))
+
+        Args:
+            val: given values to be assigned.
+            insert: inserting index. If this is specified, val is inserted
+                    at `val[i==insert]`.
+        """
+
+        if self.size == val.shape:
+            self._VAR = val
+        else:
+            for i in range(self.dim):
+                if insert is not None:
+                    if i == insert:
+                        self._VAR[i] = val
+                else:
+                    self._VAR[i] = val
+
     def __getitem__(self, idx: Union[int, slice]) -> torch.Tensor:
 
         if isinstance(idx, slice):
@@ -76,7 +117,26 @@ class Field:
 
         if isinstance(other, Field):
             self.VAR += other()
+        elif isinstance(other, float):
+            self.VAR += other
+        elif isinstance(other, list):
+
+            assert (
+                len(other) == self.dim
+            ), "Field: input vector should match with Field dimension!"
+
+            for i in range(self.dim):
+                self.VAR[i] += other[i]
+
+        elif isinstance(other, Tensor):
+
+            if other.size(0) == self.dim:
+                self.VAR = other
+            else:
+                for i in range(other.size(0)):
+                    self.VAR[i] += other[i]
         else:
+
             raise TypeError("Field: you can only add Field!")
 
         return self.copy()
@@ -110,13 +170,6 @@ class Field:
 
         return self.copy()
 
-    def add_scalar(self, idx: int, new_val: float) -> None:
-
-        if isinstance(idx, slice):
-            self.VAR += new_val
-        else:
-            self.VAR[idx] += new_val
-
     def set_bcs_and_masks(self) -> None:
         """Setting BCs from the given configurations.
         If there is no `Mesh.config.objs`, it will set `bcs` and `masks` to
@@ -129,26 +182,31 @@ class Field:
 
         # Setting boundary objects
         if self.bc_config is not None:
+
             # First domain
-            for bc, obj in zip(
-                self.bc_config["domain"], self.mesh.domain.config
-            ):
+            if self.bc_config["domain"] is not None:
+                for bc, obj in zip(
+                    self.bc_config["domain"], self.mesh.domain.config
+                ):
 
-                # Need a way to syncronize the bcs and mask!
-                self.bcs.append(
-                    BC_TYPE_FACTORY[bc["bc_type"]](
-                        "domain",
-                        bc_id=obj["name"],
-                        bc_obj=bc["bc_obj"],
-                        bc_val=bc["bc_val"],
-                        bc_var_name=self.name,
-                        bc_face=obj["geometry"]["face"],
-                        dtype=self.mesh.dtype,
-                        device=self.mesh.device,
+                    # Need a way to syncronize the bcs and mask!
+                    self.bcs.append(
+                        BC_TYPE_FACTORY[str(bc["bc_type"])](
+                            "domain",
+                            bc_id=obj["name"],
+                            bc_obj=bc["bc_obj"],
+                            bc_val=bc["bc_val"],
+                            bc_var_name=self.name,
+                            bc_face=obj["geometry"]["face"],
+                            dtype=self.mesh.dtype,
+                            device=self.mesh.device,
+                        )
                     )
-                )
 
-            if self.mesh.obstacle is not None:
+            if (
+                self.mesh.obstacle is not None
+                and self.bc_config["obstacle"] is not None
+            ):
                 raise NotImplementedError(
                     "Field: inner object is not supported yet!"
                 )

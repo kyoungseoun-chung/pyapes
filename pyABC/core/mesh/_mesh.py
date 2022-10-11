@@ -10,7 +10,7 @@ from pyABC.core.backend import DTYPE_DOUBLE
 from pyABC.core.backend import DTYPE_SINGLE
 from pyABC.core.backend import TORCH_DEVICE
 from pyABC.core.backend import TorchDevice
-from pyABC.core.geometry import Geometry
+from pyABC.core.geometry.basis import Geometry
 from pyABC.core.geometry import GeoTypeIdentifier
 
 
