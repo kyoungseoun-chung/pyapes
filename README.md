@@ -53,23 +53,23 @@ python3 -m pip install -e ./
 ## Features
 - PDE solvers
 	- [ ] Navier-Stokes equation at low Reynolds numbers
-	- [ ] Convection equation
-	- [ ] Diffusion equation
-	- [x] Poisson equation (FDM manner. Working on FVM)
-		- Jacobi and Conjugated Gradient (CG) solver
+		- [ ] Convection equation
+		- [ ] Diffusion equation
+    	- [x] Poisson equation (FDM manner. Working on FVM)
+		- Supports Jacobi, Conjugated gradient (CG), CG-Newton, and Gauss-Seidel (need verification) method.
 - Finite Volume Mesh:
 	- [x] Easy mesh creation and definition of boundary conditions
-	- [x] Spatial discretization
+	- [ ] Spatial discretization
 		- `Grad`, `Laplacian`, `Div`
 	- [ ] Time discretization
 		- Forward/backward Euler and Crank-Nicolson
 	- [ ] Flux limiters
 	- [ ] Immersed body
 
-## TODOs
+## TO-DOs
 
 - Slimmer dependency
-	- [ ] Remove unnecessary dependencies
+	- [x] Remove unnecessary dependencies
 - Refactoring the code:
 	- [ ] Make it more concise and intuitive
 	- [ ] Better data structure
