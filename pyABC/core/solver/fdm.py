@@ -521,8 +521,7 @@ def _apply_bc_otf(var: Field, var_t: Tensor, mesh: Mesh) -> Tensor:
         if mesh.obstacle is not None:
             # Fill zero to inner obstacle
             # Loop over inner object and assign values
-            for m, v in zip(var.mask_inner, var.obj_inner_interp):
-                var_t[0][var.mask_inner[m]] = v
+            raise NotImplementedError
 
         # Apply BC
         for bc, m in zip(var.bcs, var.masks):

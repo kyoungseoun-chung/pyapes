@@ -14,7 +14,7 @@ from pyABC.core.geometry.basis import NormalDir
 N_FACE = 6
 
 
-class Flux:
+class FluxO:
     """Flux object.
 
     Note:

@@ -21,7 +21,7 @@ class Mesh:
         self,
         domain: Geometry,
         obstacle: Optional[list[Geometry]],
-        spacing: list[Union[int, float]] = [],
+        spacing: Union[list[int], list[float]] = [],
         device: str = "cpu",
         dtype: Union[str, int] = "double",
     ):

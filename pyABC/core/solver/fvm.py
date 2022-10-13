@@ -1,16 +1,27 @@
 #!/usr/bin/env python3
 """Discretization using finite volume methodology (FVM) """
 from typing import Any
+from typing import NewType
 
 import torch
+from torch import Tensor
 
-from pyABC.core.geometry.basis import DimOrder
-from pyABC.core.geometry.basis import FaceDir
-from pyABC.core.geometry.basis import NormalDir
-from pyABC.core.solver.fluxes import Flux
 from pyABC.core.variables import Field
 
 DIR = ["x", "y", "z"]
+
+# New flux type
+
+
+class Flux(dict):
+    """Flux container. To distinguis leading index and other index, leading is int and other is str."""
+
+    def add(self, i: int, j: int, T: Tensor):
+        super().__setitem__(i, {DIR[j]: T})
+
+    def __call__(self, i: int, j: str):
+        grad_i = super().__getitem__(i)
+        return grad_i[j]
 
 
 class Discretizer:
@@ -23,7 +34,7 @@ class Discretizer:
     """
 
     # Class member
-    flux: list[Flux]
+    flux: Flux
     flux_total: list
 
     def set_config(self, config: dict):
@@ -60,7 +71,7 @@ class Grad(Discretizer):
         var: Variables to be solved ($\Phi$)
     """
 
-    def __call__(self, var: Field) -> Any:
+    def __call__(self, var: Field) -> Flux:
 
         self.flux = fvm_grad(var)
 
@@ -70,7 +81,7 @@ class Grad(Discretizer):
 class Div(Discretizer):
     """Divergence"""
 
-    def __call__(self, var_i: Field, var_j: Field) -> list[Flux]:
+    def __call__(self, var_i: Field, var_j: Field) -> Flux:
 
         self.flux = fvm_div(var_i, var_j)
 
@@ -80,14 +91,12 @@ class Div(Discretizer):
 class Laplacian(Discretizer):
     """Laplacian"""
 
-    def __call__(self, coeffs: float, var: Field) -> list[Flux]:
+    def __call__(self, coeffs: float, var: Field) -> Flux:
 
-        self.flux = fvm_laplacian(coeffs, var)
-
-        return self.flux
+        raise NotImplementedError
 
 
-def fvm_grad(var: Field) -> list[Flux]:
+def fvm_grad(var: Field) -> Flux:
     r"""Variable discretization: Gradient
 
     .. math::
@@ -98,28 +107,38 @@ def fvm_grad(var: Field) -> list[Flux]:
 
         >>> # Gradient of scalar field
         >>> res = fvm_grad(phi)
-        >>> res[0].x    # dphi/dx_1
+        >>> res(0, "x")    # dphi/dx_1
         >>> # Gradient of vector field
         >>> res = fvm_grad(u)
-        >>> res[0].x    # du_1/dx_1
+        >>> res(0, "x")    # du_1/dx_1
 
     Args:
         var: Variable object to be discretized ($\Phi$).
             - If var.bcs is None, Grad operation is done by finite difference method.
 
     Returns:
-        List of Flux object contains gradient of `var`.
-        If `var.type == "scalar"`, `len(list[Flux]) == 1`,
-        and `var.type == "vector"`, `len(list[Flux]) == 3`.
-
+        dictionary contains gradient of `var`.
     """
 
-    f_return = []
+    dx = var.mesh.dx
 
-    raise NotImplementedError
+    grad = Flux()
+
+    for i in range(var.dim):
+
+        for j in range(var.dim):
+
+            grad.add(
+                i,
+                j,
+                (torch.roll(var()[i], -1, j) - torch.roll(var()[i], 1, j))
+                / (2 * dx[j]),
+            )
+
+    return grad
 
 
-def fvm_div(var_i: Field, var_j: Field) -> list[Flux]:
+def fvm_div(var_i: Field, var_j: Field) -> Flux:
     r"""Divergence operator.
 
     .. math::
@@ -154,22 +173,15 @@ def fvm_div(var_i: Field, var_j: Field) -> list[Flux]:
         :attr:`var_j.NX, var_j.DX` are not equal.
     """
 
+    dim_i = var_i.dim
+    dim_j = var_j.dim
+
+    grad_j = fvm_grad(var_j)
+
     raise NotImplementedError
 
 
-def _assign_flux(f_set: list[Flux]) -> Flux:
-    """Add all flux stored in the list."""
-
-    flux_sum = f_set[0].copy_reset()
-
-    flux_sum.x = f_set[0].x
-    flux_sum.y = f_set[1].y
-    flux_sum.z = f_set[2].z
-
-    return flux_sum
-
-
-def fvm_laplacian(coeff: float, var: Field) -> list[Flux]:
+def fvm_laplacian(coeff: float, var: Field) -> Flux:
     r"""Variable discretization: Laplacian
 
     .. math::
@@ -204,7 +216,7 @@ def fvm_laplacian(coeff: float, var: Field) -> list[Flux]:
     raise NotImplementedError
 
 
-def _flux_linear(flux: Flux, f_var: torch.Tensor) -> Flux:
+def _flux_linear(flux: Flux, f_var: Tensor) -> Flux:
     r"""Linear interpolation of the flux from the node values.
 
     .. math:
@@ -216,17 +228,7 @@ def _flux_linear(flux: Flux, f_var: torch.Tensor) -> Flux:
         f_var: field values at the cell center
     """
 
-    for f in FaceDir:
-
-        flux.faces[f.value] = (
-            0.5
-            * (f_var + torch.roll(f_var, -NormalDir(f.name), DimOrder(f.name)))
-            * flux.surface[f.value]
-            * flux.normal[f.value]
-            / flux.vol
-        )
-
-    return flux
+    raise NotImplementedError
 
 
 def _fvm_i_bc_apply(var: Field, flux: Flux, type: str = "grad") -> Flux:
@@ -240,24 +242,4 @@ def _fvm_i_bc_apply(var: Field, flux: Flux, type: str = "grad") -> Flux:
         Boundary assigned Flux
     """
 
-    if var.bcs is None:
-        # Assume periodic
-        pass
-    else:
-        # Apply Bcs
-        for id, bc in enumerate(var.bcs):
-
-            face_dir = getattr(FaceDir, bc.bc_face)
-            flux_at_bc = getattr(flux, bc.bc_face)
-            mask_at_bc = var.masks[id]
-
-            bc.apply(
-                mask_at_bc,
-                flux_at_bc,
-                flux.surface[face_dir.value],
-                flux.vol,
-                var(),
-                type,
-            )
-
-    return flux
+    raise NotImplementedError

@@ -9,7 +9,6 @@ import torch
 
 from pyABC.core.solver.fdm import Discretizer as FDM_Discretizer
 from pyABC.core.solver.fdm import Laplacian as FDM_Laplacian
-from pyABC.core.solver.fluxes import Flux
 from pyABC.core.solver.fvm import Ddt as FVM_Ddt
 from pyABC.core.solver.fvm import Div as FVM_Div
 from pyABC.core.solver.fvm import Grad as FVM_Grad

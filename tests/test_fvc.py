@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Test fvc (finite difference - volume centered) solver module."""
-import torch
-import pytest
-from pyABC.core.geometry import Box
-from pyABC.core.variables import Field
-from pyABC.core.solver.ops import Solver
-from pyABC.core.mesh import Mesh
 from math import pi
+
+import pytest
+import torch
+
+from pyABC.core.geometry import Box
+from pyABC.core.mesh import Mesh
+from pyABC.core.solver.ops import Solver
+from pyABC.core.variables import Field
 
 
 @pytest.mark.parametrize(
