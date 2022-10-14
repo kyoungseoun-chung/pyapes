@@ -15,6 +15,19 @@ from pyABC.core.mesh import Mesh
 
 @dataclass
 class Field:
+    """Field variable class.
+
+    >>> var = Field(...)
+
+    Args:
+        name: name of variable.
+        dim: dimension of variable. 0 to be a scalar.
+        mesh: Mesh object.
+        bc_config: dictionary contains boundary conditions.
+        init_val: if it is given, Field will be homogeneously initialize with this valeu.
+        object_interp: if True, interpolate inside of object using the boundary value of the object.
+
+    """
 
     name: str
     dim: int

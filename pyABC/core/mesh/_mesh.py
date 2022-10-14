@@ -51,22 +51,18 @@ class Mesh:
 
         if int in GeoTypeIdentifier(spacing):
             # Node information
-            self._nx = torch.tensor(
-                spacing,
-                dtype=self.dtype.int,
-                device=self.device.type,
-                requires_grad=False,
-            )
-            self._dx = self._lx / (self._nx.type(self.dtype.float) - 1.0)
+            self._nx: list[int] = [int(s) for s in spacing]
+            self._dx: list[float] = [
+                float(l / (n - 1.0)) for l, n in zip(self._lx, self._nx)
+            ]
+
         elif float in GeoTypeIdentifier(spacing):
             # Node information
-            self._dx = torch.tensor(
-                spacing,
-                dtype=self.dtype.float,
-                device=self.device,
-                requires_grad=False,
-            )
-            self._nx = (self._lx / self._dx + 1).type(self.dtype.int)
+            self._dx: list[float] = [float(s) for s in spacing]
+            self._nx: list[int] = [
+                int(l / d + 1.0) for l, d in zip(self._lx, self._dx)
+            ]
+
         else:
             raise TypeError("Mesh: spacing only accept int or float")
 
@@ -77,12 +73,13 @@ class Mesh:
                 torch.linspace(
                     self.lower[i].item(),
                     self.upper[i].item(),
-                    int(self.nx[i]),
+                    self.nx[i],
                     dtype=self.dtype.float,
                     device=self.device,
                 )
             )
 
+        pass
         # Mesh grid
         self.grid = torch.meshgrid(self.x, indexing="ij")
 
@@ -100,7 +97,7 @@ class Mesh:
         return (
             self.grid[1]
             if self.dim > 1
-            else torch.tensor([], dtype=self.dtype.float)
+            else torch.tensor([], dtype=self.dtype.float, device=self.device)
         )
 
     @property
@@ -109,14 +106,20 @@ class Mesh:
         return (
             self.grid[2]
             if self.dim > 2
-            else torch.tensor([], dtype=self.dtype.float)
+            else torch.tensor([], dtype=self.dtype.float, device=self.device)
         )
 
     @property
     def N(self) -> int:
         """Return total number of grid points."""
 
-        return int(torch.prod(self._nx, dtype=self.dtype.int))
+        return int(
+            torch.prod(
+                torch.tensor(
+                    self._nx, dtype=self.dtype.int, device=self.device
+                )
+            )
+        )
 
     @property
     def size(self) -> float:
@@ -132,11 +135,13 @@ class Mesh:
     @property
     def dx(self) -> Tensor:
         """Mesh spacing."""
-        return self._dx
+        return torch.tensor(
+            self._dx, dtype=self.dtype.float, device=self.device
+        )
 
     @property
-    def nx(self) -> Tensor:
-        return self._nx
+    def nx(self) -> torch.Size:
+        return torch.Size(self._nx)
 
     @property
     def lower(self) -> Tensor:
