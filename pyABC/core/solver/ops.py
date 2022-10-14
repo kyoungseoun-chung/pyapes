@@ -11,6 +11,7 @@ from pyABC.core.solver.fdm import Discretizer as FDM_Discretizer
 from pyABC.core.solver.fdm import Laplacian as FDM_Laplacian
 from pyABC.core.solver.fvm import Ddt as FVM_Ddt
 from pyABC.core.solver.fvm import Div as FVM_Div
+from pyABC.core.solver.fvm import Flux
 from pyABC.core.solver.fvm import Grad as FVM_Grad
 from pyABC.core.solver.fvm import Laplacian as FVM_Laplacian
 from pyABC.core.variables import Field
@@ -60,7 +61,7 @@ class FVM:
     div: FVM_Div = FVM_Div()
     laplacian: FVM_Laplacian = FVM_Laplacian()
 
-    def set_eq(self, eq: Flux, dt_var: Field) -> None:
+    def set_lhs(self, eq: Flux, dt_var: Field) -> None:
         """Construct PDE to solve.
         (Acutally just store data for future self.solve function call)
 

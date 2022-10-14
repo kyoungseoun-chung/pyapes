@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Discretization using finite volume methodology (FVM) """
 from typing import Any
-from typing import NewType
 
 import torch
 from torch import Tensor
@@ -9,19 +8,81 @@ from torch import Tensor
 from pyABC.core.variables import Field
 
 DIR = ["x", "y", "z"]
+FDIR = ["xl", "xr", "yl", "yr", "zl", "zr"]
 
-# New flux type
+DIR_TO_NUM: dict[str, int] = {"x": 0, "y": 1, "z": 2}
 
 
-class Flux(dict):
-    """Flux container. To distinguis leading index and other index, leading is int and other is str."""
+class Flux:
+    """Flux container.
 
-    def add(self, i: int, j: int, T: Tensor):
-        super().__setitem__(i, {DIR[j]: T})
+    Note:
+        - To distinguis leading index and other index, leading is int and other is str.
+
+    >>> flux_tensor = torch.tensor(...)
+    >>> flux = Flux()
+    >>> flux.add(i, j, flux_tensor)  # j -> DIR[j] -> "x" or "y" or "z", i -> 0 or 1 or 2.
+    >>> flux(0, "x")  # return flux_tensor
+    """
+
+    _center: dict[int, dict[str, Tensor]] = {}
+    _face: dict[int, dict[str, dict[str, Tensor]]] = {}
+
+    def to_center(self, i: int, j: str, T: Tensor):
+        """Add centervalued as dictionary."""
+
+        try:
+            self._center[i][j] = T
+        except KeyError:
+            self._center.update({i: {j: T}})
 
     def __call__(self, i: int, j: str):
-        grad_i = super().__getitem__(i)
-        return grad_i[j]
+        """Return flux values with parentheses."""
+
+        if j in DIR:
+            val = self._center[i]
+        else:
+            val = self._face[i]
+
+        return val[j]
+
+    @property
+    def c_idx(self) -> tuple[list[int], list[str]]:
+
+        idx_i = list(self._center.keys())
+        idx_j = list(self._center[0].keys())
+
+        return (idx_i, idx_j)
+
+    def face(self, i: int, f_idx: str) -> Tensor:
+
+        assert f_idx in FDIR, f"Flux: face index should be one of {FDIR}!"
+
+        return self._face[i][f_idx[0]][f_idx[1]]
+
+    def to_face(self, dx: Tensor) -> None:
+
+        idx = self.c_idx
+
+        for i in idx[0]:
+            for j in idx[1]:
+
+                vc = self._center[i][j]
+                vl = (torch.roll(vc, 1, DIR_TO_NUM[j]) + vc) / (
+                    2 * dx[DIR_TO_NUM[j]]
+                )
+                vr = (torch.roll(vc, -1, DIR_TO_NUM[j]) + vc) / (
+                    2 * dx[DIR_TO_NUM[j]]
+                )
+
+                if i in self._face:
+                    if j in self._face[i]:
+                        self._face[i][j]["l"] = vl
+                        self._face[i][j]["r"] = vr
+                    else:
+                        self._face[i].update({j: {"l": vl, "r": vr}})
+                else:
+                    self._face.update({i: {j: {"l": vl, "r": vr}}})
 
 
 class Discretizer:
@@ -83,7 +144,7 @@ class Div(Discretizer):
 
     def __call__(self, var_i: Field, var_j: Field) -> Flux:
 
-        self.flux = fvm_div(var_i, var_j)
+        div = fvm_div(var_i, var_j)
 
         return self.flux
 
@@ -128,9 +189,9 @@ def fvm_grad(var: Field) -> Flux:
 
         for j in range(var.dim):
 
-            grad.add(
+            grad.to_center(
                 i,
-                j,
+                DIR[j],
                 (torch.roll(var()[i], -1, j) - torch.roll(var()[i], 1, j))
                 / (2 * dx[j]),
             )
