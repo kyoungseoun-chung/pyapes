@@ -31,8 +31,8 @@ def test_grad(domain: Box, spacing: list[int], dim: int) -> None:
 
     res = fvm_grad(var)
 
-    assert res.index[0] == [*range(dim)]
-    assert res.index[1] == [DIR[i] for i in range(dim)]
+    assert res.c_idx[0] == [*range(dim)]
+    assert res.c_idx[1] == [DIR[i] for i in range(dim)]
 
     if dim == 1:
         torch.testing.assert_close(res(0, "x")[1:-1], 2 * mesh.X[1:-1])
@@ -44,3 +44,23 @@ def test_grad(domain: Box, spacing: list[int], dim: int) -> None:
         torch.testing.assert_allclose(
             res(0, "z")[1:-1, 1:-1, 1:-1], 2 * mesh.Z[1:-1, 1:-1, 1:-1]
         )
+
+
+@pytest.mark.parametrize(
+    ("domain", "spacing", "dim"),
+    [
+        (Box[0:1], [5], 1),
+        (Box[0:1, 0:1], [5, 5], 2),
+        (Box[0:1, 0:1, 0:1], [5, 5, 5], 3),
+    ],
+)
+def test_div(domain: Box, spacing: list[int], dim: int) -> None:
+    from pyABC.core.solver.fvm import Div
+
+    mesh = Mesh(domain, None, spacing)
+    var = Field("", dim, mesh, None)
+
+    div = Div()
+
+    flux = div(var, var)
+    pass

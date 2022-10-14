@@ -36,15 +36,14 @@ class Flux:
         except KeyError:
             self._center.update({i: {j: T}})
 
-    def __call__(self, i: int, j: str):
+    def __call__(self, i: int, j: str) -> Tensor:
         """Return flux values with parentheses."""
 
         if j in DIR:
-            val = self._center[i]
+            return self._center[i][j]
         else:
-            val = self._face[i]
-
-        return val[j]
+            assert j in FDIR, f"Flux: face index should be one of {FDIR}"
+            return self._face[i][j[0]][j[1]]
 
     @property
     def c_idx(self) -> tuple[list[int], list[str]]:
@@ -60,29 +59,15 @@ class Flux:
 
         return self._face[i][f_idx[0]][f_idx[1]]
 
-    def to_face(self, dx: Tensor) -> None:
+    def to_face(self, i: int, j: str, f: str, T: Tensor) -> None:
 
-        idx = self.c_idx
-
-        for i in idx[0]:
-            for j in idx[1]:
-
-                vc = self._center[i][j]
-                vl = (torch.roll(vc, 1, DIR_TO_NUM[j]) + vc) / (
-                    2 * dx[DIR_TO_NUM[j]]
-                )
-                vr = (torch.roll(vc, -1, DIR_TO_NUM[j]) + vc) / (
-                    2 * dx[DIR_TO_NUM[j]]
-                )
-
-                if i in self._face:
-                    if j in self._face[i]:
-                        self._face[i][j]["l"] = vl
-                        self._face[i][j]["r"] = vr
-                    else:
-                        self._face[i].update({j: {"l": vl, "r": vr}})
-                else:
-                    self._face.update({i: {j: {"l": vl, "r": vr}}})
+        if i in self._face:
+            if j in self._face[i]:
+                self._face[i][j][f] = T
+            else:
+                self._face[i].update({j: {f: T}})
+        else:
+            self._face.update({i: {j: {f: T}}})
 
 
 class Discretizer:
@@ -144,9 +129,26 @@ class Div(Discretizer):
 
     def __call__(self, var_i: Field, var_j: Field) -> Flux:
 
-        div = fvm_div(var_i, var_j)
+        flux = Flux()
 
-        return self.flux
+        for i in range(var_i.dim):
+            for j in range(var_j.dim):
+
+                vi_c = var_i()
+                vj_c = var_j()
+
+                fl = (torch.roll(vj_c, 1, j) * vi_c + vj_c * vi_c) / (
+                    2 * var_j.dx[j]
+                )
+                flux.to_face(i, DIR[j], "l", fl)
+
+                fr = (torch.roll(vj_c, -1, j) * vi_c + vj_c * vi_c) / (
+                    2 * var_j.dx[j]
+                )
+                flux.to_face(i, DIR[j], "r", fr)
+
+        # Apply bc later on...
+        return flux
 
 
 class Laplacian(Discretizer):
