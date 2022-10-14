@@ -56,6 +56,9 @@ class FVM:
         grad: Gradient Loperator. Used to solve the Poisson equation.
     """
 
+    # operations are added in dictionary. But how?
+    ops: dict[str, Flux]
+
     ddt: FVM_Ddt = FVM_Ddt()
     grad: FVM_Grad = FVM_Grad()
     div: FVM_Div = FVM_Div()

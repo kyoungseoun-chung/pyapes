@@ -17,7 +17,7 @@ from pyABC.core.variables import Field
 )
 def test_grad(domain: Box, spacing: list[int], dim: int) -> None:
 
-    from pyABC.core.solver.fvm import fvm_grad, DIR
+    from pyABC.core.solver.fvm import Grad, DIR
 
     mesh = Mesh(domain, None, spacing)
     var = Field("", dim, mesh, None)
@@ -29,6 +29,7 @@ def test_grad(domain: Box, spacing: list[int], dim: int) -> None:
     else:
         var.set_var_tensor(mesh.Z**2)
 
+    fvm_grad = Grad()
     res = fvm_grad(var)
 
     assert res.c_idx[0] == [*range(dim)]
@@ -59,8 +60,12 @@ def test_div(domain: Box, spacing: list[int], dim: int) -> None:
 
     mesh = Mesh(domain, None, spacing)
     var = Field("", dim, mesh, None)
+    var.set_var_tensor(var.mesh.X)
 
     div = Div()
 
-    flux = div(var, var)
+    flux = div(var, var).flux
+    flux *= -1
+
+    op_sum = div(var, var) + div(var, var) + div(var, var)
     pass

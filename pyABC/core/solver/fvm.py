@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Discretization using finite volume methodology (FVM) """
 from typing import Any
+from typing import Union
 
 import torch
 from torch import Tensor
@@ -69,6 +70,17 @@ class Flux:
         else:
             self._face.update({i: {j: {f: T}}})
 
+    def __mul__(self, coeff: float) -> Any:
+        """Multiply coeffcient to the flux"""
+
+        for i in self._face:
+            for j in self._face[i]:
+
+                self._face[i][j]["l"] *= coeff
+                self._face[i][j]["r"] *= coeff
+
+        return self
+
 
 class Discretizer:
     """Base class of FVM discretization.
@@ -81,26 +93,36 @@ class Discretizer:
 
     # Class member
     flux: Flux
-    flux_total: list
+    ops: dict[int, dict[str, Union[Flux, str]]] = {}
 
     def set_config(self, config: dict):
 
         self.config = config
 
-    # <<<<<<<<<<<<<<<<<<< NOT SURE <<<<<<<<<<<<<<<<<<<<<<<<
-    def __add__(self, op: Any) -> Any:
+    def __add__(self, other: Any) -> Any:
 
-        self.flux_total.append(op.flux)
+        # order of multiple add?
+        self.ops.update(
+            {0: {"flux": self.flux, "op": self.__class__.__name__}}
+        )
+
+        idx = list(self.ops.keys())
+        self.ops.update(
+            {idx[-1] + 1: {"flux": other.flux, "op": other.__class__.__name__}}
+        )
 
         return self
 
-    def __sub__(self, op: Any) -> Any:
+    def __sub__(self, other: Any) -> Any:
 
-        self.flux_total.append(-op.flux)
+        idx = list(self.ops.keys())
+
+        if len(idx) == 0:
+            self.ops.update({0: -1 * other.flux})
+        else:
+            self.ops.update({idx[-1] + 1: -1 * other.flux})
 
         return self
-
-    # <<<<<<<<<<<<<<<<<<< NOT SURE <<<<<<<<<<<<<<<<<<<<<<<<
 
 
 class Ddt(Discretizer):
@@ -112,54 +134,6 @@ class Ddt(Discretizer):
 
 
 class Grad(Discretizer):
-    r"""Finite volume operator for the gradient.
-    Args:
-        var: Variables to be solved ($\Phi$)
-    """
-
-    def __call__(self, var: Field) -> Flux:
-
-        self.flux = fvm_grad(var)
-
-        return self.flux
-
-
-class Div(Discretizer):
-    """Divergence"""
-
-    def __call__(self, var_i: Field, var_j: Field) -> Flux:
-
-        flux = Flux()
-
-        for i in range(var_i.dim):
-            for j in range(var_j.dim):
-
-                vi_c = var_i()
-                vj_c = var_j()
-
-                fl = (torch.roll(vj_c, 1, j) * vi_c + vj_c * vi_c) / (
-                    2 * var_j.dx[j]
-                )
-                flux.to_face(i, DIR[j], "l", fl)
-
-                fr = (torch.roll(vj_c, -1, j) * vi_c + vj_c * vi_c) / (
-                    2 * var_j.dx[j]
-                )
-                flux.to_face(i, DIR[j], "r", fr)
-
-        # Apply bc later on...
-        return flux
-
-
-class Laplacian(Discretizer):
-    """Laplacian"""
-
-    def __call__(self, coeffs: float, var: Field) -> Flux:
-
-        raise NotImplementedError
-
-
-def fvm_grad(var: Field) -> Flux:
     r"""Variable discretization: Gradient
 
     .. math::
@@ -183,28 +157,28 @@ def fvm_grad(var: Field) -> Flux:
         dictionary contains gradient of `var`.
     """
 
-    dx = var.mesh.dx
+    def __call__(self, var: Field) -> Flux:
 
-    grad = Flux()
+        dx = var.mesh.dx
 
-    for i in range(var.dim):
+        grad = Flux()
 
-        for j in range(var.dim):
+        for i in range(var.dim):
 
-            grad.to_center(
-                i,
-                DIR[j],
-                (torch.roll(var()[i], -1, j) - torch.roll(var()[i], 1, j))
-                / (2 * dx[j]),
-            )
+            for j in range(var.dim):
 
-    return grad
+                grad.to_center(
+                    i,
+                    DIR[j],
+                    (torch.roll(var()[i], -1, j) - torch.roll(var()[i], 1, j))
+                    / (2 * dx[j]),
+                )
+
+        return grad
 
 
-def fvm_div(var_i: Field, var_j: Field) -> Flux:
-    r"""Divergence operator.
-
-    .. math::
+class Div(Discretizer):
+    r"""Divergence
 
         \frac{\partial}{\partial x_j}
         \left(
@@ -230,21 +204,34 @@ def fvm_div(var_i: Field, var_j: Field) -> Flux:
         List of Flux object contains divergence of var_i * var_j.
         If `var_i.type == "scalar"`, `len(list[Flux]) == 1`,
         and `var_i.type == "vector"`, `len(list[Flux]) == 3`.
-
-    Raises:
-        SizeDoesNotMatchError: if :attr:`var_i.NX, var_i.DX` and
-        :attr:`var_j.NX, var_j.DX` are not equal.
     """
 
-    dim_i = var_i.dim
-    dim_j = var_j.dim
+    def __call__(self, var_i: Field, var_j: Field) -> Any:
 
-    grad_j = fvm_grad(var_j)
+        flux = Flux()
 
-    raise NotImplementedError
+        for i in range(var_i.dim):
+            for j in range(var_j.dim):
+
+                vi_c = var_i()
+                vj_c = var_j()
+
+                fl = (torch.roll(vj_c, 1, j) * vi_c + vj_c * vi_c) / (
+                    2 * var_j.dx[j]
+                )
+                flux.to_face(i, DIR[j], "l", fl)
+
+                fr = (torch.roll(vj_c, -1, j) * vi_c + vj_c * vi_c) / (
+                    2 * var_j.dx[j]
+                )
+                flux.to_face(i, DIR[j], "r", fr)
+
+        # Apply bc later on...
+        self.flux = flux
+        return self
 
 
-def fvm_laplacian(coeff: float, var: Field) -> Flux:
+class Laplacian(Discretizer):
     r"""Variable discretization: Laplacian
 
     .. math::
@@ -276,7 +263,31 @@ def fvm_laplacian(coeff: float, var: Field) -> Flux:
 
     """
 
-    raise NotImplementedError
+    def __call__(self, coeff: float, var: Field) -> Any:
+
+        fvm_Grad = Grad()
+        grad = fvm_Grad(var)
+        flux = Flux()
+
+        for i in range(var.dim):
+            for j in range(var.dim):
+
+                fl = (
+                    (torch.roll(grad(0, DIR[j]), 1, j) + grad(0, DIR[j]))
+                    / (2 * var.dx[j])
+                    * coeff
+                )
+                flux.to_face(i, DIR[j], "l", fl)
+                fr = (
+                    (torch.roll(grad(0, DIR[j]), -1, j) + grad(0, DIR[j]))
+                    / (2 * var.dx[j])
+                    * coeff
+                )
+                flux.to_face(i, DIR[j], "r", fr)
+
+        self.flux = flux
+
+        return self
 
 
 def _flux_linear(flux: Flux, f_var: Tensor) -> Flux:
