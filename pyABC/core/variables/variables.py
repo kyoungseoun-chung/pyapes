@@ -32,9 +32,7 @@ class Field:
     name: str
     dim: int
     mesh: Mesh
-    bc_config: Optional[
-        dict[str, Optional[list[dict[str, Union[float, str]]]]]
-    ]
+    bc_config: Optional[dict[str, Optional[list[dict[str, Union[float, str]]]]]]
     init_val: Optional[Union[int, float]] = None
     object_interp: bool = False
 
@@ -67,7 +65,7 @@ class Field:
         return self.mesh.dx
 
     @property
-    def nx(self) -> Tensor:
+    def nx(self) -> torch.Size:
 
         return self.mesh.nx
 
@@ -101,9 +99,7 @@ class Field:
 
         return torch.sum(self.VAR, dim=dim)
 
-    def set_var_tensor(
-        self, val: Tensor, insert: Optional[int] = None
-    ) -> None:
+    def set_var_tensor(self, val: Tensor, insert: Optional[int] = None) -> None:
         """Set variable with a given Tensor.
 
         Examples:
