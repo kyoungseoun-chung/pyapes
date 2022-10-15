@@ -27,7 +27,7 @@ PyABC is/has
 	# FDM
 	fvc.solve(fvc.laplacian(var) == rhs)
 	# FVM
-	fvm.set_lhs(fvm.Ddt(var) + fvm.Div(var, u) + fvm.Laplacian(var))
+	fvm.set_eq(fvm.Ddt(var) + fvm.Div(var, u) + fvm.Laplacian(var))
 	fvm.solve(fvm.eq == rhs)
 	```
 ## Installation

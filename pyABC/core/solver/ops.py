@@ -10,6 +10,7 @@ import torch
 from pyABC.core.solver.fdm import Discretizer as FDM_Discretizer
 from pyABC.core.solver.fdm import Laplacian as FDM_Laplacian
 from pyABC.core.solver.fvm import Ddt as FVM_Ddt
+from pyABC.core.solver.fvm import Discretizer
 from pyABC.core.solver.fvm import Div as FVM_Div
 from pyABC.core.solver.fvm import Flux
 from pyABC.core.solver.fvm import Grad as FVM_Grad
@@ -17,7 +18,6 @@ from pyABC.core.solver.fvm import Laplacian as FVM_Laplacian
 from pyABC.core.variables import Field
 
 
-@dataclass
 class FVC:
     """Collection of the operators based on volume node discretization.
 
@@ -39,7 +39,6 @@ class FVC:
         return self.ops.solve()
 
 
-@dataclass
 class FVM:
     """Collection of the operators based on FVM.
 
@@ -57,14 +56,12 @@ class FVM:
     """
 
     # operations are added in dictionary. But how?
-    ops: dict[str, Flux]
-
     ddt: FVM_Ddt = FVM_Ddt()
     grad: FVM_Grad = FVM_Grad()
     div: FVM_Div = FVM_Div()
     laplacian: FVM_Laplacian = FVM_Laplacian()
 
-    def set_lhs(self, eq: Flux, dt_var: Field) -> None:
+    def set_eq(self, eq: Discretizer) -> None:
         """Construct PDE to solve.
         (Acutally just store data for future self.solve function call)
 
@@ -73,11 +70,13 @@ class FVM:
             dt_var: variable to be solved
         """
 
-        # Variable to be solved
-        self.var = dt_var
+        # Target variable
+        self.var = eq.var
 
-        # Discretized fluxes
-        self.eq = eq
+        # Collection of discretized fluxes
+        self.eq = eq.ops
+        # RHS of the equation
+        self.rhs = eq.rhs
 
     def solve(self, op: Flux) -> Field:
 
@@ -85,10 +84,14 @@ class FVM:
 
     def __eq__(self, rhs: Union[torch.Tensor, float]) -> Any:
 
-        raise NotImplementedError
+        if isinstance(rhs, float):
+            self.rhs = torch.zeros_like(self.var()) + float
+        else:
+            self.rhs = rhs
+
+        return self
 
 
-@dataclass
 class Solver:
     """Collection of all solver operators.
 

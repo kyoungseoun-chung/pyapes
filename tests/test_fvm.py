@@ -55,17 +55,27 @@ def test_grad(domain: Box, spacing: list[int], dim: int) -> None:
         (Box[0:1, 0:1, 0:1], [5, 5, 5], 3),
     ],
 )
-def test_div(domain: Box, spacing: list[int], dim: int) -> None:
-    from pyABC.core.solver.fvm import Div
+def test_fvm(domain: Box, spacing: list[int], dim: int) -> None:
+    from pyABC.core.solver.fvm import Div, Laplacian
 
     mesh = Mesh(domain, None, spacing)
     var = Field("", dim, mesh, None)
     var.set_var_tensor(var.mesh.X)
 
     div = Div()
+    laplacian = Laplacian()
 
     flux = div(var, var).flux
+    sign_test = flux(0, "xl").clone()
     flux *= -1
 
-    op_sum = div(var, var) + div(var, var) + div(var, var)
-    pass
+    torch.testing.assert_close(flux(0, "xl"), -sign_test)
+
+    # Also test sum of operations
+    op_sum = div(var, var) - laplacian(1.0, var) + div(var, var) == 10
+
+    assert len(op_sum.ops) == 3
+    assert op_sum.ops[0]["op"] == "Div"
+    assert op_sum.ops[1]["op"] == "Laplacian"
+
+    torch.testing.assert_close(op_sum.rhs, torch.zeros_like(var()) + 10)

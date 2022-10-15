@@ -26,8 +26,10 @@ class Flux:
     >>> flux(0, "x")  # return flux_tensor
     """
 
-    _center: dict[int, dict[str, Tensor]] = {}
-    _face: dict[int, dict[str, dict[str, Tensor]]] = {}
+    def __init__(self):
+
+        self._center: dict[int, dict[str, Tensor]] = {}
+        self._face: dict[int, dict[str, dict[str, Tensor]]] = {}
 
     def to_center(self, i: int, j: str, T: Tensor):
         """Add centervalued as dictionary."""
@@ -48,6 +50,7 @@ class Flux:
 
     @property
     def c_idx(self) -> tuple[list[int], list[str]]:
+        """Return center index."""
 
         idx_i = list(self._center.keys())
         idx_j = list(self._center[0].keys())
@@ -55,12 +58,21 @@ class Flux:
         return (idx_i, idx_j)
 
     def face(self, i: int, f_idx: str) -> Tensor:
+        """Return face value with index."""
 
         assert f_idx in FDIR, f"Flux: face index should be one of {FDIR}!"
 
         return self._face[i][f_idx[0]][f_idx[1]]
 
     def to_face(self, i: int, j: str, f: str, T: Tensor) -> None:
+        """Assign face values to `self._face`.
+
+        Args:
+            i (int): leading index
+            j (str): dummy index (to be summed)
+            f (str): face index l (also for back and bottom), r (also for front and top)
+            T (Tensor): face values to be stored.
+        """
 
         if i in self._face:
             if j in self._face[i]:
@@ -70,14 +82,40 @@ class Flux:
         else:
             self._face.update({i: {j: {f: T}}})
 
-    def __mul__(self, coeff: float) -> Any:
-        """Multiply coeffcient to the flux"""
+    def flux_sum(self) -> None:
+
+        self._center = {}
 
         for i in self._face:
+            c_val = {}
             for j in self._face[i]:
+                c_val.update(
+                    {j: (self._face[i][j]["l"] + self._face[i][j]["r"]) / 2}
+                )
+            self._center[i] = c_val
 
-                self._face[i][j]["l"] *= coeff
-                self._face[i][j]["r"] *= coeff
+    def __mul__(self, target: Union[float, int, Field]) -> Any:
+        """Multiply coeffcient to the flux"""
+
+        if isinstance(target, float) or isinstance(target, int):
+            for i in self._face:
+                for j in self._face[i]:
+                    self._face[i][j]["l"] *= target
+                    self._face[i][j]["r"] *= target
+                    try:
+                        self._center[i][j] *= target
+                    except KeyError:
+                        self.flux_sum()
+                        self._center[i][j] *= target
+
+        elif isinstance(target, Field):
+            # Multiply tensor in j direction for self._center
+            # Will be used for u_j \nabla_j u_i
+            for i in self._face:
+                for j in self._face[i]:
+                    self._center[i][j] *= target()
+        else:
+            raise TypeError("Flux: wrong input type is given!")
 
         return self
 
@@ -92,8 +130,16 @@ class Discretizer:
     """
 
     # Class member
-    flux: Flux
     ops: dict[int, dict[str, Union[Flux, str]]] = {}
+    rhs: Union[Tensor, float]
+
+    @property
+    def var(self) -> Field:
+        raise NotImplementedError
+
+    @property
+    def flux(self) -> Flux:
+        raise NotImplementedError
 
     def set_config(self, config: dict):
 
@@ -115,12 +161,27 @@ class Discretizer:
 
     def __sub__(self, other: Any) -> Any:
 
-        idx = list(self.ops.keys())
+        if len(self.ops) == 0:
+            self.ops.update(
+                {0: {"flux": self.flux * -1, "op": self.__class__.__name__}}
+            )
 
-        if len(idx) == 0:
-            self.ops.update({0: -1 * other.flux})
+        idx = list(self.ops.keys())
+        self.ops.update(
+            {
+                idx[-1]
+                + 1: {"flux": other.flux * -1, "op": other.__class__.__name__}
+            }
+        )
+
+        return self
+
+    def __eq__(self, other: Union[Tensor, float]) -> Any:
+
+        if isinstance(other, Tensor):
+            self.rhs = other
         else:
-            self.ops.update({idx[-1] + 1: -1 * other.flux})
+            self.rhs = torch.zeros_like(self.var()) + other
 
         return self
 
@@ -159,6 +220,8 @@ class Grad(Discretizer):
 
     def __call__(self, var: Field) -> Flux:
 
+        self._var = var
+
         dx = var.mesh.dx
 
         grad = Flux()
@@ -174,7 +237,17 @@ class Grad(Discretizer):
                     / (2 * dx[j]),
                 )
 
+        self._flux = grad
+
         return grad
+
+    @property
+    def var(self) -> Field:
+        return self._var
+
+    @property
+    def flux(self) -> Flux:
+        return self._flux
 
 
 class Div(Discretizer):
@@ -208,6 +281,8 @@ class Div(Discretizer):
 
     def __call__(self, var_i: Field, var_j: Field) -> Any:
 
+        self._var = var_i
+
         flux = Flux()
 
         for i in range(var_i.dim):
@@ -227,8 +302,16 @@ class Div(Discretizer):
                 flux.to_face(i, DIR[j], "r", fr)
 
         # Apply bc later on...
-        self.flux = flux
+        self._flux = flux
         return self
+
+    @property
+    def var(self) -> Field:
+        return self._var
+
+    @property
+    def flux(self) -> Flux:
+        return self._flux
 
 
 class Laplacian(Discretizer):
@@ -265,6 +348,8 @@ class Laplacian(Discretizer):
 
     def __call__(self, coeff: float, var: Field) -> Any:
 
+        self._var = var
+
         fvm_Grad = Grad()
         grad = fvm_Grad(var)
         flux = Flux()
@@ -285,9 +370,17 @@ class Laplacian(Discretizer):
                 )
                 flux.to_face(i, DIR[j], "r", fr)
 
-        self.flux = flux
+        self._flux = flux
 
         return self
+
+    @property
+    def var(self) -> Field:
+        return self._var
+
+    @property
+    def flux(self) -> Flux:
+        return self._flux
 
 
 def _flux_linear(flux: Flux, f_var: Tensor) -> Flux:
