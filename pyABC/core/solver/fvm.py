@@ -123,10 +123,14 @@ class Flux:
 class Discretizer:
     """Base class of FVM discretization.
 
-    Args:
-        flux: flux object as a result of FVM operation. `len(flux)` corresponding to
-              the dimension of the variable to be discretized.
-        flux_total: will be used for the FVM.set_eq (not yet fixed)
+    Examples:
+
+        >>> # Laplacian of scalar field same for Div
+        >>> laplacian = Laplacian()
+        >>> res = laplacian(coeff, phi)
+        >>> res.flux(0, "xl")    # d^2 phi/dx_1^2 on the left side of x directional cell face
+        >>> res.flux_sum()
+        >>> res.flux(0, "x")     # averaged cell centered value in x
     """
 
     # Class member
@@ -201,21 +205,9 @@ class Grad(Discretizer):
 
         \frac{\partial \Phi}{\partial x_j} = \frac{1}{V_C}\sum \Phi_f \vec{n}_f \vec{S}_f
 
-    Examples:
-
-        >>> # Gradient of scalar field
-        >>> res = fvm_grad(phi)
-        >>> res(0, "x")    # dphi/dx_1
-        >>> # Gradient of vector field
-        >>> res = fvm_grad(u)
-        >>> res(0, "x")    # du_1/dx_1
-
     Args:
-        var: Variable object to be discretized ($\Phi$).
-            - If var.bcs is None, Grad operation is done by finite difference method.
+        var: Field object to be discretized ($\Phi$).
 
-    Returns:
-        dictionary contains gradient of `var`.
     """
 
     def __call__(self, var: Field) -> Flux:
@@ -258,25 +250,9 @@ class Div(Discretizer):
             u_j \phi_i
         \right)
 
-    Examples:
-
-        >>> # Advection of scalar field
-        >>> res = fvm_div(phi, u)
-        >>> res[0].x    # dphi/dx_1
-        >>> res[0].c    # dphi/dx_1 + dphi/dx_2 + dphi/dx_3
-        >>> # Advection of vector field
-        >>> res = fvm_div(u, u)
-        >>> res[0].x    # du_1/dx_1
-        >>> res[0].c    # du_1/dx_1 + du_1/dx_2 + du_1/dx_3
-
     Args:
-        var_i: Variable object to be discretized ($\Phi_i$)
-        var_j: convective part ($\vec{u}_j$)
-
-    Returns:
-        List of Flux object contains divergence of var_i * var_j.
-        If `var_i.type == "scalar"`, `len(list[Flux]) == 1`,
-        and `var_i.type == "vector"`, `len(list[Flux]) == 3`.
+        var_i: Field object to be discretized ($\Phi_i$)
+        var_j: convective variable ($\vec{u}_j$)
     """
 
     def __call__(self, var_i: Field, var_j: Field) -> Any:
@@ -324,26 +300,10 @@ class Laplacian(Discretizer):
             \Gamma^\Phi \frac{\partial \Phi}{\partial x_j}
         \right)
 
-    Examples:
-
-        >>> # Laplacian of scalar field
-        >>> res = fvm_laplacian(coeff, phi)
-        >>> res[0].x    # d^2 phi/dx_1^2
-        >>> res[0].c    # d^2 phi/dx_1^2 + d^2 phi/dx_2^2 + d^2 phi/dx_3^2
-        >>> # Laplacian of vector field
-        >>> res = fvm_laplacian(coeff, u)
-        >>> res[0].x    # d^2 u_1/dx_1^2
-        >>> res[0].c    # d^2 u_1/dx_1^2 + d^2 u_1/dx_2^2 + d^2 u_1/dx_3^2
 
     Args:
         coeff: coefficient of the Laplacian operator ($\Gamma^\Phi$)
-        var: Variable object to be discretized ($\Phi$)
-
-    Returns:
-        List of Flux object contains Laplacian of `var`.
-        If `var.type == "scalar"`, `len(list[Flux]) == 1`,
-        and `var.type == "vector"`, `len(list[Flux]) == 3`.
-
+        var: Field object to be discretized ($\Phi$)
     """
 
     def __call__(self, coeff: float, var: Field) -> Any:
