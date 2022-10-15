@@ -4,16 +4,14 @@ from abc import ABC
 from abc import abstractmethod
 from typing import Any
 from typing import Callable
-from typing import Union
 
 import torch
 from rich import print as rprint
 from torch import Tensor
-from torch.nn import ConstantPad1d
-from torch.nn import ConstantPad2d
-from torch.nn import ConstantPad3d
 
 from pyABC.core.mesh import Mesh
+from pyABC.core.solver.tools import create_pad
+from pyABC.core.solver.tools import inner_slicer
 from pyABC.core.variables import Field
 
 
@@ -240,7 +238,7 @@ def _gs(
 ) -> tuple[Field, dict]:
     """Gauss-Seidel method."""
     # Padding for different dimensions
-    pad = _create_pad(mesh.dim)
+    pad = create_pad(mesh.dim)
 
     dx = var.nx
 
@@ -310,7 +308,7 @@ def _jacobi(
 ) -> tuple[Field, dict]:
     """Jacobi method."""
     # Padding for different dimensions
-    pad = _create_pad(mesh.dim)
+    pad = create_pad(mesh.dim)
     dx = var.dx
 
     tolerance = config["tol"]
@@ -423,7 +421,7 @@ def _cg(
     """Conjugate gradient descent method."""
 
     # Padding for different dimensions
-    pad = _create_pad(mesh.dim)
+    pad = create_pad(mesh.dim)
 
     # Grid information
     dx = var.dx
@@ -561,26 +559,3 @@ def _tolerance_check(var_new: Tensor, var_old: Tensor) -> float:
         raise RuntimeError(msg)
 
     return tol.item()
-
-
-def _create_pad(
-    dim: int,
-) -> Union[ConstantPad1d, ConstantPad2d, ConstantPad3d]:
-    """Create padd object."""
-
-    if dim == 1:
-        return ConstantPad1d(1, 0)
-    elif dim == 2:
-        return ConstantPad2d(1, 0)
-    else:
-        return ConstantPad3d(1, 0)
-
-
-def inner_slicer(dim: int) -> tuple:
-
-    if dim == 1:
-        return (slice(1, -1),)
-    elif dim == 2:
-        return (slice(1, -1), slice(1, -1))
-    else:
-        return (slice(1, -1), slice(1, -1), slice(1, -1))

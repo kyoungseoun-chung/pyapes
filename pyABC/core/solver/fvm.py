@@ -1,125 +1,20 @@
 #!/usr/bin/env python3
 """Discretization using finite volume methodology (FVM) """
+from dataclasses import dataclass
+from dataclasses import field
 from typing import Any
+from typing import Optional
 from typing import Union
 
 import torch
 from torch import Tensor
 
+from pyABC.core.solver.fluxes import Flux
+from pyABC.core.solver.tools import DIR
 from pyABC.core.variables import Field
 
-DIR = ["x", "y", "z"]
-FDIR = ["xl", "xr", "yl", "yr", "zl", "zr"]
 
-DIR_TO_NUM: dict[str, int] = {"x": 0, "y": 1, "z": 2}
-
-
-class Flux:
-    """Flux container.
-
-    Note:
-        - To distinguis leading index and other index, leading is int and other is str.
-
-    >>> flux_tensor = torch.tensor(...)
-    >>> flux = Flux()
-    >>> flux.add(i, j, flux_tensor)  # j -> DIR[j] -> "x" or "y" or "z", i -> 0 or 1 or 2.
-    >>> flux(0, "x")  # return flux_tensor
-    """
-
-    def __init__(self):
-
-        self._center: dict[int, dict[str, Tensor]] = {}
-        self._face: dict[int, dict[str, dict[str, Tensor]]] = {}
-
-    def to_center(self, i: int, j: str, T: Tensor):
-        """Add centervalued as dictionary."""
-
-        try:
-            self._center[i][j] = T
-        except KeyError:
-            self._center.update({i: {j: T}})
-
-    def __call__(self, i: int, j: str) -> Tensor:
-        """Return flux values with parentheses."""
-
-        if j in DIR:
-            return self._center[i][j]
-        else:
-            assert j in FDIR, f"Flux: face index should be one of {FDIR}"
-            return self._face[i][j[0]][j[1]]
-
-    @property
-    def c_idx(self) -> tuple[list[int], list[str]]:
-        """Return center index."""
-
-        idx_i = list(self._center.keys())
-        idx_j = list(self._center[0].keys())
-
-        return (idx_i, idx_j)
-
-    def face(self, i: int, f_idx: str) -> Tensor:
-        """Return face value with index."""
-
-        assert f_idx in FDIR, f"Flux: face index should be one of {FDIR}!"
-
-        return self._face[i][f_idx[0]][f_idx[1]]
-
-    def to_face(self, i: int, j: str, f: str, T: Tensor) -> None:
-        """Assign face values to `self._face`.
-
-        Args:
-            i (int): leading index
-            j (str): dummy index (to be summed)
-            f (str): face index l (also for back and bottom), r (also for front and top)
-            T (Tensor): face values to be stored.
-        """
-
-        if i in self._face:
-            if j in self._face[i]:
-                self._face[i][j][f] = T
-            else:
-                self._face[i].update({j: {f: T}})
-        else:
-            self._face.update({i: {j: {f: T}}})
-
-    def flux_sum(self) -> None:
-
-        self._center = {}
-
-        for i in self._face:
-            c_val = {}
-            for j in self._face[i]:
-                c_val.update(
-                    {j: (self._face[i][j]["l"] + self._face[i][j]["r"]) / 2}
-                )
-            self._center[i] = c_val
-
-    def __mul__(self, target: Union[float, int, Field]) -> Any:
-        """Multiply coeffcient to the flux"""
-
-        if isinstance(target, float) or isinstance(target, int):
-            for i in self._face:
-                for j in self._face[i]:
-                    self._face[i][j]["l"] *= target
-                    self._face[i][j]["r"] *= target
-                    try:
-                        self._center[i][j] *= target
-                    except KeyError:
-                        self.flux_sum()
-                        self._center[i][j] *= target
-
-        elif isinstance(target, Field):
-            # Multiply tensor in j direction for self._center
-            # Will be used for u_j \nabla_j u_i
-            for i in self._face:
-                for j in self._face[i]:
-                    self._center[i][j] *= target()
-        else:
-            raise TypeError("Flux: wrong input type is given!")
-
-        return self
-
-
+@dataclass(eq=False)
 class Discretizer:
     """Base class of FVM discretization.
 
@@ -133,9 +28,17 @@ class Discretizer:
         >>> res.flux(0, "x")     # averaged cell centered value in x
     """
 
-    # Class member
-    ops: dict[int, dict[str, Union[Flux, str]]] = {}
-    rhs: Union[Tensor, float]
+    # Init relavent attributes
+    _ops: dict[int, dict[str, Union[Flux, str]]] = field(default_factory=dict)
+    _rhs: Optional[Tensor] = None
+
+    @property
+    def ops(self) -> dict[int, dict[str, Union[Flux, str]]]:
+        return self._ops
+
+    @property
+    def rhs(self) -> Optional[Tensor]:
+        return self._rhs
 
     @property
     def var(self) -> Field:
@@ -149,15 +52,26 @@ class Discretizer:
 
         self.config = config
 
+    def __eq__(self, other: Union[Tensor, float]) -> Any:
+
+        if isinstance(other, Tensor):
+            self._rhs = other
+        else:
+            self._rhs = torch.zeros_like(self.var()) + other
+
+        return self
+
     def __add__(self, other: Any) -> Any:
 
-        # order of multiple add?
-        self.ops.update(
-            {0: {"flux": self.flux, "op": self.__class__.__name__}}
-        )
+        assert self.flux is not None, "Discretizer: Flux is not assigned!"
 
-        idx = list(self.ops.keys())
-        self.ops.update(
+        if len(self._ops) == 0:
+            self._ops.update(
+                {0: {"flux": self.flux, "op": self.__class__.__name__}}
+            )
+
+        idx = list(self._ops.keys())
+        self._ops.update(
             {idx[-1] + 1: {"flux": other.flux, "op": other.__class__.__name__}}
         )
 
@@ -165,13 +79,15 @@ class Discretizer:
 
     def __sub__(self, other: Any) -> Any:
 
-        if len(self.ops) == 0:
-            self.ops.update(
+        assert self.flux is not None, "Discretizer: Flux is not assigned!"
+
+        if len(self._ops) == 0:
+            self._ops.update(
                 {0: {"flux": self.flux * -1, "op": self.__class__.__name__}}
             )
 
-        idx = list(self.ops.keys())
-        self.ops.update(
+        idx = list(self._ops.keys())
+        self._ops.update(
             {
                 idx[-1]
                 + 1: {"flux": other.flux * -1, "op": other.__class__.__name__}
@@ -180,24 +96,36 @@ class Discretizer:
 
         return self
 
-    def __eq__(self, other: Union[Tensor, float]) -> Any:
 
-        if isinstance(other, Tensor):
-            self.rhs = other
-        else:
-            self.rhs = torch.zeros_like(self.var()) + other
-
-        return self
-
-
+@dataclass(eq=False)
 class Ddt(Discretizer):
     """Time discretization."""
 
+    _var: Optional[Field] = None
+    _flux: Optional[Flux] = None
+
     def __call__(self, var: Field) -> Any:
 
-        raise NotImplementedError
+        self._var = var
+
+        return self
+
+    def euler_explicit(self) -> None:
+        pass
+
+    def crank_nicolson(self) -> None:
+        pass
+
+    @property
+    def var(self) -> Optional[Field]:
+        return self._var
+
+    @property
+    def flux(self) -> Optional[Flux]:
+        return self._flux
 
 
+@dataclass(eq=False)
 class Grad(Discretizer):
     r"""Variable discretization: Gradient
 
@@ -209,6 +137,8 @@ class Grad(Discretizer):
         var: Field object to be discretized ($\Phi$).
 
     """
+    _var: Optional[Field] = None
+    _flux: Optional[Flux] = None
 
     def __call__(self, var: Field) -> Flux:
 
@@ -228,20 +158,20 @@ class Grad(Discretizer):
                     (torch.roll(var()[i], -1, j) - torch.roll(var()[i], 1, j))
                     / (2 * dx[j]),
                 )
-
         self._flux = grad
 
         return grad
 
     @property
-    def var(self) -> Field:
+    def var(self) -> Optional[Field]:
         return self._var
 
     @property
-    def flux(self) -> Flux:
+    def flux(self) -> Optional[Flux]:
         return self._flux
 
 
+@dataclass(eq=False)
 class Div(Discretizer):
     r"""Divergence
 
@@ -254,6 +184,9 @@ class Div(Discretizer):
         var_i: Field object to be discretized ($\Phi_i$)
         var_j: convective variable ($\vec{u}_j$)
     """
+
+    _var: Optional[Field] = None
+    _flux: Optional[Flux] = None
 
     def __call__(self, var_i: Field, var_j: Field) -> Any:
 
@@ -277,19 +210,20 @@ class Div(Discretizer):
                 )
                 flux.to_face(i, DIR[j], "r", fr)
 
-        # Apply bc later on...
         self._flux = flux
+
         return self
 
     @property
-    def var(self) -> Field:
+    def var(self) -> Optional[Field]:
         return self._var
 
     @property
-    def flux(self) -> Flux:
+    def flux(self) -> Optional[Flux]:
         return self._flux
 
 
+@dataclass(eq=False)
 class Laplacian(Discretizer):
     r"""Variable discretization: Laplacian
 
@@ -305,6 +239,9 @@ class Laplacian(Discretizer):
         coeff: coefficient of the Laplacian operator ($\Gamma^\Phi$)
         var: Field object to be discretized ($\Phi$)
     """
+
+    _var: Optional[Field] = None
+    _flux: Optional[Flux] = None
 
     def __call__(self, coeff: float, var: Field) -> Any:
 
@@ -329,17 +266,16 @@ class Laplacian(Discretizer):
                     * coeff
                 )
                 flux.to_face(i, DIR[j], "r", fr)
-
         self._flux = flux
 
         return self
 
     @property
-    def var(self) -> Field:
+    def var(self) -> Optional[Field]:
         return self._var
 
     @property
-    def flux(self) -> Flux:
+    def flux(self) -> Optional[Flux]:
         return self._flux
 
 

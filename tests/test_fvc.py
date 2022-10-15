@@ -4,6 +4,7 @@ from math import pi
 
 import pytest
 import torch
+from torch.testing import assert_close  # type: ignore
 
 from pyABC.core.geometry import Box
 from pyABC.core.mesh import Mesh
@@ -50,7 +51,7 @@ def test_poisson_nd(domain: tuple) -> None:
     fvc.set_eq(fvc.laplacian(var) == rhs)
     cg_sol = fvc.solve()
 
-    torch.testing.assert_close(cg_sol()[0], sol_ex, rtol=0.1, atol=0.01)
+    assert_close(cg_sol()[0], sol_ex, rtol=0.1, atol=0.01)
 
 
 @pytest.mark.parametrize("device", ["cpu", "cuda", "mps"])
@@ -76,7 +77,7 @@ def test_poisson_jacobi_gs_and_etc(device: str) -> None:
     var = Field("any", 1, mesh, {"domain": f_bc_config, "obstacle": None})
 
     assert var.size == (1, 11, 11, 11)
-    torch.testing.assert_allclose(var.sum(), torch.sum(var(), dim=0))
+    assert_close(var.sum(), torch.sum(var(), dim=0))
 
     # RHS of the Poisson equation
     zero_tensor = torch.zeros_like(var())
@@ -96,7 +97,7 @@ def test_poisson_jacobi_gs_and_etc(device: str) -> None:
     # Test with copy function
     jacobi_sol, _ = fdm_op(var.copy(), rhs, solver_config, mesh)
 
-    torch.testing.assert_close(jacobi_sol()[0], sol_ex, rtol=0.1, atol=0.01)
+    assert_close(jacobi_sol()[0], sol_ex, rtol=0.1, atol=0.01)
 
     # Test Gauss-Seidel method
     solver_config = {
@@ -127,7 +128,7 @@ def test_poisson_jacobi_gs_and_etc(device: str) -> None:
         fvc.set_eq(fvc.laplacian(var) == rhs)
         sol = fvc.solve()
 
-        torch.testing.assert_close(sol()[0], sol_ex, rtol=0.1, atol=0.01)
+        assert_close(sol()[0], sol_ex, rtol=0.1, atol=0.01)
 
 
 def create_test_poisson_bcs(dim: int = 3) -> list:

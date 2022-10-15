@@ -6,6 +6,7 @@ from typing import Union
 import pytest
 import torch
 from torch import Tensor
+from torch.testing import assert_close  # type: ignore
 
 from pyABC.core.geometry import Box
 from pyABC.core.mesh import Mesh
@@ -94,20 +95,20 @@ def test_field(domain: tuple) -> None:
 
     # Check bc_values
     if mesh.dim == 1:
-        torch.testing.assert_close(var()[0, 0].item(), 0.0)
-        torch.testing.assert_close(var()[0, -1].item(), 1.0)
+        assert_close(var()[0, 0].item(), 0.0)
+        assert_close(var()[0, -1].item(), 1.0)
     elif mesh.dim == 2:
-        torch.testing.assert_close(var()[0, 1, 0].item(), 0.0)
-        torch.testing.assert_close(var()[0, 1, -1].item(), 1.0)
-        torch.testing.assert_close(var()[0, 0, 1].item(), 2.0)
-        torch.testing.assert_close(var()[0, -1, 1].item(), 3.0)
+        assert_close(var()[0, 1, 0].item(), 0.0)
+        assert_close(var()[0, 1, -1].item(), 1.0)
+        assert_close(var()[0, 0, 1].item(), 2.0)
+        assert_close(var()[0, -1, 1].item(), 3.0)
     else:
-        torch.testing.assert_close(var()[0, 0, 1, 1].item(), 0.0)
-        torch.testing.assert_close(var()[0, -1, 1, 1].item(), 1.0)
-        torch.testing.assert_close(var()[0, 1, 0, 1].item(), 2.0)
-        torch.testing.assert_close(var()[0, 1, -1, 1].item(), 3.0)
-        torch.testing.assert_close(var()[0, 1, 1, 0].item(), 4.0)
-        torch.testing.assert_close(var()[0, 1, 1, -1].item(), 5.0)
+        assert_close(var()[0, 0, 1, 1].item(), 0.0)
+        assert_close(var()[0, -1, 1, 1].item(), 1.0)
+        assert_close(var()[0, 1, 0, 1].item(), 2.0)
+        assert_close(var()[0, 1, -1, 1].item(), 3.0)
+        assert_close(var()[0, 1, 1, 0].item(), 4.0)
+        assert_close(var()[0, 1, 1, -1].item(), 5.0)
 
     # Test for the callable BCs
     f_bc_config = create_test_field_bcs(True, dim=mesh.dim)
@@ -124,11 +125,11 @@ def test_field(domain: tuple) -> None:
         bc.apply(mask, var(), mesh)
 
     if mesh.dim == 1:
-        torch.testing.assert_close(var()[0, 0].item(), 0.0)
-        torch.testing.assert_close(var()[0, -1].item(), 1.0)
+        assert_close(var()[0, 0].item(), 0.0)
+        assert_close(var()[0, -1].item(), 1.0)
     elif mesh.dim == 2:
-        torch.testing.assert_close(var()[0, 0, 0].item(), 0.0)
-        torch.testing.assert_close(var()[0, -1, -1].item(), 1.0)
+        assert_close(var()[0, 0, 0].item(), 0.0)
+        assert_close(var()[0, -1, -1].item(), 1.0)
     else:
-        torch.testing.assert_close(var()[0, 0, 0, 0].item(), 0.0)
-        torch.testing.assert_close(var()[0, -1, -1, -1].item(), 1.0)
+        assert_close(var()[0, 0, 0, 0].item(), 0.0)
+        assert_close(var()[0, -1, -1, -1].item(), 1.0)

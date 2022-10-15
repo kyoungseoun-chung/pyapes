@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import pytest
 import torch
+from torch.testing import assert_close  # type: ignore
 
 from pyABC.core.geometry import Box
 from pyABC.core.mesh import Mesh
@@ -36,13 +37,11 @@ def test_grad(domain: Box, spacing: list[int], dim: int) -> None:
     assert res.c_idx[1] == [DIR[i] for i in range(dim)]
 
     if dim == 1:
-        torch.testing.assert_close(res(0, "x")[1:-1], 2 * mesh.X[1:-1])
+        assert_close(res(0, "x")[1:-1], 2 * mesh.X[1:-1])
     elif dim == 2:
-        torch.testing.assert_close(
-            res(0, "y")[1:-1, 1:-1], 2 * mesh.Y[1:-1, 1:-1]
-        )
+        assert_close(res(0, "y")[1:-1, 1:-1], 2 * mesh.Y[1:-1, 1:-1])
     else:
-        torch.testing.assert_allclose(
+        assert_close(
             res(0, "z")[1:-1, 1:-1, 1:-1], 2 * mesh.Z[1:-1, 1:-1, 1:-1]
         )
 
@@ -69,7 +68,7 @@ def test_fvm(domain: Box, spacing: list[int], dim: int) -> None:
     sign_test = flux(0, "xl").clone()
     flux *= -1
 
-    torch.testing.assert_close(flux(0, "xl"), -sign_test)
+    assert_close(flux(0, "xl"), -sign_test)
 
     # Also test sum of operations
     op_sum = div(var, var) - laplacian(1.0, var) + div(var, var) == 10
@@ -78,4 +77,7 @@ def test_fvm(domain: Box, spacing: list[int], dim: int) -> None:
     assert op_sum.ops[0]["op"] == "Div"
     assert op_sum.ops[1]["op"] == "Laplacian"
 
-    torch.testing.assert_close(op_sum.rhs, torch.zeros_like(var()) + 10)
+    assert_close(op_sum.rhs, torch.zeros_like(var()) + 10)
+
+    del div
+    del laplacian

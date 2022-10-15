@@ -92,6 +92,7 @@ class FVM:
         return self
 
 
+@dataclass
 class Solver:
     """Collection of all solver operators.
 
