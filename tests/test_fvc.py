@@ -10,6 +10,9 @@ from pyABC.core.geometry import Box
 from pyABC.core.mesh import Mesh
 from pyABC.core.solver.ops import Solver
 from pyABC.core.variables import Field
+from pyABC.testing.poisson import poisson_bcs
+from pyABC.testing.poisson import poisson_exact_nd
+from pyABC.testing.poisson import poisson_rhs_nd
 
 
 @pytest.mark.parametrize(
@@ -31,7 +34,7 @@ def test_poisson_nd(domain: tuple) -> None:
 
     mesh = Mesh(*domain, "cpu", "double")  # type: ignore
     dim = mesh.dim
-    f_bc_config = create_test_poisson_bcs(dim)
+    f_bc_config = poisson_bcs(dim)
     var = Field("any", 1, mesh, {"domain": f_bc_config, "obstacle": None})
 
     solver_config = {
@@ -60,7 +63,7 @@ def test_poisson_jacobi_gs_and_etc(device: str) -> None:
 
     from pyABC.core.solver.fdm import fdm_op
 
-    f_bc_config = create_test_poisson_bcs(dim=3)
+    f_bc_config = poisson_bcs(dim=3)
 
     if device == "cuda":
         if not torch.cuda.is_available():
@@ -129,77 +132,3 @@ def test_poisson_jacobi_gs_and_etc(device: str) -> None:
         sol = fvc.solve()
 
         assert_close(sol()[0], sol_ex, rtol=0.1, atol=0.01)
-
-
-def create_test_poisson_bcs(dim: int = 3) -> list:
-    """Currently we only have patches."""
-
-    bc_config = []
-
-    for _ in range(dim * 2):
-        if dim == 1:
-            bc_val = poisson_1d_bc
-        elif dim == 2:
-            bc_val = poisson_2d_bc
-        else:
-            bc_val = 0.0
-
-        bc_config.append(
-            {
-                "bc_obj": "patch",  # for debugging purposes
-                "bc_type": "dirichlet",
-                "bc_val": bc_val,
-            }
-        )
-
-    return bc_config
-
-
-def poisson_1d_bc(mesh: Mesh, mask: torch.Tensor) -> torch.Tensor:
-
-    return (
-        7.0 / 9.0
-        - 2.0 / 9.0 * mesh.X[mask]
-        + mesh.X[mask] ** 2 / 2.0
-        - mesh.X[mask] ** 4 / 6.0
-    )
-
-
-def poisson_2d_bc(mesh: Mesh, mask: torch.Tensor) -> torch.Tensor:
-
-    return mesh.Y[mask] * (1.0 - mesh.Y[mask]) * (mesh.X[mask] ** 3)
-
-
-def poisson_exact_nd(mesh: Mesh) -> torch.Tensor:
-
-    if mesh.dim == 1:
-        return (
-            7.0 / 9.0
-            - 2.0 / 9.0 * mesh.X
-            + mesh.X**2 / 2.0
-            - mesh.X**4 / 6.0
-        )
-    elif mesh.dim == 2:
-        return mesh.Y * (1.0 - mesh.Y) * (mesh.X**3)
-    else:
-        return (
-            -1.0
-            / (3 * pi**2)
-            * torch.sin(pi * mesh.X)
-            * torch.sin(pi * mesh.Y)
-            * torch.sin(pi * mesh.Z)
-        )
-
-
-def poisson_rhs_nd(mesh: Mesh) -> torch.Tensor:
-
-    if mesh.dim == 1:
-        return 1.0 - 2.0 * mesh.X**2
-    elif mesh.dim == 2:
-        return 6.0 * mesh.X * mesh.Y * (1.0 - mesh.Y) - 2.0 * (mesh.X**3)
-    else:
-        return (
-            torch.sin(pi * mesh.X)
-            * torch.sin(pi * mesh.Y)
-            * torch.sin(pi * mesh.Z)
-        )

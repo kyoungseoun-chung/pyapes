@@ -5,7 +5,43 @@ from torch.testing import assert_close  # type: ignore
 
 from pyABC.core.geometry import Box
 from pyABC.core.mesh import Mesh
+from pyABC.core.solver.ops import Solver
 from pyABC.core.variables import Field
+
+
+@pytest.mark.parametrize(
+    ("domain", "spacing", "dim"),
+    [
+        (Box[0:1], [0.01], 1),
+        (Box[0:1, 0:1], [64, 64], 2),
+        (Box[0:1, 0:1, 0:1], [0.1, 0.1, 0.1], 3),
+    ],
+)
+def test_poisson(domain: Box, spacing: list[int], dim: int) -> None:
+
+    from pyABC.testing.poisson import (
+        poisson_bcs,
+        poisson_rhs_nd,
+        poisson_exact_nd,
+    )
+
+    mesh = Mesh(domain, None, spacing)
+    var = Field("", dim, mesh, {"domain": poisson_bcs(dim), "obstacle": None})
+
+    solver_config = {
+        "fvm": {
+            "method": "cg",
+            "tol": 1e-5,
+            "max_it": 1000,
+            "report": True,
+        }
+    }
+
+    fvm = Solver(solver_config).fvm
+    fvm.set_eq(fvm.laplacian(1.0, var) == poisson_rhs_nd(mesh))
+
+    assert fvm.laplacian.coeff == 1.0
+    pass
 
 
 @pytest.mark.parametrize(
@@ -78,6 +114,3 @@ def test_fvm(domain: Box, spacing: list[int], dim: int) -> None:
     assert op_sum.ops[1]["op"] == "Laplacian"
 
     assert_close(op_sum.rhs, torch.zeros_like(var()) + 10)
-
-    del div
-    del laplacian

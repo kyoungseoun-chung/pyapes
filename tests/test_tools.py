@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Collection of tests for the utils."""
-import warnings
 from dataclasses import dataclass
 
 import numpy as np
