@@ -83,6 +83,75 @@ class Mesh:
         # Mesh grid
         self.grid = torch.meshgrid(self.x, indexing="ij")
 
+        # Obtain face area and volume
+        self._A, self._V = self.get_A_and_V()
+
+    @property
+    def _depth(self) -> float:
+        """Depth of mesh. If the mesh is 1D or 2D, takes `self.dx[0]` as a reference size."""
+
+        if self.dim == 1:
+            depth = self.dx[0].item() * self.dx[0].item()
+        elif self.dim == 2:
+            depth = self.dx[0].item()
+        else:
+            depth = 1.0
+        return depth
+
+    @property
+    def A(self) -> dict[str, Tensor]:
+        return self._A
+
+    @property
+    def V(self) -> Tensor:
+        return self._V
+
+    def get_A_and_V(self) -> tuple[dict[str, Tensor], Tensor]:
+
+        return self.get_A(), self.get_V()
+
+    def get_A(self) -> dict[str, Tensor]:
+        """Area of mesh.
+        Leading dimension is `2 * self.mesh.dim`. Therefore comes with the following order: 0 -> x-l, 1 -> x-r, 2 -> y-l, 3 -> y-r, 4 -> z-l, 5 -> z-r.
+        """
+
+        faces = 2 * self.dim
+        area = torch.zeros(
+            (faces, *self.nx), dtype=self.dtype.float, device=self.device
+        )
+
+        if self.dim == 1:
+            area += self._depth
+            return {"xl": area[0], "xr": area[1]}
+        elif self.dim == 2:
+            area[:2, :] = self.dx[1] * self._depth
+            area[2:, :] = self.dx[0] * self._depth
+            return {"xl": area[0], "xr": area[1], "yl": area[2], "yr": area[3]}
+        else:
+            area[:2, :] = self.dx[1] * self.dx[2]
+            area[2:4, :] = self.dx[0] * self.dx[2]
+            area[4:, :] = self.dx[0] * self.dx[1]
+            return {
+                "xl": area[0],
+                "xr": area[1],
+                "yl": area[2],
+                "yr": area[3],
+                "zl": area[4],
+                "zr": area[5],
+            }
+
+    def get_V(self) -> Tensor:
+        """Volume of mesh."""
+
+        vol = torch.zeros(*self.nx, dtype=self.dtype.float, device=self.device)
+
+        if self.dim == 1:
+            return vol + self.dx[0] * self._depth
+        elif self.dim == 2:
+            return vol + self.dx[0] * self.dx[1] * self._depth
+        else:
+            return vol + self.dx[0] * self.dx[1] * self.dx[2]
+
     @property
     def dim(self) -> int:
         return self.domain.dim

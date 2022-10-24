@@ -5,8 +5,9 @@ from typing import Union
 
 from torch import Tensor
 
+from pyABC.core.geometry.basis import DIR
+from pyABC.core.geometry.basis import FDIR
 from pyABC.core.variables import Field
-from pyABC.core.solver.tools import DIR, FDIR
 
 
 class Flux:
@@ -77,7 +78,7 @@ class Flux:
         else:
             self._face.update({i: {j: {f: T}}})
 
-    def flux_sum(self) -> None:
+    def flux_sum_dim(self) -> None:
 
         self._center = {}
 
@@ -85,7 +86,7 @@ class Flux:
             c_val = {}
             for j in self._face[i]:
                 c_val.update(
-                    {j: (self._face[i][j]["l"] + self._face[i][j]["r"]) / 2}
+                    {j: (-self._face[i][j]["l"] + self._face[i][j]["r"])}
                 )
             self._center[i] = c_val
 
@@ -100,7 +101,7 @@ class Flux:
                     try:
                         self._center[i][j] *= target
                     except KeyError:
-                        self.flux_sum()
+                        self.flux_sum_dim()
                         self._center[i][j] *= target
 
         elif isinstance(target, Field):

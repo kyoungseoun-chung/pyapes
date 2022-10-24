@@ -3,9 +3,9 @@
 """
 from dataclasses import dataclass
 from typing import Any
-from typing import Union
 
 import torch
+from torch import Tensor
 
 from pyABC.core.solver.fdm import Discretizer as FDM_Discretizer
 from pyABC.core.solver.fdm import Laplacian as FDM_Laplacian
@@ -74,22 +74,21 @@ class FVM:
         self.var = eq.var
 
         # Collection of discretized fluxes
-        self.eq = eq.ops
+        self.eqs = eq.ops
         # RHS of the equation
         self.rhs = eq.rhs
 
-    def solve(self, op: Flux) -> Field:
+    def Aop(self) -> Tensor:
+        pass
+
+    def solve(self) -> Field:
+
+        Aop = torch.zeros_like(self.var())
+        for eq in self.eqs:
+            if self.eqs[eq]["op"] != "Ddt":
+                pass
 
         raise NotImplementedError
-
-    def __eq__(self, rhs: Union[torch.Tensor, float]) -> Any:
-
-        if isinstance(rhs, float):
-            self.rhs = torch.zeros_like(self.var()) + float
-        else:
-            self.rhs = rhs
-
-        return self
 
 
 @dataclass

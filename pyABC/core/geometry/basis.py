@@ -3,6 +3,18 @@
 from enum import Enum
 from typing import Any
 
+DIR = ["x", "y", "z"]
+DIR_TO_NUM: dict[str, int] = {"x": 0, "y": 1, "z": 2}
+FDIR = ["xl", "xr", "yl", "yr", "zl", "zr"]
+FDIR_TO_NUM: dict[str, int] = {
+    "xl": 0,
+    "xr": 1,
+    "yl": 2,
+    "yr": 3,
+    "zl": 4,
+    "zr": 5,
+}
+
 
 class Order:
     def __call__(self, f: str):

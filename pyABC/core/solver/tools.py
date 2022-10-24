@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
 """Collection of useful tools to be used in `pyABC.core.solver` module."""
-
 from typing import Union
+
 from torch.nn import ConstantPad1d
 from torch.nn import ConstantPad2d
 from torch.nn import ConstantPad3d
-
-DIR = ["x", "y", "z"]
-DIR_TO_NUM: dict[str, int] = {"x": 0, "y": 1, "z": 2}
-FDIR = ["xl", "xr", "yl", "yr", "zl", "zr"]
 
 
 def create_pad(
