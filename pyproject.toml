@@ -2,9 +2,9 @@
 filterwarnings = ["ignore::DeprecationWarning:tensorboard[.*]"]
 
 [tool.poetry]
-name = "pyabc"
+name = "pyapes"
 version = "0.0.0"
-description = "Python Awesome Basic Calculus (PDE solver)"
+description = "Python Awesome Partial differential Equation Solver"
 authors = ["Kyoungseoun Chung <kchung@student.ethz.ch>"]
 
 [tool.poetry.dependencies]
