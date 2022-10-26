@@ -5,13 +5,13 @@ from typing import Union
 import torch
 from torch import Tensor
 
-from pyABC.core.backend import DType
-from pyABC.core.backend import DTYPE_DOUBLE
-from pyABC.core.backend import DTYPE_SINGLE
-from pyABC.core.backend import TORCH_DEVICE
-from pyABC.core.backend import TorchDevice
-from pyABC.core.geometry import GeoTypeIdentifier
-from pyABC.core.geometry.basis import Geometry
+from pyapes.core.backend import DType
+from pyapes.core.backend import DTYPE_DOUBLE
+from pyapes.core.backend import DTYPE_SINGLE
+from pyapes.core.backend import TORCH_DEVICE
+from pyapes.core.backend import TorchDevice
+from pyapes.core.geometry import GeoTypeIdentifier
+from pyapes.core.geometry.basis import Geometry
 
 
 class Mesh:

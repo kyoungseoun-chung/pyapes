@@ -16,10 +16,10 @@ from typing import Union
 import torch
 from torch import Tensor
 
-from pyABC.core.backend import DType
-from pyABC.core.geometry.basis import DimOrder
-from pyABC.core.geometry.basis import NormalDir
-from pyABC.core.mesh import Mesh
+from pyapes.core.backend import DType
+from pyapes.core.geometry.basis import DimOrder
+from pyapes.core.geometry.basis import NormalDir
+from pyapes.core.mesh import Mesh
 
 
 @dataclass

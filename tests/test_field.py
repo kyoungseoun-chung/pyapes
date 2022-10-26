@@ -8,8 +8,8 @@ import torch
 from torch import Tensor
 from torch.testing import assert_close  # type: ignore
 
-from pyABC.core.geometry import Box
-from pyABC.core.mesh import Mesh
+from pyapes.core.geometry import Box
+from pyapes.core.mesh import Mesh
 
 
 def create_test_field_bcs(
@@ -100,7 +100,7 @@ def test_mesh(domain: tuple) -> None:
 def test_field(domain: tuple) -> None:
     """Test field boundaries."""
 
-    from pyABC.core.variables import Field
+    from pyapes.core.variables import Field
 
     # First, check without callable function for the bc
     f_bc_config = create_test_field_bcs(False)

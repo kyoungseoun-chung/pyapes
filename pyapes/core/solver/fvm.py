@@ -10,9 +10,9 @@ from typing import Union
 import torch
 from torch import Tensor
 
-from pyABC.core.geometry.basis import DIR
-from pyABC.core.solver.fluxes import Flux
-from pyABC.core.variables import Field
+from pyapes.core.geometry.basis import DIR
+from pyapes.core.solver.fluxes import Flux
+from pyapes.core.variables import Field
 
 
 @dataclass(eq=False)
@@ -247,6 +247,9 @@ class Laplacian(Discretizer):
         self._coeff = coeff
         self._var = var
 
+        # Need to store Callable Aop, Var, coeffs so on...
+        # So that I can use them in pyapes.core.solver.linalg.solve
+        # by looping over self._ops to construct Aop
         self._ops[0] = {"flux": self.Aop, "op": self.__class__.__name__}
 
         return self

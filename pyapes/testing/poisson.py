@@ -12,7 +12,7 @@ from typing import Union
 import torch
 from torch import Tensor
 
-from pyABC.core.mesh import Mesh
+from pyapes.core.mesh import Mesh
 
 
 def poisson_rhs_nd(mesh: Mesh) -> Tensor:

@@ -6,7 +6,7 @@ def test_tensorboard() -> None:
 
     import matplotlib.pyplot as plt
 
-    from pyABC.tools.diagnostics import TensorBoardTracker
+    from pyapes.tools.diagnostics import TensorBoardTracker
 
     save_dir = "./tests/tmp_dir/"
 
@@ -40,7 +40,7 @@ def test_tensorboard() -> None:
 def test_save_vtk():
 
     from tests.test_variables import test_get_box_333
-    from pyABC.tools.diagnostics import SaveDictionary
+    from pyapes.tools.diagnostics import SaveDictionary
 
     mesh = test_get_box_333(False)
 

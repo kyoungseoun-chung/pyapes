@@ -8,9 +8,9 @@ from typing import Union
 import torch
 from torch import Tensor
 
-from pyABC.core.boundaries import BC_TYPE_FACTORY
-from pyABC.core.mesh import field_patch_mask
-from pyABC.core.mesh import Mesh
+from pyapes.core.boundaries import BC_TYPE_FACTORY
+from pyapes.core.mesh import field_patch_mask
+from pyapes.core.mesh import Mesh
 
 
 @dataclass

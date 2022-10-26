@@ -11,7 +11,7 @@ import pyevtk
 import torch
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from pyABC.core.mesh import Mesh
+from pyapes.core.mesh import Mesh
 
 
 PATHLIKE = Union[str, Path, os.PathLike]

@@ -5,9 +5,9 @@ from typing import Union
 
 from torch import Tensor
 
-from pyABC.core.geometry.basis import DIR
-from pyABC.core.geometry.basis import FDIR
-from pyABC.core.variables import Field
+from pyapes.core.geometry.basis import DIR
+from pyapes.core.geometry.basis import FDIR
+from pyapes.core.variables import Field
 
 
 class Flux:

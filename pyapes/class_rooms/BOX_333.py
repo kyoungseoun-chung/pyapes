@@ -6,7 +6,6 @@ Note:
 """
 import numpy as np
 import torch
-
 from pyABC.tools.utils import Container
 
 LX_min = (0.0, 0.0, 0.0)

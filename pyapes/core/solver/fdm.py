@@ -9,10 +9,10 @@ import torch
 from rich import print as rprint
 from torch import Tensor
 
-from pyABC.core.mesh import Mesh
-from pyABC.core.solver.tools import create_pad
-from pyABC.core.solver.tools import inner_slicer
-from pyABC.core.variables import Field
+from pyapes.core.mesh import Mesh
+from pyapes.core.solver.tools import create_pad
+from pyapes.core.solver.tools import inner_slicer
+from pyapes.core.variables import Field
 
 
 class Discretizer(ABC):

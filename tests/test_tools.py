@@ -10,7 +10,7 @@ import torch
 
 def test_container(report: bool = True) -> None:
 
-    from pyABC.tools.utils import Container
+    from pyapes.tools.utils import Container
 
     A = Container(test=10)
 
@@ -32,7 +32,7 @@ def test_container(report: bool = True) -> None:
 
 def test_getsize() -> None:
 
-    from pyABC.tools.utils import getsize
+    from pyapes.tools.utils import getsize
 
     @dataclass
     class Dummy:

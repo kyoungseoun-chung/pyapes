@@ -1,22 +1,18 @@
 # THIS LIBRARY IS CURRENTLY BROKEN!! IT IS PRE-ALPHA STAGE!
-# Python Awesome Basic Calculus: pyABC
+# Python Awesome Partial differential Equation Solver: PyAPES
 
-<img src="pyABC/assets/logo.png" width="150"/>
+<img src="PyAPES/assets/logo.png" width="150"/>
 
 The code was inspired by https://gitlab.ethz.ch/ifd-pdf/airborne-transmission/airborne_covid19.
 
 ![python](http://ForTheBadge.com/images/badges/made-with-python.svg)
 
 
-[![pipeline](https://gitlab.ethz.ch/kchung/pyabc/badges/main/pipeline.svg)](https://gitlab.ethz.ch/kchung/pyabc/commits/main)
-[![coverage](https://gitlab.ethz.ch/kchung/pyabc/badges/main/coverage.svg)](https://gitlab.ethz.ch/kchung/pyabc/commits/main)
-[![python3.9](https://img.shields.io/badge/python-3.9-blue)](https://www.python.org/downloads/release/python-390/)
-
 ## Description
 
-PyABC is designed to solve various engineering problems.
+PyAPES is designed to solve various engineering problems.
 
-PyABC is/has
+PyAPES is/has
 - Cross-platform
 	- Both tested on Mac and Linux (Arch)
 	- Windows support is under testing
@@ -33,8 +29,8 @@ PyABC is/has
 ## Installation
 
 ```bash
-git clone git@gitlab.ethz.ch:kchung/pyabc.git
-cd pyabc
+git clone git@gitlab.ethz.ch:kchung/PyAPES.git
+cd PyAPES
 python3 -m pip install -e ./
 ```
 

@@ -3,10 +3,10 @@ import pytest
 import torch
 from torch.testing import assert_close  # type: ignore
 
-from pyABC.core.geometry import Box
-from pyABC.core.mesh import Mesh
-from pyABC.core.solver.ops import Solver
-from pyABC.core.variables import Field
+from pyapes.core.geometry import Box
+from pyapes.core.mesh import Mesh
+from pyapes.core.solver.ops import Solver
+from pyapes.core.variables import Field
 
 
 @pytest.mark.parametrize(
@@ -19,7 +19,7 @@ from pyABC.core.variables import Field
 )
 def test_poisson(domain: Box, spacing: list[int], dim: int) -> None:
 
-    from pyABC.testing.poisson import (
+    from pyapes.testing.poisson import (
         poisson_bcs,
         poisson_rhs_nd,
         poisson_exact_nd,
@@ -54,7 +54,7 @@ def test_poisson(domain: Box, spacing: list[int], dim: int) -> None:
 )
 def test_grad(domain: Box, spacing: list[int], dim: int) -> None:
 
-    from pyABC.core.solver.fvm import Grad, DIR
+    from pyapes.core.solver.fvm import Grad, DIR
 
     mesh = Mesh(domain, None, spacing)
     var = Field("", dim, mesh, None)
@@ -91,7 +91,7 @@ def test_grad(domain: Box, spacing: list[int], dim: int) -> None:
     ],
 )
 def test_fvm(domain: Box, spacing: list[int], dim: int) -> None:
-    from pyABC.core.solver.fvm import Div, Laplacian
+    from pyapes.core.solver.fvm import Div, Laplacian
 
     mesh = Mesh(domain, None, spacing)
     var = Field("", dim, mesh, None)

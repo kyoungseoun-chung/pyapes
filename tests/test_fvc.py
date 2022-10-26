@@ -6,13 +6,13 @@ import pytest
 import torch
 from torch.testing import assert_close  # type: ignore
 
-from pyABC.core.geometry import Box
-from pyABC.core.mesh import Mesh
-from pyABC.core.solver.ops import Solver
-from pyABC.core.variables import Field
-from pyABC.testing.poisson import poisson_bcs
-from pyABC.testing.poisson import poisson_exact_nd
-from pyABC.testing.poisson import poisson_rhs_nd
+from pyapes.core.geometry import Box
+from pyapes.core.mesh import Mesh
+from pyapes.core.solver.ops import Solver
+from pyapes.core.variables import Field
+from pyapes.testing.poisson import poisson_bcs
+from pyapes.testing.poisson import poisson_exact_nd
+from pyapes.testing.poisson import poisson_rhs_nd
 
 
 @pytest.mark.parametrize(
@@ -61,7 +61,7 @@ def test_poisson_nd(domain: tuple) -> None:
 def test_poisson_jacobi_gs_and_etc(device: str) -> None:
     """Test the Poisson Jacobi and Gauss-Seidel solver."""
 
-    from pyABC.core.solver.fdm import fdm_op
+    from pyapes.core.solver.fdm import fdm_op
 
     f_bc_config = poisson_bcs(dim=3)
 
