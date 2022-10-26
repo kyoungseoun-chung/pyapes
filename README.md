@@ -10,15 +10,15 @@ The code was inspired by https://gitlab.ethz.ch/ifd-pdf/airborne-transmission/ai
 
 ## Description
 
-PyAPES is designed to solve various engineering problems.
+`pyapes` is designed to solve various engineering problems.
 
-PyAPES is/has
+`pyapes` is/has
 - Cross-platform
 	- Both tested on Mac and Linux (Arch)
 	- Windows support is under testing
 - GPU acceleration in a structured grid with [PyTorch](https://pytorch.org)
 	- Use of `torch.Tensor`. User can choose either `torch.device("cpu")` or `torch.device("cuda")`
-- Generically expressed (OpenFoam-like, human-readable formulation)
+- Generically expressed (OpenFOAM-like, human-readable formulation)
 	```python
 	# FDM
 	fvc.solve(fvc.laplacian(var) == rhs)
@@ -28,10 +28,12 @@ PyAPES is/has
 	```
 ## Installation
 
+We recommend to use `poetry` to manage all dependencies.
+
 ```bash
-git clone git@gitlab.ethz.ch:kchung/PyAPES.git
-cd PyAPES
-python3 -m pip install -e ./
+git clone git@gitlab.ethz.ch:kchung/pyapes.git
+cd pyapes
+poetry install
 ```
 
 ## Dependencies
