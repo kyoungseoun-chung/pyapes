@@ -1,6 +1,6 @@
 # THIS LIBRARY IS CURRENTLY BROKEN!! IT IS PRE-ALPHA STAGE!
-# Python Awesome Partial differential Equation Solver: PyAPES
-
+# pyapes
+**PY**thon **A**wesome **P**artial differential **E**quation **S**olver (general purpose finite volume PDE solver)
 <img src="PyAPES/assets/logo.png" width="150"/>
 
 The code was inspired by https://gitlab.ethz.ch/ifd-pdf/airborne-transmission/airborne_covid19.
@@ -9,23 +9,23 @@ The code was inspired by https://gitlab.ethz.ch/ifd-pdf/airborne-transmission/ai
 
 
 ## Description
+`pyapes` is designed to solve various engineering problems in retecangular grid.
 
-`pyapes` is designed to solve various engineering problems.
+`pyapes` (should be/have) is/has
 
-`pyapes` is/has
 - Cross-platform
 	- Both tested on Mac and Linux (Arch)
 	- Windows support is under testing
 - GPU acceleration in a structured grid with [PyTorch](https://pytorch.org)
-	- Use of `torch.Tensor`. User can choose either `torch.device("cpu")` or `torch.device("cuda")`
+	- Use of `torch.Tensor`. User can choose either `torch.device("cpu")` or `torch.device("cuda")`.
 - Generically expressed (OpenFOAM-like, human-readable formulation)
-	```python
-	# FDM
-	fvc.solve(fvc.laplacian(var) == rhs)
+	```python3
 	# FVM
-	fvm.set_eq(fvm.Ddt(var) + fvm.Div(var, u) + fvm.Laplacian(var))
-	fvm.solve(fvm.eq == rhs)
+  	var = Field(...)
+	fvm.set_eq(fvm.Ddt(var) + fvm.Div(var, u) + fvm.Laplacian(var) == fvc.Grad(var) + fvc.Source(var))
+  	fvm.solve()
 	```
+
 ## Installation
 
 We recommend to use `poetry` to manage all dependencies.
