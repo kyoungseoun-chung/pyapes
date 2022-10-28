@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-from .variables import Field
+from .fields import Field
+from .fluxes import Flux
 
 
-__all__ = ["Field"]
+__all__ = ["Field", "Flux"]

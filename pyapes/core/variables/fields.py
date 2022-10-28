@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 import copy
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast, get_args
 from typing import Optional
 from typing import Union
 
 import torch
 from torch import Tensor
 
-from pyapes.core.boundaries import BC_TYPE_FACTORY
-from pyapes.core.mesh import field_patch_mask
+from pyapes.core.variables.bcs import BC_FACTORY, BC_config_type, BC_val_type
 from pyapes.core.mesh import Mesh
 
 
@@ -32,9 +31,7 @@ class Field:
     name: str
     dim: int
     mesh: Mesh
-    bc_config: Optional[
-        dict[str, Optional[list[dict[str, Union[float, str]]]]]
-    ]
+    bc_config: dict[str, Union[list[BC_config_type], None]]
     init_val: Optional[Union[int, float]] = None
     object_interp: bool = False
 
@@ -59,15 +56,17 @@ class Field:
             else:
                 raise ValueError("Field: unsupported data type!")
 
-        self.set_bcs_and_masks()
+        self.set_bcs()
 
     @property
     def dx(self) -> Tensor:
+        """Mesh spacing."""
 
         return self.mesh.dx
 
     @property
     def nx(self) -> torch.Size:
+        """Number of grid points."""
 
         return self.mesh.nx
 
@@ -101,9 +100,7 @@ class Field:
 
         return torch.sum(self.VAR, dim=dim)
 
-    def set_var_tensor(
-        self, val: Tensor, insert: Optional[int] = None
-    ) -> None:
+    def set_var_tensor(self, val: Tensor, insert: Optional[int] = None) -> None:
         """Set variable with a given Tensor.
 
         Examples:
@@ -195,7 +192,7 @@ class Field:
 
         return self.copy()
 
-    def set_bcs_and_masks(self) -> None:
+    def set_bcs(self) -> None:
         """Setting BCs from the given configurations.
         If there is no `Mesh.config.objs`, it will set `bcs` and `masks` to
         None.
@@ -210,19 +207,25 @@ class Field:
 
             # First domain
             if self.bc_config["domain"] is not None:
-                for bc, obj in zip(
-                    self.bc_config["domain"], self.mesh.domain.config
-                ):
+
+                d_obj_config = self.mesh.domain.config
+                d_bc_config = self.bc_config["domain"]
+
+                for bc, obj in zip(d_bc_config, d_obj_config):
+
+                    # Ensure bc_val type is one of BC_val_type
+                    assert isinstance(bc["bc_val"], get_args(BC_val_type))
+                    bc_val = cast(BC_val_type, bc["bc_val"])
+
+                    bc_face = cast(str, d_obj_config[obj]["face"])
 
                     # Need a way to syncronize the bcs and mask!
                     self.bcs.append(
-                        BC_TYPE_FACTORY[str(bc["bc_type"])](
-                            "domain",
-                            bc_id=obj["name"],
-                            bc_obj=bc["bc_obj"],
-                            bc_val=bc["bc_val"],
+                        BC_FACTORY[str(bc["bc_type"])](
+                            bc_id=f"d-{obj}",
+                            bc_val=bc_val,
+                            bc_face=bc_face,
                             bc_var_name=self.name,
-                            bc_face=obj["geometry"]["face"],
                             dtype=self.mesh.dtype,
                             device=self.mesh.device,
                         )
@@ -232,15 +235,8 @@ class Field:
                 self.mesh.obstacle is not None
                 and self.bc_config["obstacle"] is not None
             ):
-                raise NotImplementedError(
-                    "Field: inner object is not supported yet!"
-                )
+                raise NotImplementedError
         else:
             self.bcs_obj_set = None
 
-        self.masks, self.masks_obj = field_patch_mask(self.mesh)
-
-        if self.mesh.obstacle is not None and self.object_interp:
-            raise NotImplementedError(
-                "Field: inner obstacle is not implemented yet!"
-            )
+        # Now, masks are defined in the mesh

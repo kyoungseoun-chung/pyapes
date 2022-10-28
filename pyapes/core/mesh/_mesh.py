@@ -79,12 +79,27 @@ class Mesh:
                 )
             )
 
-        pass
         # Mesh grid
         self.grid = torch.meshgrid(self.x, indexing="ij")
 
         # Obtain face area and volume
         self._A, self._V = self.get_A_and_V()
+
+        # Mesh mask
+        self.d_mask, self.o_mask = boundary_mask(self)
+
+        self.t_mask = torch.zeros_like(self.d_mask[0])
+
+        # Get all mask
+        for dm in self.d_mask:
+            self.t_mask = torch.logical_or(self.t_mask, self.d_mask[dm])
+
+        if len(self.o_mask) > 0:
+            for o_idx in self.o_mask:
+                for om in self.o_mask[o_idx]:
+                    self.t_mask = torch.logical_or(
+                        self.t_mask, self.o_mask[o_idx][om]
+                    )
 
     @property
     def _depth(self) -> float:
@@ -233,7 +248,7 @@ class Mesh:
         return self.device == torch.device("cuda")
 
 
-def field_patch_mask(mesh: Mesh) -> tuple[dict, dict]:
+def boundary_mask(mesh: Mesh) -> tuple[dict, dict]:
     """Create a mask from the objects (self.mesh.objs).
 
     Warning:
@@ -249,75 +264,83 @@ def field_patch_mask(mesh: Mesh) -> tuple[dict, dict]:
     nx = mesh.nx
     dim = mesh.dim
 
-    domain = mesh.domain.config
+    # {0: {"e_x": ..., "x_p": ..., "face": ...}, ...}
+    domain = mesh.domain
     obstacle = mesh.obstacle
 
     dtype = mesh.dtype
     device = mesh.device
 
-    mask_to_save = dict()
-    obj_mask_sep = dict()
+    domain_mask = {}
+    object_mask = {}
 
-    # Loop over patch objects
-    for obj in domain:
+    # Loop over all faces
+    for idx, obj in enumerate(domain.config):
 
         mask = torch.zeros(*nx, dtype=dtype.bool, device=device)
-        mask = get_patch_mask(x, dx, obj, mask, dim)
+        mask = get_box_mask(x, dx, domain.config[obj], mask, dim)
 
         # Save as sub dictionary
         # Should id be face dir?
-        mask_to_save["Domain-" + obj["name"]] = mask
+        domain_mask.update({idx: mask})
 
     if obstacle is not None:
 
-        raise NotImplementedError(
-            "field_path_mask: inner obstacle is not supported yet!"
-        )
+        for i, obj in enumerate(obstacle):
 
-    return mask_to_save, obj_mask_sep
+            obj_mask = {}
+            if obj.type == "box":
+                for j, o in enumerate(obj.config):
+                    mask = torch.zeros(*nx, dtype=dtype.bool, device=device)
+                    mask = get_box_mask(x, dx, obj.config[o], mask, dim)
+
+                    # Save as sub dictionary
+                    # Should id be face dir?
+                    obj_mask.update({j: mask})
+                object_mask.update({i: obj_mask})
+            else:
+
+                raise NotImplementedError(
+                    "Mask: non box type inner obstacle is not supported yet!"
+                )
+
+    return domain_mask, object_mask
 
 
-def get_patch_mask(
+def get_box_mask(
     x: list[Tensor],
     dx: Tensor,
-    obj: dict,
+    obj: dict[str, Union[list[float], str]],
     mask: Tensor,
     dim: int,
 ) -> Tensor:
-    """Get patch mask."""
+    """Get masks for boundaries."""
 
     _nx = torch.zeros(dim, dtype=torch.long)
     _ix = torch.zeros_like(_nx)
 
-    x_p = obj["geometry"]["x_p"]
-    e_x = obj["geometry"]["e_x"]
+    x_p = torch.tensor(obj["x_p"], dtype=x[0].dtype, device=x[0].device)
+    e_x = torch.tensor(obj["e_x"], dtype=x[0].dtype, device=x[0].device)
 
     for i in range(dim):
         x_p[i] = x[i][torch.argmin(abs(x[i] - x_p[i]))]
         _nx[i] = torch.ceil(e_x[i] / dx[i]).type(torch.long) + 1
         _ix[i] = torch.argmin(abs(x[i] - x_p[i]))
 
-    mask = _assign_mask(mask, _ix, _nx, dim)
-
-    return mask
-
-
-def _assign_mask(mask: Tensor, ix: Tensor, nx: Tensor, dim: int) -> Tensor:
-
     if dim == 1:
         mask[
-            ix[0] : ix[0] + nx[0],
+            _ix[0] : _ix[0] + _nx[0],
         ] = True
     elif dim == 2:
         mask[
-            ix[0] : ix[0] + nx[0],
-            ix[1] : ix[1] + nx[1],
+            _ix[0] : _ix[0] + _nx[0],
+            _ix[1] : _ix[1] + _nx[1],
         ] = True
     else:
         mask[
-            ix[0] : ix[0] + nx[0],
-            ix[1] : ix[1] + nx[1],
-            ix[2] : ix[2] + nx[2],
+            _ix[0] : _ix[0] + _nx[0],
+            _ix[1] : _ix[1] + _nx[1],
+            _ix[2] : _ix[2] + _nx[2],
         ] = True
 
     return mask
