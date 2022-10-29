@@ -12,10 +12,10 @@ import torch
 from torch import Tensor
 
 from pyapes.core.mesh import Mesh
-from pyapes.core.solver.fluxes import Flux
 from pyapes.core.solver.tools import create_pad
 from pyapes.core.solver.tools import inner_slicer
 from pyapes.core.variables import Field
+from pyapes.core.variables import Flux
 
 
 def solve(

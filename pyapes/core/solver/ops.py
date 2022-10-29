@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 """Module for the various solvers.
+
+Usage of fvm and fvc is a bit different than openFOAM.
+Here, fvc returns dictionary of `torch.Tensor` as a result of discretization,
+on the other hand, fvm returns operation matrix, `Aop` of each individual discretization scheme.
+
 """
 from dataclasses import dataclass
 from typing import Any
@@ -12,7 +17,6 @@ from pyapes.core.solver.fdm import Laplacian as FDM_Laplacian
 from pyapes.core.solver.fvm import Ddt as FVM_Ddt
 from pyapes.core.solver.fvm import Discretizer
 from pyapes.core.solver.fvm import Div as FVM_Div
-from pyapes.core.solver.fvm import Flux
 from pyapes.core.solver.fvm import Grad as FVM_Grad
 from pyapes.core.solver.fvm import Laplacian as FVM_Laplacian
 from pyapes.core.variables import Field

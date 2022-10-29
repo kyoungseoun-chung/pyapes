@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Box geometry."""
 #!/usr/bin/env python3
+from typing import Union
+
 from pyapes.core.geometry.basis import Geometry
 
 
@@ -66,26 +68,14 @@ class Box(Geometry, metaclass=BoxType):
         self._upper = [float(i) for i in upper]
 
         # Box element discriminator
-        self.ex, self.xp, self.id, self.face, self._dim = _box_edge_and_corner(
+        self.ex, self.xp, self.face, self._dim = _box_edge_and_corner(
             self.lower, self.upper
         )
 
-        self._config = []
-
-        # Create object configuration
-        for n, e, x, f in zip(self.id, self.ex, self.xp, self.face):
-
-            self._config.append(
-                {
-                    "name": n,
-                    "type": "patch",
-                    "geometry": {
-                        "e_x": e,
-                        "x_p": x,
-                        "face": f,
-                    },
-                }
-            )
+        self._config: dict[int, dict[str, Union[list[float], str]]] = {}
+        # Create all face configurations
+        for idx, (e, x, f) in enumerate(zip(self.ex, self.xp, self.face)):
+            self._config.update({idx: {"e_x": e, "x_p": x, "face": f}})
 
     @property
     def dim(self) -> int:
@@ -130,7 +120,7 @@ class Box(Geometry, metaclass=BoxType):
         return self._lower[2]
 
     @property
-    def config(self) -> list[dict]:
+    def config(self) -> dict[int, dict[str, Union[list[float], str]]]:
         return self._config
 
     @property
@@ -144,7 +134,7 @@ class Box(Geometry, metaclass=BoxType):
 
 def _box_edge_and_corner(
     lower: list[float], upper: list[float]
-) -> tuple[list, list, list, list, int]:
+) -> tuple[list[list[float]], list[list[float]], list[str], int]:
     """Crate edge and  corner information based on input dimension.
 
     Note:
@@ -166,8 +156,7 @@ def _box_edge_and_corner(
         # 1D edge and corner
         xp = [[lower[0]], [upper[0]]]
         ex = [[lower[0] - xp[0][0]], [upper[0] - xp[1][0]]]
-        id = ["-", "+"]
-        face = ["w", "e"]
+        face = ["xl", "xr"]
     elif dim == 2:
         # 2D edge and corner
         xp = [
@@ -182,8 +171,7 @@ def _box_edge_and_corner(
             [lower[0] - xp[2][0], upper[1] - xp[2][1]],
             [upper[0] - xp[3][0], upper[1] - xp[3][1]],
         ]
-        id = ["y-", "y+", "x-", "x+"]
-        face = ["b", "f", "w", "e"]
+        face = ["yl", "yr", "xl", "xr"]
     else:
         # 3D edge and corner
         # Set of xp
@@ -203,7 +191,6 @@ def _box_edge_and_corner(
             [upper[0] - xp[4][0], upper[1] - xp[4][1], lower[2] - xp[4][2]],
             [upper[0] - xp[5][0], upper[1] - xp[5][1], upper[2] - xp[5][2]],
         ]
-        id = ["yz-", "yz+", "xz-", "xz+", "xy-", "xy+"]
-        face = ["w", "e", "s", "n", "b", "f"]
+        face = ["xl", "xr", "yl", "yr", "zl", "zr"]
 
-    return ex, xp, id, face, dim
+    return ex, xp, face, dim

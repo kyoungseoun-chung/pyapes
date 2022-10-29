@@ -2,9 +2,11 @@
 """Basis of geometries."""
 from enum import Enum
 from typing import Any
+from typing import Union
 
 DIR = ["x", "y", "z"]
 DIR_TO_NUM: dict[str, int] = {"x": 0, "y": 1, "z": 2}
+NUM_TO_DIR: dict[int, str] = {0: "x", 1: "y", 2: "z"}
 FDIR = ["xl", "xr", "yl", "yr", "zl", "zr"]
 FDIR_TO_NUM: dict[str, int] = {
     "xl": 0,
@@ -14,57 +16,6 @@ FDIR_TO_NUM: dict[str, int] = {
     "zl": 4,
     "zr": 5,
 }
-
-
-class Order:
-    def __call__(self, f: str):
-        return getattr(self, f)
-
-
-class _DimOrder(Order):
-    """Data index: X - 0, Y - 1, Z - 2.
-
-    * Domain is defined as following manner:
-
-        .. code-block:: text
-
-                z (s-n)
-                |
-                .---- x (w-e)
-               /
-              y (b-f)
-    """
-
-    w = 0
-    e = 0
-    f = 1
-    b = 1
-    n = 2
-    s = 2
-
-
-class _NormalDir(Order):
-    """Sign of the normal direction."""
-
-    w = -1
-    e = 1
-    n = 1
-    s = -1
-    f = 1
-    b = -1
-
-
-class FaceDir(Enum):
-    w = 0
-    e = 1
-    n = 2
-    s = 3
-    f = 4
-    b = 5
-
-
-NormalDir = _NormalDir()
-DimOrder = _DimOrder()
 
 
 class GeoTypeIdentifier(list):
@@ -121,7 +72,7 @@ class Geometry:
         raise NotImplementedError
 
     @property
-    def config(self) -> list[dict]:
+    def config(self) -> dict[int, dict[str, Union[list[list[float]], str]]]:
         """Configuration of the geometry."""
         raise NotImplementedError
 

@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Test fvc (finite difference - volume centered) solver module."""
+"""Test fvc (finite difference - volume centered) solver module.
+
+Need to be revised. I comfused concept of fvc and fvm.
+"""
 from math import pi
 
 import pytest
@@ -13,6 +16,10 @@ from pyapes.core.variables import Field
 from pyapes.testing.poisson import poisson_bcs
 from pyapes.testing.poisson import poisson_exact_nd
 from pyapes.testing.poisson import poisson_rhs_nd
+
+
+def test_fvc_grad() -> None:
+    pass
 
 
 @pytest.mark.parametrize(
