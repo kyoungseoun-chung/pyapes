@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 import copy
 from dataclasses import dataclass
-from typing import Any, cast, get_args
+from typing import Any
+from typing import cast
+from typing import get_args
 from typing import Optional
 from typing import Union
 
 import torch
 from torch import Tensor
 
-from pyapes.core.variables.bcs import BC_FACTORY, BC_config_type, BC_val_type
 from pyapes.core.mesh import Mesh
+from pyapes.core.variables.bcs import BC_config_type
+from pyapes.core.variables.bcs import BC_FACTORY
+from pyapes.core.variables.bcs import BC_type
+from pyapes.core.variables.bcs import BC_val_type
 
 
 @dataclass
@@ -100,7 +105,9 @@ class Field:
 
         return torch.sum(self.VAR, dim=dim)
 
-    def set_var_tensor(self, val: Tensor, insert: Optional[int] = None) -> None:
+    def set_var_tensor(
+        self, val: Tensor, insert: Optional[int] = None
+    ) -> None:
         """Set variable with a given Tensor.
 
         Examples:
@@ -159,7 +166,9 @@ class Field:
                     self.VAR[i] += other[i]
         else:
 
-            raise TypeError("Field: you can only add Field!")
+            raise TypeError(
+                "Field: you can only add Field, float, Tensor, list[int], or list[float]!"
+            )
 
         return self.copy()
 
@@ -176,8 +185,12 @@ class Field:
 
         if isinstance(other, Field):
             self.VAR *= other()
+        elif isinstance(other, Union[float, int]):
+            self.VAR *= other
         else:
-            raise TypeError("Field: you can only multiply Field!")
+            raise TypeError(
+                "Field: you can only multiply Field, int, or float!"
+            )
 
         return self.copy()
 
@@ -198,7 +211,7 @@ class Field:
         None.
         """
 
-        self.bcs = []
+        self.bcs: list[BC_type] = []
         self.masks = dict()
         self.mask_inner = dict()
 

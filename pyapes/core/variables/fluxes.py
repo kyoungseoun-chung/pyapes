@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Discretization using finite volume methodology (FVM) """
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field
 from typing import Any
 from typing import Union
 
@@ -72,7 +73,24 @@ class Flux:
         else:
             self._face.update({i: {j: {f: T}}})
 
-    def to_center(self) -> None:
+    def to_center(self, i: int, j: str, T: Tensor):
+        """Assign face values to `self._center`.
+
+        Args:
+            i (int): leading index
+            j (str): dummy index (to be summed)
+            T (Tensor): center values to be stored.
+        """
+
+        if i in self._center:
+            if j in self._center[i]:
+                self._center[i][j] = T
+            else:
+                self._center[i].update({j: T})
+        else:
+            self._center.update({i: {j: T}})
+
+    def sum_flux(self) -> None:
         """Sum all fluxes at the faces and assign to the center of a cell volume."""
 
         for i in self._face:
@@ -102,7 +120,7 @@ class Flux:
                 try:
                     self._center[i][j] *= target
                 except KeyError:
-                    self.to_center()
+                    self.sum_flux()
                     self._center[i][j] *= target
 
         return self

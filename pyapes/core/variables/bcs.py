@@ -7,18 +7,19 @@ Supporting types:
     * Symmetry
     * Periodic
 """
+from abc import ABC
+from abc import abstractmethod
+from dataclasses import dataclass
+from typing import Callable
+from typing import get_args
+from typing import Union
 
 import torch
 from torch import Tensor
 
-
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Callable, Type, Union, get_args
-
 from pyapes.core.backend import DType
-from pyapes.core.variables.fluxes import Flux
 from pyapes.core.geometry.basis import FDIR_TO_NUM
+from pyapes.core.variables.fluxes import Flux
 
 BC_val_type = Union[int, float, list[int], list[float], Callable]
 BC_config_type = dict[str, Union[str, BC_val_type]]
@@ -57,7 +58,12 @@ class BC(ABC):
 
     @abstractmethod
     def apply(
-        self, mask: Tensor, var: Tensor, flux: Flux, grid: Tensor, order: int
+        self,
+        mask: Tensor,
+        var: Tensor,
+        flux: Flux,
+        grid: tuple[Tensor],
+        order: int,
     ) -> Tensor:
         """Apply boundary conditions.
 
@@ -75,7 +81,12 @@ class Dirichlet(BC):
     r"""Apply Dirichlet boundary conditions."""
 
     def apply(
-        self, mask: Tensor, var: Tensor, flux: Flux, grid: Tensor, order: int
+        self,
+        mask: Tensor,
+        var: Tensor,
+        flux: Flux,
+        grid: tuple[Tensor],
+        order: int,
     ) -> None:
         """Apply BC"""
         dim = var.size(0)
@@ -115,15 +126,14 @@ class Neumann(BC):
     r"""Apply Neumann boundary conditions."""
 
     def apply(
-        self, mask: Tensor, var: Tensor, flux: Flux, grid: Tensor
+        self,
+        mask: Tensor,
+        var: Tensor,
+        flux: Flux,
+        grid: tuple[Tensor],
+        order=int,
     ) -> None:
-        """Apply BC
-        Args:
-            mask: mask of bc object
-            var: Field vaules at the volume center
-            flux: Flux object to apply the boundary condition
-            grid: `Mesh.grid` to be used for `Callable` `self.bc_val`
-        """
+        """Apply BC"""
         dim = var.size(0)
 
         raise NotImplementedError
@@ -132,24 +142,21 @@ class Neumann(BC):
 class Symmetry(BC):
     r"""Apply Neumann boundary conditions."""
 
-    def apply(
-        self, mask: Tensor, var: Tensor, flux: Flux, grid: Tensor
-    ) -> None:
-        """Apply BC
-        Args:
-            mask: mask of bc object
-            var: Field vaules at the volume center
-            flux: Flux object to apply the boundary condition
-            grid: `Mesh.grid` to be used for `Callable` `self.bc_val`
-        """
+    def apply(self, mask: Tensor, var: Tensor, flux: Flux, *_) -> None:
+        """Apply BC"""
         dim = var.size(0)
+
         for d in range(dim):
+
             if self.bc_face[1] == "l":
                 opp_face = self.bc_face.replace("l", "r")
             else:
                 opp_face = self.bc_face.replace("r", "l")
 
-            face_val = flux.face(d, opp_face)
+            face_val = flux.face(d, self.bc_face)
+            opp_face_val = flux.face(d, opp_face)
+
+            face_val[mask] = opp_face_val[mask]
             flux.to_face(d, self.bc_face[0], self.bc_face[1], face_val)
 
 
@@ -170,10 +177,10 @@ def _bc_val_type_check(bc_val: BC_val_type):
         )
 
 
-BC_type = Union[Type[Dirichlet], Type[Neumann], Type[Symmetry], Type[Periodic]]
+BC_type = Union[Dirichlet, Neumann, Symmetry, Periodic]
 
 
-BC_FACTORY: dict[str, BC_type] = {
+BC_FACTORY = {
     "dirichlet": Dirichlet,
     "neumann": Neumann,
     "symmetry": Symmetry,
