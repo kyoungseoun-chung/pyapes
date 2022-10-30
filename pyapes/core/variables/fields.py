@@ -22,13 +22,14 @@ class Field:
     """Field variable class.
 
     >>> var = Field(...)
+    >>> var() # To get `Tensor` value of the Field
 
     Args:
         name: name of variable.
         dim: dimension of variable. 0 to be a scalar.
         mesh: Mesh object.
         bc_config: dictionary contains boundary conditions.
-        init_val: if it is given, Field will be homogeneously initialize with this valeu.
+        init_val: if it is given, Field will be homogeneously initialize with this value.
         object_interp: if True, interpolate inside of object using the boundary value of the object.
 
     """
@@ -100,7 +101,7 @@ class Field:
         """Sum variable.
 
         Args:
-            dim: dimesnion of the tensor to apply the sum operation. Defaults to 0.
+            dim: dimension of the tensor to apply the sum operation. Defaults to 0.
         """
 
         return torch.sum(self.VAR, dim=dim)
@@ -228,16 +229,16 @@ class Field:
 
                     # Ensure bc_val type is one of BC_val_type
                     assert isinstance(bc["bc_val"], get_args(BC_val_type))
+
                     bc_val = cast(BC_val_type, bc["bc_val"])
+                    bc_face = cast(str, bc["bc_face"])
 
-                    bc_face = cast(str, d_obj_config[obj]["face"])
-
-                    # Need a way to syncronize the bcs and mask!
                     self.bcs.append(
                         BC_FACTORY[str(bc["bc_type"])](
                             bc_id=f"d-{obj}",
                             bc_val=bc_val,
                             bc_face=bc_face,
+                            bc_mask=self.mesh.d_mask[bc_face],
                             bc_var_name=self.name,
                             dtype=self.mesh.dtype,
                             device=self.mesh.device,
@@ -249,7 +250,3 @@ class Field:
                 and self.bc_config["obstacle"] is not None
             ):
                 raise NotImplementedError
-        else:
-            self.bcs_obj_set = None
-
-        # Now, masks are defined in the mesh

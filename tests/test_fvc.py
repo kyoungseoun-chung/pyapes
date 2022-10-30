@@ -18,8 +18,30 @@ from pyapes.testing.poisson import poisson_exact_nd
 from pyapes.testing.poisson import poisson_rhs_nd
 
 
-def test_fvc_grad() -> None:
-    pass
+@pytest.mark.parametrize(
+    ["domain", "spacing", "dim"],
+    [
+        [Box[0:1], [0.1], 1],
+        [Box[0:1, 0:1], [0.1, 0.1], 2],
+        [Box[0:1, 0:1, 0:1], [0.1, 0.1, 0.1], 3],
+    ],
+)
+def test_fvc_ops(domain: Box, spacing: list[float], dim: int) -> None:
+
+    from pyapes.core.variables.bcs import BC_HD
+    from pyapes.core.solver.fvc import Grad
+
+    mesh = Mesh(domain, None, spacing)
+
+    # Field boundaries are all set to zero
+    var = Field("test", 1, mesh, {"domain": BC_HD(dim, 0.0), "obstacle": None})
+
+    var.set_var_tensor(mesh.X**2)
+
+    grad = Grad()(var)
+
+    target = (2 * mesh.X)[~mesh.t_mask]
+    assert_close(grad(0, "x")[~mesh.t_mask], target)
 
 
 @pytest.mark.parametrize(
@@ -62,80 +84,3 @@ def test_poisson_nd(domain: tuple) -> None:
     cg_sol = fvc.solve()
 
     assert_close(cg_sol()[0], sol_ex, rtol=0.1, atol=0.01)
-
-
-@pytest.mark.parametrize("device", ["cpu", "cuda", "mps"])
-def test_poisson_jacobi_gs_and_etc(device: str) -> None:
-    """Test the Poisson Jacobi and Gauss-Seidel solver."""
-
-    from pyapes.core.solver.fdm import fdm_op
-
-    f_bc_config = poisson_bcs(dim=3)
-
-    if device == "cuda":
-        if not torch.cuda.is_available():
-            return
-    elif device == "mps":
-        # MPS does not support double precision. Skip this...
-        return
-
-    mesh = Mesh(Box[0:1, 0:1, 0:1], None, [0.1, 0.1, 0.1], device, "single")
-
-    assert mesh.dx[0] == 0.1
-    assert mesh.nx[0] == 11
-
-    var = Field("any", 1, mesh, {"domain": f_bc_config, "obstacle": None})
-
-    assert var.size == (1, 11, 11, 11)
-    assert_close(var.sum(), torch.sum(var(), dim=0))
-
-    # RHS of the Poisson equation
-    zero_tensor = torch.zeros_like(var())
-
-    rhs = poisson_rhs_nd(mesh)
-    sol_ex = poisson_exact_nd(mesh)
-
-    # Test Jacobi method
-    solver_config = {
-        "method": "jacobi",
-        "omega": 2 / 3,
-        "tol": 1e-5,
-        "max_it": 1000,
-        "report": True,
-    }
-
-    # Test with copy function
-    jacobi_sol, _ = fdm_op(var.copy(), rhs, solver_config, mesh)
-
-    assert_close(jacobi_sol()[0], sol_ex, rtol=0.1, atol=0.01)
-
-    # Test Gauss-Seidel method
-    solver_config = {
-        "method": "gs",
-        "tol": 1e-5,
-        "omega": 2 / 3,
-        "max_it": 1000,
-        "report": True,
-    }
-
-    solver_config = {
-        "fvc": {
-            "method": "cg",
-            "tol": 1e-5,
-            "max_it": 100,
-            "report": True,
-        }
-    }
-    # Test as a whole
-    fvc = Solver(solver_config).fvc
-
-    # Assimilate the iteration
-    for _ in range(3):
-
-        # Add noise
-        rand_tensor = torch.rand(*var.size)
-        var.set_var_tensor(zero_tensor + 0.0001 * rand_tensor)
-        fvc.set_eq(fvc.laplacian(var) == rhs)
-        sol = fvc.solve()
-
-        assert_close(sol()[0], sol_ex, rtol=0.1, atol=0.01)

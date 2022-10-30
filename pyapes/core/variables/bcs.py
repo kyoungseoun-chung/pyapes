@@ -12,12 +12,14 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Callable
 from typing import get_args
+from typing import Optional
 from typing import Union
 
 import torch
 from torch import Tensor
 
 from pyapes.core.backend import DType
+from pyapes.core.geometry.basis import FDIR
 from pyapes.core.geometry.basis import FDIR_TO_NUM
 from pyapes.core.variables.fluxes import Flux
 
@@ -39,6 +41,7 @@ class BC(ABC):
         bc_type: BC type either (:py:mod:`Neumann` or :py:mod:`Dirichlet`)
         bc_val: values for the boundary condition. Either `list[float]` or
             `float` or `Callable`
+        bc_mask: boundary mask according to the face of the mesh
         bc_var_name: name of the variable
         dtype: :py:mod:`DType`
         device: torch.device. Either `cpu` or `cuda`
@@ -47,6 +50,7 @@ class BC(ABC):
     bc_id: str
     bc_val: BC_val_type
     bc_face: str
+    bc_mask: Tensor
     bc_var_name: str
     dtype: DType
     device: torch.device
@@ -58,21 +62,16 @@ class BC(ABC):
 
     @abstractmethod
     def apply(
-        self,
-        mask: Tensor,
-        var: Tensor,
-        flux: Flux,
-        grid: tuple[Tensor],
-        order: int,
+        self, var: Tensor, flux: Flux, grid: tuple[Tensor], order: int
     ) -> Tensor:
         """Apply boundary conditions.
 
         Args:
             mask: mask of bc object
-            var: Field vaules at the volume center
+            var: Field values at the volume center
             flux: Flux object to apply the boundary condition
             grid: `Mesh.grid` to be used for `Callable` `self.bc_val`
-            order: order of boundary evaluation. if `order` is zero, face value will bel linearly evaulated in between cell `i` and `i+1`. else `order` is non-zero, face value will be `order`-derivative at the face.
+            order: order of boundary evaluation. if `order` is zero, face value will bel linearly evaluated in between cell `i` and `i+1`. else `order` is non-zero, face value will be `order`-derivative at the face.
         """
         ...
 
@@ -81,12 +80,7 @@ class Dirichlet(BC):
     r"""Apply Dirichlet boundary conditions."""
 
     def apply(
-        self,
-        mask: Tensor,
-        var: Tensor,
-        flux: Flux,
-        grid: tuple[Tensor],
-        order: int,
+        self, var: Tensor, flux: Flux, grid: tuple[Tensor], order: int
     ) -> None:
         """Apply BC"""
         dim = var.size(0)
@@ -94,15 +88,15 @@ class Dirichlet(BC):
         if callable(self.bc_val):
 
             # TODO: NEED TO BE CHECKED
-            bc_callable = self.bc_val(grid, mask)
+            bc_callable = self.bc_val(grid, self.bc_mask)
 
             for d in range(dim):
                 face_val = flux.face(d, self.bc_face)
 
+                # Face value derivative order
                 if order == 0:
-                    face_val[mask] = bc_callable
+                    face_val[self.bc_mask] = bc_callable
                 else:
-                    # TODO: shit I need mesh info...
                     raise ValueError
 
                 flux.to_face(d, self.bc_face[0], self.bc_face[1], face_val)
@@ -112,26 +106,26 @@ class Dirichlet(BC):
 
                 face_val = flux.face(d, self.bc_face)
 
-                if isinstance(self.bc_val, int) or isinstance(
-                    self.bc_val, float
-                ):
-                    face_val[mask] = self.bc_val * self.face_n_dir
+                if order == 0:
+                    face_val[self.bc_mask] = (
+                        self.bc_val * self.face_n_dir
+                        if not isinstance(self.bc_val, list)
+                        else self.bc_val[d] * self.face_n_dir
+                    )
+                    flux.to_face(d, self.bc_face[0], self.bc_face[1], face_val)
+                elif order == 1:
+                    pass
                 else:
-                    face_val[mask] = self.bc_val[d] * self.face_n_dir
-
-                flux.to_face(d, self.bc_face[0], self.bc_face[1], face_val)
+                    raise ValueError(
+                        f"BC: boundary value evaluation for {order}-derivative is not supported!"
+                    )
 
 
 class Neumann(BC):
     r"""Apply Neumann boundary conditions."""
 
     def apply(
-        self,
-        mask: Tensor,
-        var: Tensor,
-        flux: Flux,
-        grid: tuple[Tensor],
-        order=int,
+        self, var: Tensor, flux: Flux, grid: tuple[Tensor], order=int
     ) -> None:
         """Apply BC"""
         dim = var.size(0)
@@ -142,7 +136,7 @@ class Neumann(BC):
 class Symmetry(BC):
     r"""Apply Neumann boundary conditions."""
 
-    def apply(self, mask: Tensor, var: Tensor, flux: Flux, *_) -> None:
+    def apply(self, var: Tensor, flux: Flux, *_) -> None:
         """Apply BC"""
         dim = var.size(0)
 
@@ -156,7 +150,7 @@ class Symmetry(BC):
             face_val = flux.face(d, self.bc_face)
             opp_face_val = flux.face(d, opp_face)
 
-            face_val[mask] = opp_face_val[mask]
+            face_val[self.bc_mask] = opp_face_val[self.bc_mask]
             flux.to_face(d, self.bc_face[0], self.bc_face[1], face_val)
 
 
@@ -175,6 +169,38 @@ def _bc_val_type_check(bc_val: BC_val_type):
         raise TypeError(
             f"BC: wrong bc variable -> {type(bc_val)} is not one of {get_args(BC_val_type)}!"
         )
+
+
+def homogeneous_bcs(
+    dim: int, bc_val: Optional[float], bc_type: str
+) -> list[BC_config_type]:
+    """Simple pre-defined boundary condition.
+    Args:
+        dim: dimension of mesh
+        bc_val: value at the boundary. Homogenous at the boundary surface.
+        bc_type: Type of bc
+    """
+
+    bc_config = []
+    for i in range(dim * 2):
+        bc_config.append(
+            {"bc_face": FDIR[i], "bc_type": bc_type, "bc_val": bc_val}
+        )
+    return bc_config
+
+
+class BC_HD:
+    """Homogeneous Dirichlet BC for the box. Just a useful tool."""
+
+    def __new__(cls, dim: int, bc_val: float):
+        return homogeneous_bcs(dim, bc_val, "dirichlet")
+
+
+class BC_HN:
+    """Homogeneous Neumann BC for the box. Just a useful tool."""
+
+    def __new__(cls, dim: int, bc_val: float):
+        return homogeneous_bcs(dim, bc_val, "neumann")
 
 
 BC_type = Union[Dirichlet, Neumann, Symmetry, Periodic]

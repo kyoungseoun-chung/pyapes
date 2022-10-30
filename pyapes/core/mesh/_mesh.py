@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from typing import cast
 from typing import Optional
 from typing import Union
 
@@ -88,7 +89,7 @@ class Mesh:
         # Mesh mask
         self.d_mask, self.o_mask = boundary_mask(self)
 
-        self.t_mask = torch.zeros_like(self.d_mask[0])
+        self.t_mask = torch.zeros_like(self.d_mask["xl"])
 
         # Get all mask
         for dm in self.d_mask:
@@ -271,32 +272,35 @@ def boundary_mask(mesh: Mesh) -> tuple[dict, dict]:
     dtype = mesh.dtype
     device = mesh.device
 
-    domain_mask = {}
+    domain_mask: dict[str, Tensor] = {}
     object_mask = {}
 
     # Loop over all faces
-    for idx, obj in enumerate(domain.config):
+    for obj in domain.config:
 
         mask = torch.zeros(*nx, dtype=dtype.bool, device=device)
         mask = get_box_mask(x, dx, domain.config[obj], mask, dim)
 
         # Save as sub dictionary
-        # Should id be face dir?
-        domain_mask.update({idx: mask})
+        mask_face_id = cast(str, domain.config[obj]["face"])
+        domain_mask.update({mask_face_id: mask})
 
+    # For the inner objects
     if obstacle is not None:
 
         for i, obj in enumerate(obstacle):
-
             obj_mask = {}
             if obj.type == "box":
-                for j, o in enumerate(obj.config):
+                for o in obj.config:
                     mask = torch.zeros(*nx, dtype=dtype.bool, device=device)
                     mask = get_box_mask(x, dx, obj.config[o], mask, dim)
 
                     # Save as sub dictionary
                     # Should id be face dir?
-                    obj_mask.update({j: mask})
+                    # Save as sub dictionary
+                    mask_face_id = cast(str, obj.config[o]["face"])
+
+                    obj_mask.update({mask_face_id: mask})
                 object_mask.update({i: obj_mask})
             else:
 
@@ -310,7 +314,7 @@ def boundary_mask(mesh: Mesh) -> tuple[dict, dict]:
 def get_box_mask(
     x: list[Tensor],
     dx: Tensor,
-    obj: dict[str, Union[list[float], str]],
+    obj: dict[str, Union[list[list[float]], str]],
     mask: Tensor,
     dim: int,
 ) -> Tensor:

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """New FVM module. WIP"""
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC
+from abc import abstractmethod
+from abc import abstractproperty
 from dataclasses import dataclass
 from dataclasses import field
 from typing import Any
@@ -12,9 +14,9 @@ import torch
 from torch import Tensor
 
 from pyapes.core.geometry.basis import DIR
-from pyapes.core.variables import Flux
-from pyapes.core.variables import Field
 from pyapes.core.solver.fvc import Grad
+from pyapes.core.variables import Field
+from pyapes.core.variables import Flux
 
 
 @dataclass(eq=False)

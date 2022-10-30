@@ -16,17 +16,7 @@ from pyapes.core.variables import Flux
 
 @dataclass(eq=False)
 class Discretizer:
-    """Base class of FVM discretization.
-
-    Examples:
-
-        >>> # Laplacian of scalar field same for Div
-        >>> laplacian = Laplacian()
-        >>> res = laplacian(coeff, phi)
-        >>> res.flux(0, "xl")    # d^2 phi/dx_1^2 on the left side of x directional cell face
-        >>> res.flux_sum()
-        >>> res.flux(0, "x")     # averaged cell centered value in x
-    """
+    """Base class of FVM discretization."""
 
     # Init relavent attributes
     _ops: dict[int, dict[str, Union[Callable, str]]] = field(
@@ -36,28 +26,28 @@ class Discretizer:
 
     @property
     def ops(self) -> dict[int, dict[str, Union[Callable, str]]]:
+        """Collection of operators used in `pyapes.core.solver.Solver().set_eq()`"""
         return self._ops
 
     @property
     def rhs(self) -> Optional[Tensor]:
+        """RHS of `set_eq()`"""
         return self._rhs
 
     @property
     def var(self) -> Field:
+        """Primary Field variable to be discretized."""
         raise NotImplementedError
 
     @property
     def flux(self) -> Flux:
+        """Flux object to be computed."""
         raise NotImplementedError
 
     @property
     def Aop(self) -> Tensor:
         """Obtain operation matrix to solve the linear system."""
         raise NotImplementedError
-
-    def set_config(self, config: dict):
-
-        self.config = config
 
     def __eq__(self, other: Union[Tensor, float]) -> Any:
 

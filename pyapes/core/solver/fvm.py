@@ -1,98 +1,17 @@
 #!/usr/bin/env python3
-"""Discretization using finite volume methodology (FVM) """
+"""Discretization using finite volume methodology (FVM). Unlike `fvc`, `fvm` solve the field implicitly."""
 from dataclasses import dataclass
-from dataclasses import field
 from typing import Any
-from typing import Callable
 from typing import Optional
 from typing import Union
 
 import torch
 from torch import Tensor
 
+from .fv import Discretizer
 from pyapes.core.geometry.basis import DIR
 from pyapes.core.variables import Field
 from pyapes.core.variables import Flux
-
-
-@dataclass(eq=False)
-class Discretizer:
-    """Base class of FVM discretization.
-
-    Examples:
-
-        >>> # Laplacian of scalar field same for Div
-        >>> laplacian = Laplacian()
-        >>> res = laplacian(coeff, phi)
-        >>> res.flux(0, "xl")    # d^2 phi/dx_1^2 on the left side of x directional cell face
-        >>> res.flux_sum()
-        >>> res.flux(0, "x")     # averaged cell centered value in x
-    """
-
-    # Init relavent attributes
-    _ops: dict[int, dict[str, Union[Callable, str]]] = field(
-        default_factory=dict
-    )
-    _rhs: Optional[Tensor] = None
-
-    @property
-    def ops(self) -> dict[int, dict[str, Union[Callable, str]]]:
-        return self._ops
-
-    @property
-    def rhs(self) -> Optional[Tensor]:
-        return self._rhs
-
-    @property
-    def var(self) -> Field:
-        raise NotImplementedError
-
-    @property
-    def flux(self) -> Flux:
-        raise NotImplementedError
-
-    @property
-    def Aop(self) -> Tensor:
-        """Obtain operation matrix to solve the linear system."""
-        raise NotImplementedError
-
-    def set_config(self, config: dict):
-
-        self.config = config
-
-    def __eq__(self, other: Union[Tensor, float]) -> Any:
-
-        if isinstance(other, Tensor):
-            self._rhs = other
-        else:
-            self._rhs = torch.zeros_like(self.var()) + other
-
-        return self
-
-    def __add__(self, other: Any) -> Any:
-
-        assert self.flux is not None, "Discretizer: Flux is not assigned!"
-
-        idx = list(self._ops.keys())
-        self._ops.update(
-            {idx[-1] + 1: {"flux": other.flux, "op": other.__class__.__name__}}
-        )
-
-        return self
-
-    def __sub__(self, other: Any) -> Any:
-
-        assert self.flux is not None, "Discretizer: Flux is not assigned!"
-
-        idx = list(self._ops.keys())
-        self._ops.update(
-            {
-                idx[-1]
-                + 1: {"flux": other.flux * -1, "op": other.__class__.__name__}
-            }
-        )
-
-        return self
 
 
 @dataclass(eq=False)
@@ -144,7 +63,7 @@ class Grad(Discretizer):
 
         dx = var.mesh.dx
 
-        grad = Flux()
+        grad = Flux(var.mesh)
 
         for i in range(var.dim):
 
@@ -190,7 +109,7 @@ class Div(Discretizer):
 
         self._var = var_i
 
-        flux = Flux()
+        flux = Flux(var_i.mesh)
 
         for i in range(var_i.dim):
             for j in range(var_j.dim):
@@ -274,7 +193,7 @@ class Laplacian(Discretizer):
 
         fvm_Grad = Grad()
         grad = fvm_Grad(var)
-        flux = Flux()
+        flux = Flux(var.mesh)
 
         for i in range(var.dim):
             for j in range(var.dim):
@@ -304,30 +223,4 @@ class Laplacian(Discretizer):
         return flux
 
 
-def _flux_linear(flux: Flux, f_var: Tensor) -> Flux:
-    r"""Linear interpolation of the flux from the node values.
-
-    .. math:
-
-        \Phi_f = \frac{\Phi^{+1} + \Phi^{c}}{2}
-
-    Args:
-        flux: flux object to be calculated
-        f_var: field values at the cell center
-    """
-
-    raise NotImplementedError
-
-
-def _fvm_i_bc_apply(var: Field, flux: Flux, type: str = "grad") -> Flux:
-    """Apply BC for the product of a single variable.
-
-    Args:
-        var: target variable. Same Variable type with the final return type
-        flux: flux calculated from nodes
-
-    Returns:
-        Boundary assigned Flux
-    """
-
-    raise NotImplementedError
+FVM_type = Union[Div, Grad, Laplacian]

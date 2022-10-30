@@ -12,7 +12,9 @@ from typing import Union
 import torch
 from torch import Tensor
 
+from pyapes.core.geometry.basis import FDIR
 from pyapes.core.mesh import Mesh
+from pyapes.core.variables.bcs import BC_config_type
 
 
 def poisson_rhs_nd(mesh: Mesh) -> Tensor:
@@ -52,12 +54,12 @@ def poisson_exact_nd(mesh: Mesh) -> Tensor:
         )
 
 
-def poisson_bcs(dim: int = 3) -> list[dict[str, Union[float, str]]]:
+def poisson_bcs(dim: int = 3) -> list[BC_config_type]:
     """Currently we only have patches."""
 
     bc_config = []
 
-    for _ in range(dim * 2):
+    for i in range(dim * 2):
         if dim == 1:
             bc_val = poisson_1d_bc
         elif dim == 2:
@@ -67,7 +69,7 @@ def poisson_bcs(dim: int = 3) -> list[dict[str, Union[float, str]]]:
 
         bc_config.append(
             {
-                "bc_obj": "patch",  # for debugging purposes
+                "bc_face": FDIR[i],  # for debugging purposes
                 "bc_type": "dirichlet",
                 "bc_val": bc_val,
             }

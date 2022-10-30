@@ -3,31 +3,24 @@
 Results of discretization always returns torch.Tensor.
 """
 from typing import Union
+
 import torch
 from torch import Tensor
 
-from pyapes.core.variables import Field
+from .fv import Discretizer
 from pyapes.core.geometry.basis import DIR
+from pyapes.core.variables import Field
 from pyapes.core.variables import Flux
 
 
-class Source:
+class Source(Discretizer):
     """Create source/sink at the cell center."""
 
-    def __new__(cls, *args, **kwargs):
-        return "__call__"
-
-    @staticmethod
-    def __call__(val: Union[float, Tensor], var: Field) -> Flux:
-
-        source = Flux(var.mesh)
-        for i in range(var.dim):
-            for j in range(var.mesh.dim):
-                if 
-                source.to_center(i, j, )
+    def __call__(self, val: Union[float, Tensor], var: Field) -> Flux:
+        raise NotImplementedError
 
 
-class Grad:
+class Grad(Discretizer):
     r"""Explicit discretization: Gradient
 
     Args:
@@ -38,11 +31,7 @@ class Grad:
 
     """
 
-    def __new__(cls, *args, **kwargs):
-        return "__call__"
-
-    @staticmethod
-    def __call__(var: Field) -> Flux:
+    def __call__(self, var: Field) -> Flux:
 
         grad = Flux(var.mesh)
 
@@ -58,14 +47,57 @@ class Grad:
                 grad.to_face(
                     i,
                     DIR[j],
-                    "l",
+                    "r",
                     (var()[i] + torch.roll(var()[i], -1, j)) / 2,
                 )
 
-        # How to BCs?
-        for bc, mask in zip(var.bcs, var.mesh.d_mask):
-            bc.apply(mask, var(), grad, var.mesh.grid, 0)
+        for bc in var.bcs:
+            bc.apply(var(), grad, var.mesh.grid, 0)
 
-        grad.sum_flux()
+        grad.sum()
 
         return grad
+
+
+class Laplacian(Discretizer):
+    r"""Explicit discretization: Laplacian
+
+    Args:
+        var: Field object to be discretized ($\Phi$).
+
+    Returns:
+        dict[int, dict[str, Tensor]]: resulting `torch.Tensor`. `int` represents variable dimension, and `str` indicates `Mesh` dimension.
+
+    """
+
+    def __call__(self, var: Field) -> Flux:
+
+        laplacian = Flux(var.mesh)
+
+        dx = var.dx
+
+        for i in range(var.dim):
+            for j in range(var.mesh.dim):
+
+                laplacian.to_face(
+                    i,
+                    DIR[j],
+                    "l",
+                    (var()[i] - torch.roll(var()[i], 1, j)) / dx[j],
+                )
+                laplacian.to_face(
+                    i,
+                    DIR[j],
+                    "r",
+                    (torch.roll(var()[i], -1, j) - var()[i]) / dx[j],
+                )
+
+        for bc in var.bcs:
+            bc.apply(var(), laplacian, var.mesh.grid, 1)
+
+        laplacian.sum()
+
+        return laplacian
+
+
+FVC_type = Union[Source, Grad, Laplacian]

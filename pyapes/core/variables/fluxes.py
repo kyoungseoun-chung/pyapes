@@ -21,7 +21,7 @@ class Flux:
     """Flux container.
 
     Note:
-        - To distinguis leading index and other index, leading is int and other is str.
+        - To distinguish leading index and other index, leading is int and other is str.
 
     >>> flux_tensor = torch.tensor(...)
     >>> flux = Flux()
@@ -90,7 +90,7 @@ class Flux:
         else:
             self._center.update({i: {j: T}})
 
-    def sum_flux(self) -> None:
+    def sum(self) -> None:
         """Sum all fluxes at the faces and assign to the center of a cell volume."""
 
         for i in self._face:
@@ -110,6 +110,10 @@ class Flux:
                 )
             self._center[i] = c_val
 
+    def limiter(self, l_type: str) -> None:
+
+        raise NotImplementedError
+
     def __mul__(self, target: Union[float, int]) -> Any:
         """Multiply coeffcient to the flux"""
 
@@ -120,7 +124,7 @@ class Flux:
                 try:
                     self._center[i][j] *= target
                 except KeyError:
-                    self.sum_flux()
+                    self.sum()
                     self._center[i][j] *= target
 
         return self

@@ -21,7 +21,7 @@ class FractionColumn(ProgressColumn):
     def render(self, task):
         """Calculate common unit for completed and total."""
         completed = int(task.completed)
-        total = int(task.total)
+        total = int(task.total)  # type: ignore
         unit, suffix = filesize.pick_unit_and_suffix(total, [""], 1)
 
         precision = 0 if unit == 1 else 1
@@ -46,7 +46,7 @@ class RateColumn(ProgressColumn):
         if speed is None:
             return Text(f"? {self.unit}/s", style="progress.data.speed")
         else:
-            unit, suffix = filesize.pick_unit_and_suffix(speed, [""], 1)
+            unit, suffix = filesize.pick_unit_and_suffix(speed, [""], 1)  # type: ignore
         precision = 0 if unit == 1 else 1
 
         return Text(
@@ -73,7 +73,6 @@ rich_progress_config = (
 class RichPBar(tqdm):  # pragma: no cover
     """Experimental rich.progress GUI version of tqdm!"""
 
-    # TODO: @classmethod: write()?
     def __init__(self, *args, **kwargs):
         """
         This class accepts the following parameters *in addition* to
