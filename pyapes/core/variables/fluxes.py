@@ -73,6 +73,7 @@ class Flux:
         else:
             self._face.update({i: {j: {f: T}}})
 
+    # TODO: Not sure about center implementation here!!
     def to_center(self, i: int, j: str, T: Tensor):
         """Assign face values to `self._center`.
 

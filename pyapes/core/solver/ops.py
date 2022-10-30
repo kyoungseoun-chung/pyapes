@@ -82,8 +82,15 @@ class Solver:
         # RHS of the equation
         self.rhs = eq.rhs
 
-    def Aop(self) -> Tensor:
-        pass
+    # NOTE: Will be structured like this but not yet validated.
+    def Aop(self, var: Field) -> Tensor:
+
+        res = torch.zeros_like(var())
+        for op in self.eqs:
+            flux = self.eqs[op](var)
+            res += flux.sum()
+
+        return res
 
     def __call__(self) -> Field:
 

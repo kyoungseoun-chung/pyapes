@@ -17,7 +17,19 @@ class Source(Discretizer):
     """Create source/sink at the cell center."""
 
     def __call__(self, val: Union[float, Tensor], var: Field) -> Flux:
-        raise NotImplementedError
+
+        source = Flux(var.mesh)
+
+        for i in range(var.dim):
+            for j in range(var.mesh.dim):
+                source.to_center(
+                    i,
+                    DIR[j],
+                    val
+                    if isinstance(val, Tensor)
+                    else val * torch.ones_like(var()),
+                )
+        return source
 
 
 class Grad(Discretizer):
@@ -70,7 +82,7 @@ class Laplacian(Discretizer):
 
     """
 
-    def __call__(self, var: Field) -> Flux:
+    def __call__(self, gamma: float, var: Field) -> Flux:
 
         laplacian = Flux(var.mesh)
 
@@ -96,6 +108,7 @@ class Laplacian(Discretizer):
             bc.apply(var(), laplacian, var.mesh.grid, 1)
 
         laplacian.sum()
+        laplacian *= gamma
 
         return laplacian
 

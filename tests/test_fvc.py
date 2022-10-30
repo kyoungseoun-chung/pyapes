@@ -29,7 +29,7 @@ from pyapes.testing.poisson import poisson_rhs_nd
 def test_fvc_ops(domain: Box, spacing: list[float], dim: int) -> None:
 
     from pyapes.core.variables.bcs import BC_HD
-    from pyapes.core.solver.fvc import Grad
+    from pyapes.core.solver.fvc import Grad, Laplacian, Source
 
     mesh = Mesh(domain, None, spacing)
 
@@ -42,6 +42,14 @@ def test_fvc_ops(domain: Box, spacing: list[float], dim: int) -> None:
 
     target = (2 * mesh.X)[~mesh.t_mask]
     assert_close(grad(0, "x")[~mesh.t_mask], target)
+
+    laplacian = Laplacian()(1.0, var)
+    target = (2 + (mesh.X) * 0.0)[~mesh.t_mask]
+    assert_close(laplacian(0, "x")[~mesh.t_mask], target)
+
+    source = Source()(9.81, var)
+    target = torch.zeros_like(var()) + 9.81
+    assert_close(source(0, "x"), target)
 
 
 @pytest.mark.parametrize(

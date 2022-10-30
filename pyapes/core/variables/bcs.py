@@ -19,8 +19,8 @@ import torch
 from torch import Tensor
 
 from pyapes.core.backend import DType
+from pyapes.core.geometry.basis import DIR_TO_NUM
 from pyapes.core.geometry.basis import FDIR
-from pyapes.core.geometry.basis import FDIR_TO_NUM
 from pyapes.core.variables.fluxes import Flux
 
 BC_val_type = Union[int, float, list[int], list[float], Callable]
@@ -58,7 +58,7 @@ class BC(ABC):
     def __post_init__(self):
 
         _bc_val_type_check(self.bc_val)
-        self.face_n_dir = -1 if FDIR_TO_NUM[self.bc_face] % 2 == 0 else 1
+        self.bc_face_dim = DIR_TO_NUM[self.bc_face[0]]
 
     @abstractmethod
     def apply(
@@ -85,40 +85,40 @@ class Dirichlet(BC):
         """Apply BC"""
         dim = var.size(0)
 
-        if callable(self.bc_val):
+        # NOTE: I'd like to integrate callable too...
+        for d in range(dim):
 
-            # TODO: NEED TO BE CHECKED
-            bc_callable = self.bc_val(grid, self.bc_mask)
+            face_val = flux.face(d, self.bc_face)
 
-            for d in range(dim):
-                face_val = flux.face(d, self.bc_face)
-
-                # Face value derivative order
-                if order == 0:
-                    face_val[self.bc_mask] = bc_callable
-                else:
-                    raise ValueError
-
+            if order == 0:
+                face_val[self.bc_mask] = (
+                    self.bc_val[d]
+                    if isinstance(self.bc_val, list)
+                    else self.bc_val(grid, self.bc_mask)[d]
+                    if isinstance(self.bc_val, Callable)
+                    else self.bc_val
+                )
                 flux.to_face(d, self.bc_face[0], self.bc_face[1], face_val)
-
-        else:
-            for d in range(dim):
-
-                face_val = flux.face(d, self.bc_face)
-
-                if order == 0:
-                    face_val[self.bc_mask] = (
-                        self.bc_val * self.face_n_dir
-                        if not isinstance(self.bc_val, list)
-                        else self.bc_val[d] * self.face_n_dir
+            elif order == 1:
+                dx = flux.mesh.dx
+                pass
+                face_val[self.bc_mask] = (
+                    (self.bc_val[d] - var[d][self.bc_mask])
+                    / (2 * dx[self.bc_face_dim])
+                    if isinstance(self.bc_val, list)
+                    else (
+                        self.bc_val(grid, self.bc_mask)[d]
+                        - var[d][self.bc_mask]
                     )
-                    flux.to_face(d, self.bc_face[0], self.bc_face[1], face_val)
-                elif order == 1:
-                    pass
-                else:
-                    raise ValueError(
-                        f"BC: boundary value evaluation for {order}-derivative is not supported!"
-                    )
+                    / (2 * dx[self.bc_face_dim])
+                    if isinstance(self.bc_val, Callable)
+                    else (self.bc_val - var[d][self.bc_mask])
+                    / (2 * dx[self.bc_face_dim])
+                )
+            else:
+                raise ValueError(
+                    f"BC: boundary value evaluation for {order}-derivative is not supported!"
+                )
 
 
 class Neumann(BC):

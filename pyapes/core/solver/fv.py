@@ -18,7 +18,7 @@ from pyapes.core.variables import Flux
 class Discretizer:
     """Base class of FVM discretization."""
 
-    # Init relavent attributes
+    # Init relevant attributes
     _ops: dict[int, dict[str, Union[Callable, str]]] = field(
         default_factory=dict
     )
@@ -42,11 +42,6 @@ class Discretizer:
     @property
     def flux(self) -> Flux:
         """Flux object to be computed."""
-        raise NotImplementedError
-
-    @property
-    def Aop(self) -> Tensor:
-        """Obtain operation matrix to solve the linear system."""
         raise NotImplementedError
 
     def __eq__(self, other: Union[Tensor, float]) -> Any:
