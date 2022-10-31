@@ -78,16 +78,16 @@ def poisson_bcs(dim: int = 3) -> list[BC_config_type]:
     return bc_config
 
 
-def poisson_1d_bc(mesh: Mesh, mask: Tensor) -> Tensor:
+def poisson_1d_bc(grid: Tensor, mask: Tensor) -> Tensor:
 
     return (
         7.0 / 9.0
-        - 2.0 / 9.0 * mesh.X[mask]
-        + mesh.X[mask] ** 2 / 2.0
-        - mesh.X[mask] ** 4 / 6.0
+        - 2.0 / 9.0 * grid[0][mask]
+        + grid[0][mask] ** 2 / 2.0
+        - grid[0][mask] ** 4 / 6.0
     )
 
 
-def poisson_2d_bc(mesh: Mesh, mask: Tensor) -> Tensor:
+def poisson_2d_bc(grid: Tensor, mask: Tensor) -> Tensor:
 
-    return mesh.Y[mask] * (1.0 - mesh.Y[mask]) * (mesh.X[mask] ** 3)
+    return grid[1][mask] * (1.0 - grid[1][mask]) * (grid[0][mask] ** 3)

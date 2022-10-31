@@ -19,7 +19,7 @@ FDIR_TO_NUM: dict[str, int] = {
 
 
 class GeoTypeIdentifier(list):
-    """Class that helps to idensitfy the list of types."""
+    """Class that helps to identify the list of types."""
 
     def __contains__(self, typ: type):
         for val in self:

@@ -186,41 +186,35 @@ class Laplacian(Discretizer):
         return self._flux
 
     @staticmethod
-    def Aop(coeff: float, var: Field) -> Flux:
+    def Aop(gamma: float, var: Field) -> Tensor:
 
-        area = var.mesh.A
-        vol = var.mesh.V
+        laplacian = Flux(var.mesh)
 
-        fvm_Grad = Grad()
-        grad = fvm_Grad(var)
-        flux = Flux(var.mesh)
+        dx = var.dx
 
         for i in range(var.dim):
-            for j in range(var.dim):
+            for j in range(var.mesh.dim):
 
-                # L is negative since wall normal vector is opposite direction of coordinate
-                fl = -(
-                    (
-                        (torch.roll(grad(0, DIR[j]), 1, j) + grad(0, DIR[j]))
-                        / (2 * var.dx[j])
-                        * coeff
-                    )
-                    * area[DIR[j] + "l"]
-                    / vol
+                laplacian.to_face(
+                    i,
+                    DIR[j],
+                    "l",
+                    (var()[i] - torch.roll(var()[i], 1, j)) / dx[j],
                 )
-                flux.to_face(i, DIR[j], "l", fl)
-                fr = (
-                    (
-                        (torch.roll(grad(0, DIR[j]), -1, j) + grad(0, DIR[j]))
-                        / (2 * var.dx[j])
-                        * coeff
-                    )
-                    * area[DIR[j] + "r"]
-                    / vol
+                laplacian.to_face(
+                    i,
+                    DIR[j],
+                    "r",
+                    (torch.roll(var()[i], -1, j) - var()[i]) / dx[j],
                 )
-                flux.to_face(i, DIR[j], "r", fr)
 
-        return flux
+        for bc in var.bcs:
+            bc.apply(var(), laplacian, var.mesh.grid, 1)
+
+        laplacian.sum_all()
+        laplacian *= gamma
+
+        return laplacian.tensor()
 
 
 FVM_type = Union[Div, Grad, Laplacian]

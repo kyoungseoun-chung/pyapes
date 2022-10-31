@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Discretization using finite volume methodology (FVM) """
+from __future__ import annotations
+
 from dataclasses import dataclass
 from dataclasses import field
 from typing import Any
 from typing import Union
 
+import torch
 from torch import Tensor
 
 from pyapes.core.geometry.basis import DIR
@@ -42,6 +45,18 @@ class Flux:
         else:
             return self.face(i, j)
 
+    def tensor(self) -> Tensor:
+        """Return `self._center` as Tensor."""
+
+        var_tensor = []
+        for v_d in self._center:
+            coord_tensor = []
+            for c_d in self._center[v_d]:
+                coord_tensor.append(self._center[v_d][c_d])
+            var_tensor.append(torch.stack(coord_tensor, dim=0))
+
+        return torch.stack(var_tensor)
+
     def center(self, i: int, s_idx: str) -> Tensor:
         """Return flux sum."""
         assert s_idx in DIR, f"Flux: sum index should be one of {DIR}!"
@@ -73,7 +88,6 @@ class Flux:
         else:
             self._face.update({i: {j: {f: T}}})
 
-    # TODO: Not sure about center implementation here!!
     def to_center(self, i: int, j: str, T: Tensor):
         """Assign face values to `self._center`.
 
@@ -91,11 +105,28 @@ class Flux:
         else:
             self._center.update({i: {j: T}})
 
+    def sum_all(self) -> None:
+        """Sum fluxes in all directions."""
+
+        for i in self._face:
+            val_tensor = torch.zeros_like(self.mesh.V)
+            for j in self._face[i]:
+                Al_V = self.mesh.A[j + "l"] / self.mesh.V
+                Ar_V = self.mesh.A[j + "r"] / self.mesh.V
+
+                # sumAll face_val * face_are / cell_volume
+                val_tensor += (
+                    self._face[i][j]["r"] * Ar_V - self._face[i][j]["l"] * Al_V
+                )
+
+            self._center[i] = {"all": val_tensor}
+
     def sum(self) -> None:
-        """Sum all fluxes at the faces and assign to the center of a cell volume."""
+        """Sum fluxes in each direction at the faces and assign to the center of a cell volume."""
 
         for i in self._face:
             c_val = {}
+
             for j in self._face[i]:
                 Al_V = self.mesh.A[j + "l"] / self.mesh.V
                 Ar_V = self.mesh.A[j + "r"] / self.mesh.V
@@ -115,17 +146,17 @@ class Flux:
 
         raise NotImplementedError
 
-    def __mul__(self, target: Union[float, int]) -> Any:
-        """Multiply coeffcient to the flux"""
+    def __mul__(self, target: float | int) -> Flux:
+        """Multiply coefficient to the flux"""
 
         for i in self._face:
             for j in self._face[i]:
+
                 self._face[i][j]["l"] *= target
                 self._face[i][j]["r"] *= target
-                try:
-                    self._center[i][j] *= target
-                except KeyError:
-                    self.sum()
-                    self._center[i][j] *= target
+
+        for i in self._center:
+            for j in self._center[i]:
+                self._center[i][j] *= target
 
         return self

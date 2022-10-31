@@ -13,10 +13,18 @@ from pyapes.core.variables import Field
 from pyapes.core.variables import Flux
 
 
+class FTensor(Discretizer):
+    """Simple interface around `torch.Tensor`."""
+
+    def __call__(self, val: Tensor) -> Tensor:
+
+        return val
+
+
 class Source(Discretizer):
     """Create source/sink at the cell center."""
 
-    def __call__(self, val: Union[float, Tensor], var: Field) -> Flux:
+    def __call__(self, val: Union[float, Tensor], var: Field) -> Tensor:
 
         source = Flux(var.mesh)
 
@@ -29,7 +37,7 @@ class Source(Discretizer):
                     if isinstance(val, Tensor)
                     else val * torch.ones_like(var()),
                 )
-        return source
+        return source.tensor()
 
 
 class Grad(Discretizer):
@@ -43,7 +51,7 @@ class Grad(Discretizer):
 
     """
 
-    def __call__(self, var: Field) -> Flux:
+    def __call__(self, var: Field) -> Tensor:
 
         grad = Flux(var.mesh)
 
@@ -68,7 +76,7 @@ class Grad(Discretizer):
 
         grad.sum()
 
-        return grad
+        return grad.tensor()
 
 
 class Laplacian(Discretizer):
@@ -82,7 +90,7 @@ class Laplacian(Discretizer):
 
     """
 
-    def __call__(self, gamma: float, var: Field) -> Flux:
+    def __call__(self, gamma: float, var: Field) -> Tensor:
 
         laplacian = Flux(var.mesh)
 
@@ -107,10 +115,10 @@ class Laplacian(Discretizer):
         for bc in var.bcs:
             bc.apply(var(), laplacian, var.mesh.grid, 1)
 
-        laplacian.sum()
+        laplacian.sum_all()
         laplacian *= gamma
 
-        return laplacian
+        return laplacian.tensor()
 
 
-FVC_type = Union[Source, Grad, Laplacian]
+FVC_type = Union[Source, Grad, Laplacian, FTensor]

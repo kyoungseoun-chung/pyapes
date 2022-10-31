@@ -227,9 +227,7 @@ class Field:
 
                 for bc, obj in zip(d_bc_config, d_obj_config):
 
-                    # Ensure bc_val type is one of BC_val_type
-                    assert isinstance(bc["bc_val"], get_args(BC_val_type))
-
+                    # Not sure about a proper typing checking here...
                     bc_val = cast(BC_val_type, bc["bc_val"])
                     bc_face = cast(str, bc["bc_face"])
 

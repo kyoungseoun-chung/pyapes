@@ -41,26 +41,28 @@ def test_fvc_ops(domain: Box, spacing: list[float], dim: int) -> None:
     grad = Grad()(var)
 
     target = (2 * mesh.X)[~mesh.t_mask]
-    assert_close(grad(0, "x")[~mesh.t_mask], target)
+    assert_close(grad[0, 0, ~mesh.t_mask], target)
 
     laplacian = Laplacian()(1.0, var)
     target = (2 + (mesh.X) * 0.0)[~mesh.t_mask]
-    assert_close(laplacian(0, "x")[~mesh.t_mask], target)
+    assert_close(laplacian[0, 0, ~mesh.t_mask], target)
 
     source = Source()(9.81, var)
     target = torch.zeros_like(var()) + 9.81
-    assert_close(source(0, "x"), target)
+    assert_close(source[0, 0], target)
+
+    pass
 
 
 @pytest.mark.parametrize(
-    "domain",
+    ["domain", "spacing", "dim"],
     [
-        (Box[0:1], None, [0.01]),
-        (Box[0:1, 0:1], None, [64, 64]),
-        (Box[0:1, 0:1, 0:1], None, [0.1, 0.1, 0.1]),
+        [Box[0:1], [0.01], 1],
+        [Box[0:1, 0:1], [0.01, 0.01], 2],
+        [Box[0:1, 0:1, 0:1], [0.1, 0.1, 0.1], 3],
     ],
 )
-def test_poisson_nd(domain: tuple) -> None:
+def test_poisson_nd(domain: Box, spacing: list[float], dim: int) -> None:
     """Test poisson in N-D cases.
 
     Reference:
@@ -69,10 +71,9 @@ def test_poisson_nd(domain: tuple) -> None:
         - 3D: Zhi Shi et al (2012) (https://doi.org/10.1016/j.apm.2011.11.078)
     """
 
-    mesh = Mesh(*domain, "cpu", "double")  # type: ignore
-    dim = mesh.dim
-    f_bc_config = poisson_bcs(dim)
-    var = Field("any", 1, mesh, {"domain": f_bc_config, "obstacle": None})
+    mesh = Mesh(domain, None, spacing)
+    f_bc = poisson_bcs(dim)
+    var = Field("test", 1, mesh, {"domain": f_bc, "obstacle": None})
 
     solver_config = {
         "fvc": {
@@ -83,12 +84,14 @@ def test_poisson_nd(domain: tuple) -> None:
         }
     }
 
-    fvc = Solver(solver_config).fvc
+    solver = Solver(solver_config)
+    fvc = solver.fvc
+    fvm = solver.fvm
 
     rhs = poisson_rhs_nd(mesh)
     sol_ex = poisson_exact_nd(mesh)
 
-    fvc.set_eq(fvc.laplacian(var) == rhs)
-    cg_sol = fvc.solve()
+    solver.set_eq(fvm.laplacian(1.0, var) == fvc.tensor(rhs))
+    cg_sol = solver()
 
     assert_close(cg_sol()[0], sol_ex, rtol=0.1, atol=0.01)

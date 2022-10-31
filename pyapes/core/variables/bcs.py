@@ -165,10 +165,13 @@ class Periodic(BC):
 
 def _bc_val_type_check(bc_val: BC_val_type):
 
-    if type(bc_val) not in get_args(BC_val_type):
-        raise TypeError(
-            f"BC: wrong bc variable -> {type(bc_val)} is not one of {get_args(BC_val_type)}!"
-        )
+    # NOTE: NOT SURE ABOUT THIS.. TYPING CHECKING IS WEIRD HERE..
+    if not isinstance(bc_val, Callable):
+
+        if type(bc_val) not in get_args(BC_val_type):
+            raise TypeError(
+                f"BC: wrong bc variable -> {type(bc_val)} is not one of {get_args(BC_val_type)}!"
+            )
 
 
 def homogeneous_bcs(

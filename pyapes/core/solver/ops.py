@@ -12,6 +12,7 @@ from typing import Union
 import torch
 from torch import Tensor
 
+from pyapes.core.solver.fvc import FTensor as FVC_Tensor
 from pyapes.core.solver.fvc import FVC_type
 from pyapes.core.solver.fvc import Grad as FVC_Grad
 from pyapes.core.solver.fvc import Laplacian as FVC_Laplacian
@@ -31,6 +32,7 @@ class FVC:
     grad: FVC_Grad = FVC_Grad()
     laplacian: FVC_Laplacian = FVC_Laplacian()
     source: FVC_Source = FVC_Source()
+    tensor: FVC_Tensor = FVC_Tensor()
 
 
 @dataclass
@@ -81,6 +83,7 @@ class Solver:
         self.eqs = eq.ops
         # RHS of the equation
         self.rhs = eq.rhs
+        pass
 
     # NOTE: Will be structured like this but not yet validated.
     def Aop(self, var: Field) -> Tensor:

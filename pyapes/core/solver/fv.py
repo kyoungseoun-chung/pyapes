@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Finite volume discretizer base class to be used in `pyapes.core.solver.fvc` and `pyapes.core.solver.fvm`"""
+from __future__ import annotations
+
 from dataclasses import dataclass
 from dataclasses import field
 from typing import Any
@@ -19,18 +21,16 @@ class Discretizer:
     """Base class of FVM discretization."""
 
     # Init relevant attributes
-    _ops: dict[int, dict[str, Union[Callable, str]]] = field(
-        default_factory=dict
-    )
-    _rhs: Optional[Tensor] = None
+    _ops: dict[int, dict[str, Callable | str]] = field(default_factory=dict)
+    _rhs: Tensor | None = None
 
     @property
-    def ops(self) -> dict[int, dict[str, Union[Callable, str]]]:
+    def ops(self) -> dict[int, dict[str, Callable | str]]:
         """Collection of operators used in `pyapes.core.solver.Solver().set_eq()`"""
         return self._ops
 
     @property
-    def rhs(self) -> Optional[Tensor]:
+    def rhs(self) -> Tensor | None:
         """RHS of `set_eq()`"""
         return self._rhs
 
@@ -44,7 +44,7 @@ class Discretizer:
         """Flux object to be computed."""
         raise NotImplementedError
 
-    def __eq__(self, other: Union[Tensor, float]) -> Any:
+    def __eq__(self, other: Tensor | float) -> Discretizer:
 
         if isinstance(other, Tensor):
             self._rhs = other
@@ -53,7 +53,7 @@ class Discretizer:
 
         return self
 
-    def __add__(self, other: Any) -> Any:
+    def __add__(self, other: Discretizer) -> Discretizer:
 
         assert self.flux is not None, "Discretizer: Flux is not assigned!"
 
@@ -64,7 +64,7 @@ class Discretizer:
 
         return self
 
-    def __sub__(self, other: Any) -> Any:
+    def __sub__(self, other: Discretizer) -> Discretizer:
 
         assert self.flux is not None, "Discretizer: Flux is not assigned!"
 
