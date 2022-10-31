@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Discretization using finite volume methodology (FVM). Unlike `fvc`, `fvm` solve the field implicitly."""
+"""Discretization using finite volume methodology (FVM). Unlike `fvc`, `fvm` is designed to solve the field implicitly. Therefore, it contains more complicated data structure rather than just returning `torch.Tensor`."""
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Any
 from typing import Optional
@@ -9,6 +11,7 @@ import torch
 from torch import Tensor
 
 from .fv import Discretizer
+from .fvc import FVC
 from pyapes.core.geometry.basis import DIR
 from pyapes.core.variables import Field
 from pyapes.core.variables import Flux
@@ -18,8 +21,8 @@ from pyapes.core.variables import Flux
 class Ddt(Discretizer):
     """Time discretization."""
 
-    _var: Optional[Field] = None
-    _flux: Optional[Flux] = None
+    _var: Field | None = None
+    _flux: Flux | None = None
 
     def __call__(self, var: Field) -> Any:
 
@@ -34,11 +37,11 @@ class Ddt(Discretizer):
         pass
 
     @property
-    def var(self) -> Optional[Field]:
+    def var(self) -> Field | None:
         return self._var
 
     @property
-    def flux(self) -> Optional[Flux]:
+    def flux(self) -> Flux | None:
         return self._flux
 
 
@@ -54,8 +57,8 @@ class Grad(Discretizer):
         var: Field object to be discretized ($\Phi$).
 
     """
-    _var: Optional[Field] = None
-    _flux: Optional[Flux] = None
+    _var: Field | None = None
+    _flux: Flux | None = None
 
     def __call__(self, var: Field) -> Flux:
 
@@ -80,11 +83,11 @@ class Grad(Discretizer):
         return grad
 
     @property
-    def var(self) -> Optional[Field]:
+    def var(self) -> Field | None:
         return self._var
 
     @property
-    def flux(self) -> Optional[Flux]:
+    def flux(self) -> Flux | None:
         return self._flux
 
 
@@ -102,8 +105,8 @@ class Div(Discretizer):
         var_j: convective variable ($\vec{u}_j$)
     """
 
-    _var: Optional[Field] = None
-    _flux: Optional[Flux] = None
+    _var: Field | None = None
+    _flux: Flux | None = None
 
     def __call__(self, var_i: Field, var_j: Field) -> Any:
 
@@ -133,11 +136,11 @@ class Div(Discretizer):
         return self
 
     @property
-    def var(self) -> Optional[Field]:
+    def var(self) -> Field | None:
         return self._var
 
     @property
-    def flux(self) -> Optional[Flux]:
+    def flux(self) -> Flux | None:
         return self._flux
 
 
@@ -158,18 +161,18 @@ class Laplacian(Discretizer):
         var: Field object to be discretized ($\Phi$)
     """
 
-    _var: Optional[Field] = None
-    _flux: Optional[Flux] = None
+    _var: Field | None = None
+    _flux: Flux | None = None
 
-    def __call__(self, coeff: float, var: Field) -> Any:
+    def __call__(self, coeff: float, var: Field) -> Laplacian:
 
         self._coeff = coeff
         self._var = var
-
-        # Need to store Callable Aop, Var, coeffs so on...
-        # So that I can use them in pyapes.core.solver.linalg.solve
-        # by looping over self._ops to construct Aop
-        self._ops[0] = {"flux": self.Aop, "op": self.__class__.__name__}
+        self._ops[0] = {
+            "name": self.__class__.__name__,
+            "Aop": self.Aop,
+            "input": (coeff, var),
+        }
 
         return self
 
@@ -178,43 +181,27 @@ class Laplacian(Discretizer):
         return self._coeff
 
     @property
-    def var(self) -> Optional[Field]:
+    def var(self) -> Field | None:
         return self._var
 
     @property
-    def flux(self) -> Optional[Flux]:
+    def flux(self) -> Flux | None:
         return self._flux
 
     @staticmethod
     def Aop(gamma: float, var: Field) -> Tensor:
 
-        laplacian = Flux(var.mesh)
+        return FVC.laplacian(gamma, var)
 
-        dx = var.dx
 
-        for i in range(var.dim):
-            for j in range(var.mesh.dim):
+@dataclass
+class FVM:
+    """Collection of the operators for implicit finite volume discretizations."" """
 
-                laplacian.to_face(
-                    i,
-                    DIR[j],
-                    "l",
-                    (var()[i] - torch.roll(var()[i], 1, j)) / dx[j],
-                )
-                laplacian.to_face(
-                    i,
-                    DIR[j],
-                    "r",
-                    (torch.roll(var()[i], -1, j) - var()[i]) / dx[j],
-                )
-
-        for bc in var.bcs:
-            bc.apply(var(), laplacian, var.mesh.grid, 1)
-
-        laplacian.sum_all()
-        laplacian *= gamma
-
-        return laplacian.tensor()
+    ddt: Ddt = Ddt()
+    grad: Grad = Grad()
+    div: Div = Div()
+    laplacian: Laplacian = Laplacian()
 
 
 FVM_type = Union[Div, Grad, Laplacian]

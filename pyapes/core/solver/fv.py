@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from dataclasses import field
-from typing import Any
 from typing import Callable
-from typing import Optional
-from typing import Union
 
 import torch
 from torch import Tensor
@@ -15,17 +12,19 @@ from torch import Tensor
 from pyapes.core.variables import Field
 from pyapes.core.variables import Flux
 
+OPS_type = dict[str, Callable | str | tuple[float, Field]]
+
 
 @dataclass(eq=False)
 class Discretizer:
     """Base class of FVM discretization."""
 
     # Init relevant attributes
-    _ops: dict[int, dict[str, Callable | str]] = field(default_factory=dict)
+    _ops: dict[int, OPS_type] = field(default_factory=dict)
     _rhs: Tensor | None = None
 
     @property
-    def ops(self) -> dict[int, dict[str, Callable | str]]:
+    def ops(self) -> dict[int, OPS_type]:
         """Collection of operators used in `pyapes.core.solver.Solver().set_eq()`"""
         return self._ops
 

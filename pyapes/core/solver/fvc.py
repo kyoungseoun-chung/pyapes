@@ -7,24 +7,22 @@ from typing import Union
 import torch
 from torch import Tensor
 
-from .fv import Discretizer
 from pyapes.core.geometry.basis import DIR
 from pyapes.core.variables import Field
 from pyapes.core.variables import Flux
 
 
-class FTensor(Discretizer):
-    """Simple interface around `torch.Tensor`."""
+class FVC:
+    """Collection of the operators for explicit finite volume discretizations."""
 
-    def __call__(self, val: Tensor) -> Tensor:
+    @staticmethod
+    def tensor(val: Tensor) -> Tensor:
+        """Simply assign a given tensor and return. Mostly used for the RHS in `FVM`."""
 
         return val
 
-
-class Source(Discretizer):
-    """Create source/sink at the cell center."""
-
-    def __call__(self, val: Union[float, Tensor], var: Field) -> Tensor:
+    @staticmethod
+    def source(val: Union[float, Tensor], var: Field) -> Tensor:
 
         source = Flux(var.mesh)
 
@@ -39,20 +37,22 @@ class Source(Discretizer):
                 )
         return source.tensor()
 
+    # WIP: Need implementation soon
+    @staticmethod
+    def div(var_i: Field, var_j: Field) -> Tensor:
+        pass
 
-class Grad(Discretizer):
-    r"""Explicit discretization: Gradient
+    @staticmethod
+    def grad(var: Field) -> Tensor:
+        r"""Explicit discretization: Gradient
 
-    Args:
-        var: Field object to be discretized ($\Phi$).
+        Args:
+            var: Field object to be discretized ($\Phi$).
 
-    Returns:
-        dict[int, dict[str, Tensor]]: resulting `torch.Tensor`. `int` represents variable dimension, and `str` indicates `Mesh` dimension.
+        Returns:
+            dict[int, dict[str, Tensor]]: resulting `torch.Tensor`. `int` represents variable dimension, and `str` indicates `Mesh` dimension.
 
-    """
-
-    def __call__(self, var: Field) -> Tensor:
-
+        """
         grad = Flux(var.mesh)
 
         for i in range(var.dim):
@@ -78,19 +78,17 @@ class Grad(Discretizer):
 
         return grad.tensor()
 
+    @staticmethod
+    def laplacian(gamma: float, var: Field) -> Tensor:
+        r"""Explicit discretization: Laplacian
 
-class Laplacian(Discretizer):
-    r"""Explicit discretization: Laplacian
+        Args:
+            var: Field object to be discretized ($\Phi$).
 
-    Args:
-        var: Field object to be discretized ($\Phi$).
+        Returns:
+            dict[int, dict[str, Tensor]]: resulting `torch.Tensor`. `int` represents variable dimension, and `str` indicates `Mesh` dimension.
 
-    Returns:
-        dict[int, dict[str, Tensor]]: resulting `torch.Tensor`. `int` represents variable dimension, and `str` indicates `Mesh` dimension.
-
-    """
-
-    def __call__(self, gamma: float, var: Field) -> Tensor:
+        """
 
         laplacian = Flux(var.mesh)
 
@@ -119,6 +117,3 @@ class Laplacian(Discretizer):
         laplacian *= gamma
 
         return laplacian.tensor()
-
-
-FVC_type = Union[Source, Grad, Laplacian, FTensor]

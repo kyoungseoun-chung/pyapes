@@ -7,42 +7,14 @@ on the other hand, fvm returns operation matrix, `Aop` of each individual discre
 
 """
 from dataclasses import dataclass
-from typing import Union
 
 import torch
 from torch import Tensor
 
-from pyapes.core.solver.fvc import FTensor as FVC_Tensor
-from pyapes.core.solver.fvc import FVC_type
-from pyapes.core.solver.fvc import Grad as FVC_Grad
-from pyapes.core.solver.fvc import Laplacian as FVC_Laplacian
-from pyapes.core.solver.fvc import Source as FVC_Source
-from pyapes.core.solver.fvm import Ddt as FVM_Ddt
-from pyapes.core.solver.fvm import Div as FVM_Div
-from pyapes.core.solver.fvm import FVM_type
-from pyapes.core.solver.fvm import Grad as FVM_Grad
-from pyapes.core.solver.fvm import Laplacian as FVM_Laplacian
+from pyapes.core.solver.fv import Discretizer
+from pyapes.core.solver.fvc import FVC
+from pyapes.core.solver.fvm import FVM
 from pyapes.core.variables import Field
-
-
-@dataclass
-class FVC:
-    """Collection of the operators for explicit finite volume discretizations."""
-
-    grad: FVC_Grad = FVC_Grad()
-    laplacian: FVC_Laplacian = FVC_Laplacian()
-    source: FVC_Source = FVC_Source()
-    tensor: FVC_Tensor = FVC_Tensor()
-
-
-@dataclass
-class FVM:
-    """Collection of the operators for implicit finite volume discretizations."" """
-
-    ddt: FVM_Ddt = FVM_Ddt()
-    grad: FVM_Grad = FVM_Grad()
-    div: FVM_Div = FVM_Div()
-    laplacian: FVM_Laplacian = FVM_Laplacian()
 
 
 @dataclass
@@ -67,7 +39,7 @@ class Solver:
     fvc: FVC = FVC()
     fvm: FVM = FVM()
 
-    def set_eq(self, eq: Union[FVC_type, FVM_type]) -> None:
+    def set_eq(self, eq: Discretizer) -> None:
         """Construct PDE to solve.
         (Actually just store data for future self.solve function call)
 
