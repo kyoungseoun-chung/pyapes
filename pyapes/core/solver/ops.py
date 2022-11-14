@@ -55,15 +55,16 @@ class Solver:
         self.eqs = eq.ops
         # RHS of the equation
         self.rhs = eq.rhs
-        pass
 
-    # NOTE: Will be structured like this but not yet validated.
-    def Aop(self, var: Field) -> Tensor:
+    def Aop(self) -> Tensor:
+        """Return tensor of discretized operation."""
 
-        res = torch.zeros_like(var())
+        res = torch.zeros_like(self.eqs[0]["var"]())
         for op in self.eqs:
-            flux = self.eqs[op](var)
-            res += flux.sum()
+            res += (
+                self.eqs[op]["Aop"](*self.eqs[op]["inputs"])
+                * self.eqs[op]["sign"]
+            )
 
         return res
 
@@ -73,7 +74,6 @@ class Solver:
 
         Aop = torch.zeros_like(self.var())
         for eq in self.eqs:
-            if self.eqs[eq]["op"] != "Ddt":
-                pass
+            pass
 
         raise NotImplementedError

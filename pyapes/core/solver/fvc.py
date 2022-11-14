@@ -40,7 +40,7 @@ class FVC:
     # WIP: Need implementation soon
     @staticmethod
     def div(var_i: Field, var_j: Field) -> Tensor:
-        pass
+        ...
 
     @staticmethod
     def grad(var: Field) -> Tensor:

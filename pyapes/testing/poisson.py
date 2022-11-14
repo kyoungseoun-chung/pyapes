@@ -7,7 +7,6 @@ Reference:
         - 3D: Zhi Shi et al (2012) (https://doi.org/10.1016/j.apm.2011.11.078)
 """
 from math import pi
-from typing import Union
 
 import torch
 from torch import Tensor

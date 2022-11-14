@@ -4,15 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
-from typing import Optional
 from typing import Union
 
-import torch
 from torch import Tensor
 
 from .fv import Discretizer
 from .fvc import FVC
-from pyapes.core.geometry.basis import DIR
 from pyapes.core.variables import Field
 from pyapes.core.variables import Flux
 
@@ -60,35 +57,22 @@ class Grad(Discretizer):
     _var: Field | None = None
     _flux: Flux | None = None
 
-    def __call__(self, var: Field) -> Flux:
+    def __call__(self, var: Field) -> Any:
 
         self._var = var
+        self._ops[0] = {
+            "name": self.__class__.__name__,
+            "Aop": self.Aop,
+            "inputs": (var,),
+            "var": var,
+            "sign": 1.0,
+        }
+        return self
 
-        dx = var.mesh.dx
+    @staticmethod
+    def Aop(var: Field) -> Tensor:
 
-        grad = Flux(var.mesh)
-
-        for i in range(var.dim):
-
-            for j in range(var.mesh.dim):
-
-                grad.to_center(
-                    i,
-                    DIR[j],
-                    (torch.roll(var()[i], -1, j) - torch.roll(var()[i], 1, j))
-                    / (2 * dx[j]),
-                )
-        self._flux = grad
-
-        return grad
-
-    @property
-    def var(self) -> Field | None:
-        return self._var
-
-    @property
-    def flux(self) -> Flux | None:
-        return self._flux
+        return FVC.grad(var)
 
 
 @dataclass(eq=False)
@@ -110,38 +94,22 @@ class Div(Discretizer):
 
     def __call__(self, var_i: Field, var_j: Field) -> Any:
 
-        self._var = var_i
-
-        flux = Flux(var_i.mesh)
-
-        for i in range(var_i.dim):
-            for j in range(var_j.dim):
-
-                vi_c = var_i()
-                vj_c = var_j()
-
-                fl = (torch.roll(vj_c, 1, j) * vi_c + vj_c * vi_c) / (
-                    2 * var_j.dx[j]
-                )
-                flux.to_face(i, DIR[j], "l", fl)
-
-                fr = (torch.roll(vj_c, -1, j) * vi_c + vj_c * vi_c) / (
-                    2 * var_j.dx[j]
-                )
-                flux.to_face(i, DIR[j], "r", fr)
-
-        self._flux = flux
-        self._ops[0] = {"flux": flux, "op": self.__class__.__name__}
+        self._var_i = var_i
+        self._var_j = var_j
+        self._ops[0] = {
+            "name": self.__class__.__name__,
+            "Aop": self.Aop,
+            "inputs": (var_i, var_j),
+            "var": var_i,
+            "sign": 1.0,
+        }
 
         return self
 
-    @property
-    def var(self) -> Field | None:
-        return self._var
+    @staticmethod
+    def Aop(var_i: Field, var_j: Field) -> Tensor:
 
-    @property
-    def flux(self) -> Flux | None:
-        return self._flux
+        return FVC.div(var_i, var_j)
 
 
 @dataclass(eq=False)
@@ -171,22 +139,12 @@ class Laplacian(Discretizer):
         self._ops[0] = {
             "name": self.__class__.__name__,
             "Aop": self.Aop,
-            "input": (coeff, var),
+            "inputs": (coeff, var),
+            "var": var,
+            "sign": 1.0,
         }
 
         return self
-
-    @property
-    def coeff(self) -> float:
-        return self._coeff
-
-    @property
-    def var(self) -> Field | None:
-        return self._var
-
-    @property
-    def flux(self) -> Flux | None:
-        return self._flux
 
     @staticmethod
     def Aop(gamma: float, var: Field) -> Tensor:

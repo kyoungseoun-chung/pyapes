@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from dataclasses import field
 from typing import Callable
+from typing import TypedDict
 
 import torch
 from torch import Tensor
@@ -12,7 +13,15 @@ from torch import Tensor
 from pyapes.core.variables import Field
 from pyapes.core.variables import Flux
 
-OPS_type = dict[str, Callable | str | tuple[float, Field]]
+
+class OPStype(TypedDict):
+    """Typed dict for the operation types."""
+
+    name: str
+    Aop: Callable[..., Tensor]
+    inputs: tuple[float, Field] | tuple[Field, Field] | tuple[Field]
+    var: Field
+    sign: float | int
 
 
 @dataclass(eq=False)
@@ -20,11 +29,11 @@ class Discretizer:
     """Base class of FVM discretization."""
 
     # Init relevant attributes
-    _ops: dict[int, OPS_type] = field(default_factory=dict)
+    _ops: dict[int, OPStype] = field(default_factory=dict)
     _rhs: Tensor | None = None
 
     @property
-    def ops(self) -> dict[int, OPS_type]:
+    def ops(self) -> dict[int, OPStype]:
         """Collection of operators used in `pyapes.core.solver.Solver().set_eq()`"""
         return self._ops
 
@@ -57,9 +66,7 @@ class Discretizer:
         assert self.flux is not None, "Discretizer: Flux is not assigned!"
 
         idx = list(self._ops.keys())
-        self._ops.update(
-            {idx[-1] + 1: {"flux": other.flux, "op": other.__class__.__name__}}
-        )
+        self._ops.update({idx[-1] + 1: other.ops[0]})
 
         return self
 
@@ -68,11 +75,7 @@ class Discretizer:
         assert self.flux is not None, "Discretizer: Flux is not assigned!"
 
         idx = list(self._ops.keys())
-        self._ops.update(
-            {
-                idx[-1]
-                + 1: {"flux": other.flux * -1, "op": other.__class__.__name__}
-            }
-        )
+        other.ops[0]["sign"] = -1
+        self._ops.update({idx[-1] + 1: other.ops[0]})
 
         return self

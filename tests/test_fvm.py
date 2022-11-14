@@ -12,49 +12,16 @@ from pyapes.core.variables import Field
 @pytest.mark.parametrize(
     ("domain", "spacing", "dim"),
     [
-        (Box[0:1], [0.01], 1),
-        (Box[0:1, 0:1], [64, 64], 2),
-        (Box[0:1, 0:1, 0:1], [0.1, 0.1, 0.1], 3),
-    ],
-)
-def test_poisson(domain: Box, spacing: list[int], dim: int) -> None:
-
-    from pyapes.testing.poisson import (
-        poisson_bcs,
-        poisson_rhs_nd,
-        poisson_exact_nd,
-    )
-
-    mesh = Mesh(domain, None, spacing)
-    var = Field("", dim, mesh, {"domain": poisson_bcs(dim), "obstacle": None})
-
-    solver_config = {
-        "fvm": {
-            "method": "cg",
-            "tol": 1e-5,
-            "max_it": 1000,
-            "report": True,
-        }
-    }
-
-    fvm = Solver(solver_config).fvm
-    fvm.set_eq(fvm.laplacian(1.0, var) == poisson_rhs_nd(mesh))
-
-    assert fvm.laplacian.coeff == 1.0
-    pass
-
-
-@pytest.mark.parametrize(
-    ("domain", "spacing", "dim"),
-    [
         (Box[0:1], [5], 1),
         (Box[0:1, 0:1], [5, 5], 2),
         (Box[0:1, 0:1, 0:1], [5, 5, 5], 3),
     ],
 )
-def test_grad(domain: Box, spacing: list[int], dim: int) -> None:
+def test_fvm_ops(domain: Box, spacing: list[int], dim: int) -> None:
+    """Test fvm operators."""
 
-    from pyapes.core.solver.fvm import Grad, DIR
+    from pyapes.core.solver.fvm import Grad
+    from pyapes.core.geometry.basis import DIR
 
     mesh = Mesh(domain, None, spacing)
     var = Field("", dim, mesh, None)
@@ -91,6 +58,7 @@ def test_grad(domain: Box, spacing: list[int], dim: int) -> None:
     ],
 )
 def test_fvm(domain: Box, spacing: list[int], dim: int) -> None:
+    """Test FVM basic structure of operators."""
     from pyapes.core.solver.fvm import Div, Laplacian
 
     mesh = Mesh(domain, None, spacing)
@@ -110,7 +78,7 @@ def test_fvm(domain: Box, spacing: list[int], dim: int) -> None:
     op_sum = div(var, var) - laplacian(1.0, var) + div(var, var) == 10
 
     assert len(op_sum.ops) == 3
-    assert op_sum.ops[0]["op"] == "Div"
-    assert op_sum.ops[1]["op"] == "Laplacian"
+    assert op_sum.ops[0]["name"] == "Div"
+    assert op_sum.ops[1]["name"] == "Laplacian"
 
     assert_close(op_sum.rhs, torch.zeros_like(var()) + 10)
