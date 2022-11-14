@@ -3,7 +3,6 @@ import copy
 from dataclasses import dataclass
 from typing import Any
 from typing import cast
-from typing import get_args
 from typing import Optional
 from typing import Union
 
@@ -37,7 +36,7 @@ class Field:
     name: str
     dim: int
     mesh: Mesh
-    bc_config: dict[str, Union[list[BC_config_type], None]]
+    bc_config: Optional[dict[str, Union[list[BC_config_type], None]]]
     init_val: Optional[Union[int, float]] = None
     object_interp: bool = False
 
@@ -202,7 +201,7 @@ class Field:
 
             self.VAR[mask] /= other()[mask]
         else:
-            raise TypeError("Field: you can only divide Field!")
+            raise TypeError("Field: you can only divide by Field!")
 
         return self.copy()
 
