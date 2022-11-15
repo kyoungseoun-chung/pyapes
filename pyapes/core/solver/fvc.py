@@ -37,10 +37,40 @@ class FVC:
                 )
         return source.tensor()
 
-    # WIP: Need implementation soon
+    # WIP: Need a good idea for the boundary conditions
     @staticmethod
     def div(var_i: Field, var_j: Field) -> Tensor:
-        ...
+        """Divergence of two fields."""
+
+        div = Flux(var_i.mesh)
+
+        dx = var_i.dx
+
+        for i in range(var_i.dim):
+            for j in range(var_j.dim):
+
+                # div.to_face(
+                #     i,
+                #     DIR[j],
+                #     "l",
+                #     (var()[i] - torch.roll(var()[i], 1, j)) / dx[j],
+                # )
+                # div.to_face(
+                #     i,
+                #     DIR[j],
+                #     "r",
+                #     (torch.roll(var()[i], -1, j) - var()[i]) / dx[j],
+                # )
+                pass
+
+        # TODO: Below doesn't look good. Need to be fixed.
+        for bc in var_i.bcs:
+            var_ij = var_i() * var_j()
+            bc.apply(var_ij, div, var_i.mesh.grid, 0)
+
+        div.sum_all()
+
+        return div.tensor()
 
     @staticmethod
     def grad(var: Field) -> Tensor:
