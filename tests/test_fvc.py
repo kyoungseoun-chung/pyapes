@@ -34,12 +34,37 @@ def test_fvc_ops(domain: Box, spacing: list[float], dim: int) -> None:
 
     grad = FVC.grad(var)
 
+    # Check interior
     target = (2 * mesh.X)[~mesh.t_mask]
     assert_close(grad[0, 0, ~mesh.t_mask], target)
 
+    # Check edge values
+    if dim == 1:
+        assert_close(grad[0, 0, 0].item(), 0.05)
+        assert_close(grad[0, 0, -1].item(), -9.05)
+    elif dim == 2:
+        assert_close(grad[0, 0, 0, 0].item(), 0.05)
+        assert_close(grad[0, 0, -1, 0].item(), -9.05)
+    else:
+        assert_close(grad[0, 0, 0, 0, 0].item(), 0.05)
+        assert_close(grad[0, 0, -1, 0, 0].item(), -9.05)
+
     laplacian = FVC.laplacian(1.0, var)
+
+    # Check interior
     target = (2 + (mesh.X) * 0.0)[~mesh.t_mask]
     assert_close(laplacian[0, 0, ~mesh.t_mask], target)
+
+    # Check edge values
+    if dim == 1:
+        assert_close(laplacian[0, 0, 0].item(), 1.0)
+        assert_close(laplacian[0, 0, -1].item(), -219.0)
+    elif dim == 2:
+        assert_close(laplacian[0, 0, 0, 0].item(), 1.0)
+        assert_close(laplacian[0, 0, -1, 0].item(), -219.0)
+    else:
+        assert_close(laplacian[0, 0, 0, 0, 0].item(), 1.0)
+        assert_close(laplacian[0, 0, -1, 0, 0].item(), -219.0)
 
     source = FVC.source(9.81, var)
     target = torch.zeros_like(var()) + 9.81

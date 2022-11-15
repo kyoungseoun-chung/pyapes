@@ -72,24 +72,25 @@ class BC(ABC):
     def at_bc(
         self, var: Tensor, flux: Flux, grid: tuple[Tensor, ...], order: int
     ) -> list[Tensor]:
-        ...
-
-    @abstractmethod
-    def to_bc(self, var: Tensor, flux: Flux, bc_vals: list[Tensor]) -> None:
-        ...
-
-    @abstractmethod
-    def apply(
-        self, var: Tensor, flux: Flux, grid: tuple[Tensor, ...], order: int
-    ) -> None:
-        """Apply boundary conditions. Combination of `self.at_bc` and `self.to_bc`.
-
+        """Compute flux at the boundary.
         Args:
             var: Field values at the volume center
             flux: Flux object to apply the boundary condition
             grid: `Mesh.grid` to be used for `Callable` `self.bc_val`
             order: order of boundary evaluation. if `order` is zero, face value will be linearly evaluated in between cell `i` and `i+1`. else `order` is non-zero, face value will be `order`-derivative at the face.
         """
+        ...
+
+    @abstractmethod
+    def to_bc(self, var: Tensor, flux: Flux, bc_vals: list[Tensor]) -> None:
+        """Assign bc_vals to flux."""
+        ...
+
+    @abstractmethod
+    def apply(
+        self, var: Tensor, flux: Flux, grid: tuple[Tensor, ...], order: int
+    ) -> None:
+        """Apply boundary conditions. Combination of `self.at_bc` and `self.to_bc`."""
         ...
 
 
@@ -99,7 +100,6 @@ class Dirichlet(BC):
     def at_bc(
         self, var: Tensor, flux: Flux, grid: tuple[Tensor, ...], order: int
     ) -> list[Tensor]:
-        """Extract BC flux."""
 
         dim = var.size(0)
 
@@ -124,16 +124,16 @@ class Dirichlet(BC):
                 dx = flux.mesh.dx
                 face_val[self.bc_mask] = (
                     (self.bc_val[d] - var[d][self.bc_mask])
-                    / (2 * dx[self.bc_face_dim])
+                    / (0.5 * dx[self.bc_face_dim])
                     if isinstance(self.bc_val, list)
                     else (
                         self.bc_val(grid, self.bc_mask)[d]
                         - var[d][self.bc_mask]
                     )
-                    / (2 * dx[self.bc_face_dim])
+                    / (0.5 * dx[self.bc_face_dim])
                     if callable(self.bc_val)
                     else (self.bc_val - var[d][self.bc_mask])
-                    / (2 * dx[self.bc_face_dim])
+                    / (0.5 * dx[self.bc_face_dim])
                 )
             else:
                 raise ValueError(
@@ -144,7 +144,6 @@ class Dirichlet(BC):
         return bc_vals
 
     def to_bc(self, var: Tensor, flux: Flux, bc_vals: list[Tensor]) -> None:
-        """Assign bc_vals to flux."""
         dim = var.size(0)
 
         for d in range(dim):
