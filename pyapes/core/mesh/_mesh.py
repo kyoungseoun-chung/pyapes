@@ -16,7 +16,15 @@ from pyapes.core.geometry.basis import Geometry
 
 
 class Mesh:
-    """Equidistance rectangular (in mind) mesh."""
+    """Equidistance rectangular (in mind) mesh.
+
+    Args:
+        domain (Geometry): Domain geometry.
+        obstacle (Optional[list[Geometry]]): Obstacle geometry.
+        spacing (Union[list[int], list[float]], optional): Mesh spacing. Defaults to [].
+        device (str, optional): Device for `torch.Tensor`. Defaults to "cpu".
+        dtype (Union[str, int], optional): Data type for `torch.Tensor`. Defaults to "double".
+    """
 
     def __init__(
         self,
@@ -82,6 +90,7 @@ class Mesh:
 
         # Mesh grid
         self.grid = torch.meshgrid(self.x, indexing="ij")
+        """Mesh grid created by `torch.meshgrid`"""
 
         # Obtain face area and volume
         self._A, self._V = self.get_A_and_V()
@@ -90,6 +99,7 @@ class Mesh:
         self.d_mask, self.o_mask = boundary_mask(self)
 
         self.t_mask = torch.zeros_like(self.d_mask["xl"])
+        """Mask combined all."""
 
         # Get all mask
         for dm in self.d_mask:
@@ -116,13 +126,16 @@ class Mesh:
 
     @property
     def A(self) -> dict[str, Tensor]:
+        """Area of the cell."""
         return self._A
 
     @property
     def V(self) -> Tensor:
+        """Volume of the cell."""
         return self._V
 
     def get_A_and_V(self) -> tuple[dict[str, Tensor], Tensor]:
+        """Calculate cell area and volume."""
 
         return self.get_A(), self.get_V()
 
@@ -170,15 +183,20 @@ class Mesh:
 
     @property
     def dim(self) -> int:
+        """Dimension of the mesh."""
         return self.domain.dim
 
     @property
     def X(self) -> Tensor:
+        """Return X coordinate of the mesh."""
         return self.grid[0]
 
     @property
     def Y(self) -> Tensor:
-        """If `self.dim > 1` return empty tensor."""
+        """Return Y coordinate of the mesh.
+        Note:
+            If `self.dim > 1` return empty tensor.
+        """
         return (
             self.grid[1]
             if self.dim > 1
@@ -187,7 +205,10 @@ class Mesh:
 
     @property
     def Z(self) -> Tensor:
-        """If `self.dim > 2` return empty tensor."""
+        """Return Z coordinate of the mesh.
+        Note:
+            If `self.dim > 2` return empty tensor.
+        """
         return (
             self.grid[2]
             if self.dim > 2
@@ -226,6 +247,7 @@ class Mesh:
 
     @property
     def nx(self) -> torch.Size:
+        """Return number of grid points."""
         return torch.Size(self._nx)
 
     @property
