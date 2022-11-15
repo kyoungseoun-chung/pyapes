@@ -70,7 +70,7 @@ class BC(ABC):
 
     @abstractmethod
     def at_bc(
-        self, var: Tensor, flux: Flux, grid: tuple[Tensor, ...]
+        self, var: Tensor, flux: Flux, grid: tuple[Tensor, ...], order: int
     ) -> list[Tensor]:
         ...
 
