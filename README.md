@@ -76,12 +76,19 @@ poetry install
 - Refactoring the code:
   - Better data structure
     - [x] Flux class
+    - [ ] `FVC` for explicit discretization
+    - [ ] `FVM` for implicit discretization
   - BCs
-    - [ ] Dirichlet
+    - [x] Dirichlet
     - [ ] Neumann
     - [ ] Symmetry
     - [ ] Periodic
     - [ ] Inflow/Outflow
+  - Discretization
+    - [x] `Grad`
+    - [x] `Laplacian`
+    - [ ] `Div`
+    - [ ] `Ddt`
 - Need different derivative order at the cell face
   - Additional features
     - [ ] High order time discretization
@@ -90,10 +97,12 @@ poetry install
 - Testing and validation
   - Create test files
     - [x] `test_mesh.py`
-    - [x] `test_variables.py`: Working on different BCs
+    - [x] `test_variables.py`
     - [ ] `test_fvc.py`
     - [ ] `test_fvm.py`
   - PDF solver examples
     - [ ] The diffusion equation
     - [ ] The Euler equation
     - [ ] The Navier-Stokes equation at low Reynolds numbers
+    - [ ] The Black-Scholes equation
+- Publish to pypi.org
