@@ -37,7 +37,7 @@ class Field:
     dim: int
     mesh: Mesh
     bc_config: Optional[dict[str, Union[list[BC_config_type], None]]]
-    init_val: Optional[Union[int, float]] = None
+    init_val: Optional[int | float | list[float] | list[int] | Tensor] = None
     object_interp: bool = False
 
     def __post_init__(self):
@@ -55,9 +55,18 @@ class Field:
 
             if isinstance(self.init_val, float):
                 self.VAR += self.init_val
-            elif isinstance(self.init_val, Tensor):
+            elif isinstance(self.init_val, list):
+                assert self.dim == len(
+                    self.init_val
+                ), "Field: init_val should match with Field dimension!"
                 for d in range(self.dim):
-                    self.VAR[d, :] += self.init_val[d]
+                    self.VAR[d] += float(self.init_val[d])
+            elif isinstance(self.init_val, Tensor):
+                assert self.dim == self.init_val.size(
+                    0
+                ), "Field: init_val should match with Field dimension!"
+                for d in range(self.dim):
+                    self.VAR[d] += self.init_val[d]
             else:
                 raise ValueError("Field: unsupported data type!")
 
