@@ -68,6 +68,11 @@ class BC(ABC):
         _bc_val_type_check(self.bc_val)
         self.bc_face_dim = DIR_TO_NUM[self.bc_face[0]]
 
+        if self.bc_face[-1] == "l":
+            self.bc_sign = -1.0
+        else:
+            self.bc_sign = 1.0
+
     @abstractmethod
     def at_bc(
         self, var: Tensor, flux: Flux, grid: tuple[Tensor, ...], order: int
@@ -125,15 +130,18 @@ class Dirichlet(BC):
                 face_val[self.bc_mask] = (
                     (self.bc_val[d] - var[d][self.bc_mask])
                     / (0.5 * dx[self.bc_face_dim])
+                    * self.bc_sign
                     if isinstance(self.bc_val, list)
                     else (
                         self.bc_val(grid, self.bc_mask)[d]
                         - var[d][self.bc_mask]
                     )
                     / (0.5 * dx[self.bc_face_dim])
+                    * self.bc_sign
                     if callable(self.bc_val)
                     else (self.bc_val - var[d][self.bc_mask])
                     / (0.5 * dx[self.bc_face_dim])
+                    * self.bc_sign
                 )
             else:
                 raise ValueError(
