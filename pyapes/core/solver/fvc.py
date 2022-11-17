@@ -44,25 +44,30 @@ class FVC:
 
         div = Flux(var_i.mesh)
 
-        dx = var_i.dx
+        assert (
+            var_j.dim < 4
+        ), "Div: dimension of var_j cannot be higher than 3."
+
+        dx = var_j.dx
 
         for i in range(var_i.dim):
             for j in range(var_j.dim):
-                val = var_i() * var_j()
+                val = var_i()[i] * var_j()[j]
+                pass
                 div.to_face(
                     i,
                     DIR[j],
                     "l",
-                    (val[i] - torch.roll(val[i], 1, j)) / dx[j],
+                    (val + torch.roll(val, 1, j)) / (0.5 * dx[j]),
                 )
                 div.to_face(
                     i,
                     DIR[j],
                     "r",
-                    (torch.roll(val[i], -1, j) - val[i]) / dx[j],
+                    (torch.roll(val, -1, j) + val) / (0.5 * dx[j]),
                 )
-                pass
 
+        pass
         for bc_i, bc_j in zip(var_i.bcs, var_j.bcs):
 
             bc_vals_i = bc_i.at_bc(var_i(), div, var_i.mesh.grid, 0)

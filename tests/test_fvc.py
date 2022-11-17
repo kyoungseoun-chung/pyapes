@@ -246,6 +246,29 @@ def test_fvc_ops(domain: Box, spacing: list[float], dim: int) -> None:
             xr_n - xl_n + yr_n - yl_n + zr_n - zl_n,
         )
 
+    bc_val = 1.0
+
+    # Test div(scalar, vector)
+    # Scalar field
+    var_i = Field(
+        "test", 1, mesh, {"domain": BC_HD(dim, bc_val), "obstacle": None}
+    )
+    var_i.set_var_tensor(mesh.X)
+
+    # Vector field
+    var_j = Field(
+        "test",
+        3,
+        mesh,
+        {"domain": BC_HD(dim, 0.0), "obstacle": None},
+        init_val=[1.0, 2.0, 3.0],
+    )
+
+    div = FVC.div(var_i, var_j)
+    pass
+
+    # Test div(vector, vector)
+
     source = FVC.source(9.81, var)
     target = torch.zeros_like(var()) + 9.81
     assert_close(source[0, 0], target)
