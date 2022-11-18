@@ -51,9 +51,9 @@ class FVC:
         dx = var_j.dx
 
         for i in range(var_i.dim):
-            for j in range(var_j.dim):
+
+            for j in range(var_i.mesh.dim):
                 val = var_i()[i] * var_j()[j]
-                pass
                 div.to_face(
                     i,
                     DIR[j],
@@ -154,4 +154,4 @@ class FVC:
         laplacian.sum_all()
         laplacian *= gamma
 
-        return laplacian.tensor()
+        return laplacian.tensor(True)

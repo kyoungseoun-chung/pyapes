@@ -45,15 +45,20 @@ class Flux:
         else:
             return self.face(i, j)
 
-    def tensor(self) -> Tensor:
-        """Return `self._center` as Tensor."""
+    def tensor(self, f_all: bool = False) -> Tensor:
+        """Return `self._center` as Tensor.
+        This function will keep x, y, and z dimension.
+        """
 
         var_tensor = []
         for v_d in self._center:
-            coord_tensor = []
-            for c_d in self._center[v_d]:
-                coord_tensor.append(self._center[v_d][c_d])
-            var_tensor.append(torch.stack(coord_tensor, dim=0))
+            if f_all:
+                var_tensor.append(self._center[v_d]["all"])
+            else:
+                coord_tensor = []
+                for c_d in self._center[v_d]:
+                    coord_tensor.append(self._center[v_d][c_d])
+                var_tensor.append(torch.stack(coord_tensor, dim=0))
 
         return torch.stack(var_tensor)
 

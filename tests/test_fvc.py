@@ -154,7 +154,7 @@ def test_fvc_ops(domain: Box, spacing: list[float], dim: int) -> None:
 
     # Check interior
     target = (2 + (mesh.X) * 0.0)[~mesh.t_mask]
-    assert_close(laplacian[0, 0, ~mesh.t_mask], target)
+    assert_close(laplacian[0, ~mesh.t_mask], target)
 
     # Check edge values
     if dim == 1:
@@ -165,8 +165,8 @@ def test_fvc_ops(domain: Box, spacing: list[float], dim: int) -> None:
         xr_n = (bc_val - var()[0, -1]) / (0.5 * dx) / dx
         xl_n = (var()[0, -1] - var()[0, -2]) / dx / dx
 
-        assert_close(laplacian[0, 0, 0], xr_0 - xl_0)
-        assert_close(laplacian[0, 0, -1], xr_n - xl_n)
+        assert_close(laplacian[0, 0], xr_0 - xl_0)
+        assert_close(laplacian[0, -1], xr_n - xl_n)
     elif dim == 2:
         # 2 Corners
         xr_0 = (var()[0, 1, 0] - var()[0, 0, 0]) / dx / dx
@@ -174,14 +174,14 @@ def test_fvc_ops(domain: Box, spacing: list[float], dim: int) -> None:
         yr_0 = (var()[0, 0, 1] - var()[0, 0, 0]) / dx / dx
         yl_0 = (var()[0, 0, 0] - bc_val) / (0.5 * dx) / dx
 
-        assert_close(laplacian[0, 0, 0, 0], xr_0 - xl_0 + yr_0 - yl_0)
+        assert_close(laplacian[0, 0, 0], xr_0 - xl_0 + yr_0 - yl_0)
 
         xr_n = (bc_val - var()[0, -1, -1]) / (0.5 * dx) / dx
         xl_n = (var()[0, -1, -1] - var()[0, -2, -1]) / dx / dx
         yr_n = (bc_val - var()[0, -1, -1]) / (0.5 * dx) / dx
         yl_n = (var()[0, -1, -1] - var()[0, -1, -2]) / dx / dx
 
-        assert_close(laplacian[0, 0, -1, -1], xr_n - xl_n + yr_n - yl_n)
+        assert_close(laplacian[0, -1, -1], xr_n - xl_n + yr_n - yl_n)
 
         # 2 Edges
         xr_0 = (var()[0, 2, 0] - var()[0, 1, 0]) / dx / dx
@@ -189,14 +189,14 @@ def test_fvc_ops(domain: Box, spacing: list[float], dim: int) -> None:
         yr_0 = (var()[0, 1, 1] - var()[0, 1, 0]) / dx / dx
         yl_0 = (var()[0, 1, 0] - bc_val) / (0.5 * dx) / dx
 
-        assert_close(laplacian[0, 0, 1, 0], xr_0 - xl_0 + yr_0 - yl_0)
+        assert_close(laplacian[0, 1, 0], xr_0 - xl_0 + yr_0 - yl_0)
 
         xr_n = (bc_val - var()[0, -1, 1]) / (0.5 * dx) / dx
         xl_n = (var()[0, -1, 1] - var()[0, -2, 1]) / dx / dx
         yr_n = (var()[0, -1, 2] - var()[0, -1, 1]) / (0.5 * dx) / dx
         yl_n = (var()[0, -1, 1] - var()[0, -1, 0]) / dx / dx
 
-        assert_close(laplacian[0, 0, -1, 1], xr_n - xl_n + yr_n - yl_n)
+        assert_close(laplacian[0, -1, 1], xr_n - xl_n + yr_n - yl_n)
     else:
         # 2 Corners
         xr_0 = (var()[0, 1, 0, 0] - var()[0, 0, 0, 0]) / dx / dx
@@ -207,7 +207,7 @@ def test_fvc_ops(domain: Box, spacing: list[float], dim: int) -> None:
         zl_0 = (var()[0, 0, 0, 0] - bc_val) / (0.5 * dx) / dx
 
         assert_close(
-            laplacian[0, 0, 0, 0, 0], xr_0 - xl_0 + yr_0 - yl_0 + zr_0 - zl_0
+            laplacian[0, 0, 0, 0], xr_0 - xl_0 + yr_0 - yl_0 + zr_0 - zl_0
         )
 
         xr_n = (bc_val - var()[0, -1, -1, -1]) / (0.5 * dx) / dx
@@ -218,7 +218,7 @@ def test_fvc_ops(domain: Box, spacing: list[float], dim: int) -> None:
         zl_n = (var()[0, -1, -1, -2] - var()[0, -1, -2, -1]) / dx / dx
 
         assert_close(
-            laplacian[0, 0, -1, -1, -1],
+            laplacian[0, -1, -1, -1],
             xr_n - xl_n + yr_n - yl_n + zr_n - zl_n,
         )
 
@@ -231,7 +231,7 @@ def test_fvc_ops(domain: Box, spacing: list[float], dim: int) -> None:
         zl_0 = (var()[0, 0, 1, 1] - bc_val) / (0.5 * dx) / dx
 
         assert_close(
-            laplacian[0, 0, 0, 1, 1], xr_0 - xl_0 + yr_0 - yl_0 + zr_0 - zl_0
+            laplacian[0, 0, 1, 1], xr_0 - xl_0 + yr_0 - yl_0 + zr_0 - zl_0
         )
 
         xr_n = (bc_val - var()[0, -2, -2, -1]) / (0.5 * dx) / dx
@@ -242,9 +242,10 @@ def test_fvc_ops(domain: Box, spacing: list[float], dim: int) -> None:
         zl_n = (var()[0, -2, -2, -1] - var()[0, -3, -2, -1]) / dx / dx
 
         assert_close(
-            laplacian[0, 0, -2, -2, -1],
+            laplacian[0, -2, -2, -1],
             xr_n - xl_n + yr_n - yl_n + zr_n - zl_n,
         )
+        pass
 
     bc_val = 1.0
 
