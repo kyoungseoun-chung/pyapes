@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from dataclasses import field
-from typing import Any
-from typing import Union
 
 import torch
 from torch import Tensor
@@ -47,7 +45,9 @@ class Flux:
 
     def tensor(self, f_all: bool = False) -> Tensor:
         """Return `self._center` as Tensor.
-        This function will keep x, y, and z dimension.
+
+        Args:
+            f_all (bool, optional): If True, tensor is summed over mesh coordinate, Else, keep its dimensions.
         """
 
         var_tensor = []

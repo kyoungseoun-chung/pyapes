@@ -67,7 +67,6 @@ class FVC:
                     (torch.roll(val, -1, j) + val) / (0.5 * dx[j]),
                 )
 
-        pass
         for bc_i, bc_j in zip(var_i.bcs, var_j.bcs):
 
             bc_vals_i = bc_i.at_bc(var_i(), div, var_i.mesh.grid, 0)

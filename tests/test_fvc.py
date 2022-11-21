@@ -245,7 +245,6 @@ def test_fvc_ops(domain: Box, spacing: list[float], dim: int) -> None:
             laplacian[0, -2, -2, -1],
             xr_n - xl_n + yr_n - yl_n + zr_n - zl_n,
         )
-        pass
 
     bc_val = 1.0
 
