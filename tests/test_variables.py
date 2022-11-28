@@ -116,7 +116,7 @@ def test_fluxes(domain: Box, spacing: list[float], dim: int) -> None:
     f_bc_config = create_test_field_bcs(False, dim)
 
     mesh = Mesh(domain, None, spacing, "cpu", "double")  # type: ignore
-    var = Field("any", 1, mesh, {"domain": f_bc_config, "obstacle": None})
+    var = Field("any", 1, mesh, {"domain": f_bc_config})
 
     flux = Flux(mesh)
 

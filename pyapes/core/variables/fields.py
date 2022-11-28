@@ -70,6 +70,13 @@ class Field:
             else:
                 raise ValueError("Field: unsupported data type!")
 
+        if self.bc_config is not None:
+            if "domain" not in self.bc_config:
+                raise ValueError("Field: domain must be defined!")
+
+            if "obstacle" not in self.bc_config:
+                self.bc_config["obstacle"] = None
+
         self.set_bcs()
 
     @property
