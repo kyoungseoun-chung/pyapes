@@ -70,9 +70,15 @@ class FVC:
         for bc_i, bc_j in zip(var_i.bcs, var_j.bcs):
 
             bc_vals_i = bc_i.at_bc(var_i(), div, var_i.mesh.grid, 0)
+            # There is a dimension mismatch
             bc_vals_j = bc_j.at_bc(var_j(), div, var_j.mesh.grid, 0)
 
-            bc_vals = [bi * bj for bi, bj in zip(bc_vals_i, bc_vals_j)]
+            mask_i = bc_i.bc_mask
+            mask_j = bc_j.bc_mask
+
+            bc_vals = [
+                bi[mask_i] * bj[mask_j] for bi, bj in zip(bc_vals_i, bc_vals_j)
+            ]
             bc_i.to_bc(var_i(), div, bc_vals)
 
         div.sum_all()

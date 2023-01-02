@@ -31,9 +31,7 @@ def test_fvc_ops(domain: Box, spacing: list[float], dim: int) -> None:
     dx = mesh.dx[0]
 
     # Field boundaries are all set to zero
-    var = Field(
-        "test", 1, mesh, {"domain": BC_HD(dim, bc_val), "obstacle": None}
-    )
+    var = Field("test", 1, mesh, {"domain": BC_HD(dim, bc_val)})
 
     var.set_var_tensor(mesh.X**2)
 
@@ -250,18 +248,12 @@ def test_fvc_ops(domain: Box, spacing: list[float], dim: int) -> None:
 
     # Test div(scalar, vector)
     # Scalar field
-    var_i = Field(
-        "test", 1, mesh, {"domain": BC_HD(dim, bc_val), "obstacle": None}
-    )
+    var_i = Field("test", 1, mesh, {"domain": BC_HD(dim, bc_val)})
     var_i.set_var_tensor(mesh.X)
 
     # Vector field
     var_j = Field(
-        "test",
-        3,
-        mesh,
-        {"domain": BC_HD(dim, 0.0), "obstacle": None},
-        init_val=[1.0, 2.0, 3.0],
+        "test", 3, mesh, {"domain": BC_HD(dim, 0.0)}, init_val=[1.0, 2.0, 3.0]
     )
 
     div = FVC.div(var_i, var_j)
