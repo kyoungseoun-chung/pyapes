@@ -35,8 +35,8 @@ def test_ops_comp():
     # Shape = (out_channels, in_channels, kernel_size)
     test_kernel = torch.zeros((k_cw, k_cw, 3))
 
-    test_kernel[-1, 0, 0] = 1
-    test_kernel[0, -1, -1] = -1
+    test_kernel[0, -1, 0] = -1
+    test_kernel[-1, 0, -1] = 1
 
     diag = torch.ones(k_cw - 1)
     test_kernel[:, :, 1] = torch.diag(diag, 1) - torch.diag(diag, -1)
@@ -44,10 +44,9 @@ def test_ops_comp():
     test_kernel /= 2 * dx
 
     # Shape = (batch, in_channels, width)
-    test_field_T = test_field.view(nx, k_cw, -1)
-    # test_field_T = torch.transpose(test_field.view(nx, k_cw, -1), 1, 2)
+    # test_field_T = test_field.view(nx, k_cw, -1)
+    test_field_T = torch.transpose(test_field.view(nx, k_cw, -1), 1, 2)
 
     conv_op = conv1d(test_field_T, test_kernel, stride=1, padding="same")
-    grad_y = conv_op.view(nx, nx)
-
-    pass
+    grad_y = torch.reshape(torch.transpose(conv_op, 1, 2), (nx, nx))
+    assert_close(grad_y[1:-1, 1:-1], 2 * Y[1:-1, 1:-1])
