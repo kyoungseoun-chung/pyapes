@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
+import warnings
 from dataclasses import dataclass
+from typing import Optional
 
 import torch
 from torch import Tensor
@@ -16,42 +18,68 @@ from pyapes.core.variables import Field
 class FDM:
     """Collection of the operators for explicit finite difference discretizations."""
 
-    param: dict[str, dict[str, str]]
+    param: Optional[dict[str, dict[str, str]]] = None
 
     def tensor(self, val: Tensor) -> Tensor:
         """Simply assign a given tensor and return. Mostly used for the RHS in `FVM`."""
 
         return val
 
-    # WIP: Need a good idea for the boundary conditions
-    def div(self, var_i: Field, var_j: Field) -> Tensor:
+    def div(self, var_i: Field, var_j: Field) -> dict[int, Tensor]:
         """Divergence of two fields.
         Note:
             - To avoid the checkerboard problem, flux limiter is used. It supports `none`, `upwind` and `quick` limiter. (here, `none` is equivalent to the second order central difference.)
         """
 
-        limitter = self.param["div"]["limitter"]
+        if self.param is not None and "limiter" in self.param["div"]:
+            limiter = self.param["div"]["limiter"]
+        else:
+            warnings.warn(
+                "FDM: no limiter is specified. Use `none` as default."
+            )
+            limiter = "none"
+
+        div: dict[int, Tensor] = {}
 
         dx = var_j.dx
 
         for i in range(var_i.dim):
 
-            for j in range(var_i.mesh.dim):
-                val = var_i()[i] * var_j()[j]
-                div.to_face(
-                    i,
-                    DIR[j],
-                    "l",
-                    (val + torch.roll(val, 1, j)) / (0.5 * dx[j]),
-                )
-                div.to_face(
-                    i,
-                    DIR[j],
-                    "r",
-                    (torch.roll(val, -1, j) + val) / (0.5 * dx[j]),
-                )
+            d_val = torch.zeros_like(var_i()[i])
 
-        return div.tensor()
+            for j in range(var_j.dim):
+
+                if limiter == "none":
+                    """Central difference scheme."""
+
+                    m_val = var_i()[i] * var_j()[j]
+                    d_val += (
+                        torch.roll(m_val, -1, j) - torch.roll(m_val, 1, j)
+                    ) / (2 * dx[j])
+
+                elif limiter == "upwind":
+
+                    m_val_p = (torch.roll(var_j()[j], -1, j) + var_j()[j]) / 2
+                    m_val_m = (torch.roll(var_j()[j], 1, j) + var_j()[j]) / 2
+
+                    f_val_p = (m_val_p + m_val_p.abs()) * var_i()[i] / 2 - (
+                        m_val_p - m_val_p.abs()
+                    ) * torch.roll(var_i()[i], -1, j) / 2
+
+                    f_val_m = (m_val_m + m_val_m.abs()) * torch.roll(
+                        var_i()[i], 1, j
+                    ) / 2 - (m_val_p - m_val_p.abs()) * var_i()[i] / 2
+
+                    d_val += (f_val_p - f_val_m) / dx[j]
+
+                elif limiter == "quick":
+                    pass
+                else:
+                    raise ValueError("FDM: Unknown limiter.")
+
+            div.update({i: d_val})
+
+        return div
 
     def grad(self, var: Field) -> dict[int, dict[str, Tensor]]:
         r"""Explicit discretization: Gradient
@@ -67,19 +95,19 @@ class FDM:
         dx = var.dx
 
         for i in range(var.dim):
+            g_val: dict[str, Tensor] = {}
             for j in range(var.mesh.dim):
 
-                grad.update(
+                g_val.update(
                     {
-                        i: {
-                            DIR[j]: (
-                                torch.roll(var()[i], -1, j)
-                                - torch.roll(var()[i], 1, j)
-                            )
-                            / (2 * dx[j])
-                        }
+                        DIR[j]: (
+                            torch.roll(var()[i], -1, j)
+                            - torch.roll(var()[i], 1, j)
+                        )
+                        / (2 * dx[j])
                     }
                 )
+            grad[i] = g_val
 
         return grad
 
@@ -104,7 +132,7 @@ class FDM:
 
             for j in range(var.mesh.dim):
                 ddx = dx[j] ** 2
-                l_val -= (
+                l_val += (
                     (
                         torch.roll(var()[i], -1, j)
                         - 2 * var()[i]

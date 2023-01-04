@@ -9,10 +9,8 @@ from torch.testing import assert_close  # type: ignore
 
 from pyapes.core.geometry import Box
 from pyapes.core.geometry.basis import FDIR
-from pyapes.core.geometry.basis import NUM_TO_DIR
 from pyapes.core.mesh import Mesh
 from pyapes.core.variables import Field
-from pyapes.core.variables import Flux
 from pyapes.core.variables.bcs import BC_config_type
 
 
@@ -100,62 +98,3 @@ def test_fields(domain: Box, spacing: list[float], dim: int) -> None:
 
     assert len(var.bcs) == 2 * dim
     assert var.bcs[0].__class__.__name__ == "Dirichlet"
-
-
-@pytest.mark.parametrize(
-    ["domain", "spacing", "dim"],
-    [
-        [Box[0:1], [0.1], 1],
-        [Box[0:1, 0:1], [0.1, 0.1], 2],
-        [Box[0:1, 0:1, 0:1], [0.1, 0.1, 0.1], 3],
-    ],
-)
-def test_fluxes(domain: Box, spacing: list[float], dim: int) -> None:
-
-    # First, check without callable function for the bc
-    f_bc_config = create_test_field_bcs(False, dim)
-
-    mesh = Mesh(domain, None, spacing, "cpu", "double")  # type: ignore
-    var = Field("any", 1, mesh, {"domain": f_bc_config})
-
-    flux = Flux(mesh)
-
-    zero_tensor = torch.zeros_like(mesh.X)
-
-    # Test flux face assigning
-    for i in range(dim):
-        flux.to_face(0, NUM_TO_DIR[i], "l", zero_tensor + 5)
-        flux.to_face(0, NUM_TO_DIR[i], "r", zero_tensor - 2)
-
-    # Test sum
-    flux.sum()
-
-    assert_close(flux.face(0, "xl"), zero_tensor + 5)
-    assert_close(flux.face(0, "xr"), zero_tensor - 2)
-    assert_close(
-        flux.center(0, "x"), (zero_tensor - 7) * mesh.A["xl"] / mesh.V
-    )
-
-    for i in range(dim):
-        flux.to_center(0, NUM_TO_DIR[i], zero_tensor + 10)
-
-    assert_close(flux.center(0, "x"), zero_tensor + 10)
-
-    # Test bcs
-    for bc in var.bcs:
-        bc.apply(var(), flux, var.mesh.grid, 0)
-
-    flux.sum()
-
-    mask = mesh.d_mask["xl"]
-    mask_tensor = torch.ones_like(mask)
-    assert_close(
-        flux.center(0, "x")[mask],
-        -2 * mask_tensor[mask] * mesh.A["xl"][mask] / mesh.V[mask],
-    )
-    mask = mesh.d_mask["xr"]
-    mask_tensor = torch.ones_like(mask)
-    assert_close(
-        flux.center(0, "x")[mask],
-        -4 * mask_tensor[mask] * mesh.A["xl"][mask] / mesh.V[mask],
-    )

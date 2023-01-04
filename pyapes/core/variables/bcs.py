@@ -21,8 +21,6 @@ from torch import Tensor
 from pyapes.core.backend import DType
 from pyapes.core.geometry.basis import DIR_TO_NUM
 from pyapes.core.geometry.basis import FDIR
-from pyapes.core.variables.fields import Field
-from pyapes.core.variables.fluxes import Flux
 
 BC_val_type = Union[
     int,
@@ -75,7 +73,7 @@ class BC(ABC):
             self.bc_sign = 1.0
 
     @abstractmethod
-    def apply(self, var: Field, grid: tuple[Tensor, ...], order: int) -> None:
+    def apply(self, var: Tensor, grid: tuple[Tensor, ...], order: int) -> None:
         """Apply boundary conditions. Combination of `self.at_bc` and `self.to_bc`."""
         ...
 
@@ -83,26 +81,28 @@ class BC(ABC):
 class Dirichlet(BC):
     r"""Apply Dirichlet boundary conditions."""
 
-    def apply(self, var: Field, grid: tuple[Tensor, ...]) -> None:
+    def apply(self, var: Tensor, grid: tuple[Tensor, ...]) -> None:
         """Apply BC"""
 
         assert not isinstance(
             self.bc_val, dict
         ), f"BC: {self.__class__.__name__} does not support dict type boundary value."
 
-        for i in range(var.dim):
+        dim = var.size(0)
+
+        for i in range(dim):
             if callable(self.bc_val):
-                var()[i, self.bc_mask] = self.bc_val(grid, self.bc_mask, i)
+                var[i, self.bc_mask] = self.bc_val(grid, self.bc_mask, i)
             elif isinstance(self.bc_val, list):
-                var()[i, self.bc_mask] = self.bc_val[i]
+                var[i, self.bc_mask] = self.bc_val[i]
             else:
-                var()[i, self.bc_mask] = self.bc_val
+                var[i, self.bc_mask] = self.bc_val
 
 
 class Neumann(BC):
     r"""Apply Neumann boundary conditions."""
 
-    def apply(self, var: Field, grid: tuple[Tensor, ...], order=int) -> None:
+    def apply(self, var: Tensor, grid: tuple[Tensor, ...], order=int) -> None:
         """Apply BC"""
 
         raise NotImplementedError
@@ -111,7 +111,7 @@ class Neumann(BC):
 class Symmetry(BC):
     r"""Apply Neumann boundary conditions."""
 
-    def apply(self, var: Tensor, flux: Flux, *_) -> None:
+    def apply(self, var: Tensor, *_) -> None:
         """Apply BC"""
         dim = var.size(0)
 
@@ -121,12 +121,6 @@ class Symmetry(BC):
                 opp_face = self.bc_face.replace("l", "r")
             else:
                 opp_face = self.bc_face.replace("r", "l")
-
-            face_val = flux.face(d, self.bc_face)
-            opp_face_val = flux.face(d, opp_face)
-
-            face_val[self.bc_mask] = opp_face_val[self.bc_mask]
-            flux.to_face(d, self.bc_face[0], self.bc_face[1], face_val)
 
 
 class Periodic(BC):
