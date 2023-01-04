@@ -49,19 +49,25 @@ def test_fdm_ops(domain: Box, spacing: list[float], dim: int) -> None:
     # Test div(scalar, vector)
 
     # Scalar advection speed
+    var_i = Field("test", 1, mesh, None)
+    var_i.set_var_tensor(torch.rand(var_i().shape))
     var_j = Field("test", 1, mesh, None, init_val=2.0)
 
-    div = fdm.div(var, var_j)
+    div = fdm.div(var_i, var_j)
+    dx = mesh.dx
 
-    target = (2 * mesh.X)[~mesh.t_mask]
+    target = (
+        (torch.roll(var_i()[0], -1, 0) - torch.roll(var_i()[0], 1, 0))
+        / (2 * dx[0])
+        * 2.0
+    )
 
-    pass
+    assert_close(div[0], target)
 
-    # Test div(vector, vector)
+    fdm.update_config("div", "limiter", "upwind")
 
-    # source = fdm.source(9.81, var)
-    # target = torch.zeros_like(var()) + 9.81
-    # assert_close(source[0, 0], target)
+    div = fdm.div(var_i, var_j)
 
-    tensor = fdm.tensor(target)
-    assert_close(tensor, target)
+    target = (var_i()[0] - torch.roll(var_i()[0], 1, 0)) / dx[0] * 2.0
+
+    assert_close(div[0], target)

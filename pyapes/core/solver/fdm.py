@@ -18,7 +18,15 @@ from pyapes.core.variables import Field
 class FDM:
     """Collection of the operators for explicit finite difference discretizations."""
 
-    param: Optional[dict[str, dict[str, str]]] = None
+    config: Optional[dict[str, dict[str, str]]] = None
+
+    def update_config(self, scheme: str, target: str, val: str):
+        """Update config values."""
+
+        if self.config is not None:
+            self.config[scheme][target] = val
+        else:
+            warnings.warn("FDM: No config is specified.")
 
     def tensor(self, val: Tensor) -> Tensor:
         """Simply assign a given tensor and return. Mostly used for the RHS in `FVM`."""
@@ -31,8 +39,8 @@ class FDM:
             - To avoid the checkerboard problem, flux limiter is used. It supports `none`, `upwind` and `quick` limiter. (here, `none` is equivalent to the second order central difference.)
         """
 
-        if self.param is not None and "limiter" in self.param["div"]:
-            limiter = self.param["div"]["limiter"]
+        if self.config is not None and "limiter" in self.config["div"]:
+            limiter = self.config["div"]["limiter"]
         else:
             warnings.warn(
                 "FDM: no limiter is specified. Use `none` as default."
