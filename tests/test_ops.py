@@ -56,9 +56,9 @@ def test_ops_comp_grad():
     assert_close(grad_y[1:-1, 1:-1], 4 * Y[1:-1, 1:-1])
 
     tic = time.perf_counter()
-    test_field_T = torch.transpose(test_field.T.view(nx, -1, k_cw), 2, 1)
+    test_field_T = torch.transpose(test_field.T.view(nx, -1, k_cw), 1, 2)
     conv_op = conv1d(test_field_T, test_kernel, stride=1, padding="same")
-    grad_x = torch.reshape(torch.transpose(conv_op, 2, 1), (nx, nx)).T
+    grad_x = torch.reshape(torch.transpose(conv_op, 1, 2), (nx, nx)).T
     t_conv_x = time.perf_counter() - tic
 
     assert_close(grad_x[1:-1, 1:-1], 2 * X[1:-1, 1:-1])

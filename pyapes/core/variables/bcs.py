@@ -21,6 +21,7 @@ from torch import Tensor
 from pyapes.core.backend import DType
 from pyapes.core.geometry.basis import DIR_TO_NUM
 from pyapes.core.geometry.basis import FDIR
+from pyapes.core.variables.fields import Field
 from pyapes.core.variables.fluxes import Flux
 
 BC_val_type = Union[
@@ -28,7 +29,7 @@ BC_val_type = Union[
     float,
     list[int],
     list[float],
-    Callable[[tuple[Tensor, ...], Tensor], Tensor],
+    Callable[[tuple[Tensor, ...], Tensor, int], Tensor],
 ]
 """BC value type."""
 BC_config_type = dict[str, Union[str, BC_val_type]]
@@ -74,27 +75,7 @@ class BC(ABC):
             self.bc_sign = 1.0
 
     @abstractmethod
-    def at_bc(
-        self, var: Tensor, flux: Flux, grid: tuple[Tensor, ...], order: int
-    ) -> list[Tensor]:
-        """Compute flux at the boundary.
-        Args:
-            var: Field values at the volume center
-            flux: Flux object to apply the boundary condition
-            grid: `Mesh.grid` to be used for `Callable` `self.bc_val`
-            order: order of boundary evaluation. if `order` is zero, face value will be linearly evaluated in between cell `i` and `i+1`. else `order` is non-zero, face value will be `order`-derivative at the face.
-        """
-        ...
-
-    @abstractmethod
-    def to_bc(self, var: Tensor, flux: Flux, bc_vals: list[Tensor]) -> None:
-        """Assign bc_vals to flux."""
-        ...
-
-    @abstractmethod
-    def apply(
-        self, var: Tensor, flux: Flux, grid: tuple[Tensor, ...], order: int
-    ) -> None:
+    def apply(self, var: Field, grid: tuple[Tensor, ...], order: int) -> None:
         """Apply boundary conditions. Combination of `self.at_bc` and `self.to_bc`."""
         ...
 
@@ -102,77 +83,27 @@ class BC(ABC):
 class Dirichlet(BC):
     r"""Apply Dirichlet boundary conditions."""
 
-    def at_bc(
-        self, var: Tensor, flux: Flux, grid: tuple[Tensor, ...], order: int
-    ) -> list[Tensor]:
-
-        dim = var.size(0)
-
-        bc_vals = []
-
-        for d in range(dim):
-
-            face_val = flux.face(d, self.bc_face)
-
-            if order == 0:
-                # Evaluate cell BC at the boundary.
-                face_val[self.bc_mask] = (
-                    self.bc_val[d]
-                    if isinstance(self.bc_val, list)
-                    else self.bc_val(grid, self.bc_mask)[d]
-                    if callable(self.bc_val)
-                    else self.bc_val
-                )
-
-            elif order == 1:
-                # Evaluate gradient for the Laplacian operator.
-                dx = flux.mesh.dx
-                face_val[self.bc_mask] = (
-                    (self.bc_val[d] - var[d][self.bc_mask])
-                    / (0.5 * dx[self.bc_face_dim])
-                    * self.bc_sign
-                    if isinstance(self.bc_val, list)
-                    else (
-                        self.bc_val(grid, self.bc_mask)[d]
-                        - var[d][self.bc_mask]
-                    )
-                    / (0.5 * dx[self.bc_face_dim])
-                    * self.bc_sign
-                    if callable(self.bc_val)
-                    else (self.bc_val - var[d][self.bc_mask])
-                    / (0.5 * dx[self.bc_face_dim])
-                    * self.bc_sign
-                )
-            else:
-                raise ValueError(
-                    f"BC: boundary value evaluation for {order}-derivative is not supported!"
-                )
-            bc_vals.append(face_val)
-
-        return bc_vals
-
-    def to_bc(self, var: Tensor, flux: Flux, bc_vals: list[Tensor]) -> None:
-        dim = var.size(0)
-
-        for d in range(dim):
-            flux.to_face(d, self.bc_face[0], self.bc_face[1], bc_vals[d])
-
-    def apply(
-        self, var: Tensor, flux: Flux, grid: tuple[Tensor, ...], order: int
-    ) -> None:
+    def apply(self, var: Field, grid: tuple[Tensor, ...]) -> None:
         """Apply BC"""
 
-        self.to_bc(var, flux, self.at_bc(var, flux, grid, order))
+        assert not isinstance(
+            self.bc_val, dict
+        ), f"BC: {self.__class__.__name__} does not support dict type boundary value."
+
+        for i in range(var.dim):
+            if callable(self.bc_val):
+                var()[i, self.bc_mask] = self.bc_val(grid, self.bc_mask, i)
+            elif isinstance(self.bc_val, list):
+                var()[i, self.bc_mask] = self.bc_val[i]
+            else:
+                var()[i, self.bc_mask] = self.bc_val
 
 
 class Neumann(BC):
     r"""Apply Neumann boundary conditions."""
 
-    def apply(
-        self, var: Tensor, flux: Flux, grid: tuple[Tensor, ...], order=int
-    ) -> None:
+    def apply(self, var: Field, grid: tuple[Tensor, ...], order=int) -> None:
         """Apply BC"""
-        dim = var.size(0)
 
         raise NotImplementedError
 

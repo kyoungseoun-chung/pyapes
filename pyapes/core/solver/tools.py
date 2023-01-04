@@ -10,7 +10,7 @@ from torch.nn import ConstantPad3d
 def create_pad(
     dim: int,
 ) -> Union[ConstantPad1d, ConstantPad2d, ConstantPad3d]:
-    """Create padd object."""
+    """Create pad object."""
 
     if dim == 1:
         return ConstantPad1d(1, 0)

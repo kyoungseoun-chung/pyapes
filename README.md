@@ -61,23 +61,25 @@ poetry install
 ## Features (Planning)
 
 - GPU enabled computation (using `torch`)
-- Finite Volume Method:
-  - Support spatial discretization in `FVC` and `FVM` manner
+- ~~Finite Volume Method~~ → FDM
+  - ~~Support spatial discretization in `FVC` and `FVM` manner~~
     - `Grad`, `Laplacian`, `Div` (`FVM` only)
   - Implicit time integration in `Ddt`
     - The backward Euler and the Crank-Nicolson
-  - Flux limiters
+  - Flux limiters for advection term: `QUICK` and `Upwind`
   - Immersed body boundary conditions
   - Linear system solvers
-    - Supports Jacobi, Conjugated gradient (CG), CG-Newton, and Gauss-Seidel (need verification) method.
+    - Supports one or all of Jacobi, Conjugated gradient (CG), CG-Newton, and Gauss-Seidel (need verification) method.
+  - Distributed computing
 
 ## Todos
 
 - Refactoring the code:
   - Better data structure
-    - [x] Flux class
-    - [ ] `FVC` for explicit discretization
-    - [ ] `FVM` for implicit discretization
+    - [ ] Revised `FDM`
+    - ~~Flux class~~
+    - ~~`FVC` for explicit discretization~~
+    - ~~`FVM` for implicit discretization~~
   - BCs
     - [x] Dirichlet
     - [ ] Neumann
