@@ -7,13 +7,9 @@ import torch
 from torch import Tensor
 
 from pyapes.core.geometry.basis import DIR
-from pyapes.core.solver.tools import create_pad
-from pyapes.core.solver.tools import inner_slicer
 from pyapes.core.variables import Field
 
 
-# NOTE: return Tensor? or dict?
-# NOTE: BC with slicer?
 @dataclass
 class FDM:
     """Collection of the operators for explicit finite difference discretizations."""
