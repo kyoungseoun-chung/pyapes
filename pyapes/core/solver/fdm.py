@@ -7,6 +7,9 @@ import torch
 from torch import Tensor
 
 from pyapes.core.geometry.basis import DIR
+from pyapes.core.solver.tools import create_pad
+from pyapes.core.solver.tools import fill_pad
+from pyapes.core.solver.tools import inner_slicer
 from pyapes.core.variables import Field
 
 
@@ -56,27 +59,43 @@ class FDM:
                 if limiter == "none":
                     """Central difference scheme."""
 
-                    m_val = var_i()[i] * var_j()[j]
+                    pad = create_pad(var_i.mesh.dim)
+                    slicer = inner_slicer(var_i.mesh.dim)
+
+                    m_val = fill_pad(
+                        pad(var_i()[i] * var_j()[j]), j, 1, slicer
+                    )
+
                     d_val += (
-                        torch.roll(m_val, -1, j) - torch.roll(m_val, 1, j)
-                    ) / (2 * dx[j])
+                        (torch.roll(m_val, -1, j) - torch.roll(m_val, 1, j))
+                        / (2 * dx[j])
+                    )[slicer]
 
                 elif limiter == "upwind":
 
-                    m_val_p = (torch.roll(var_j()[j], -1, j) + var_j()[j]) / 2
-                    m_val_m = (torch.roll(var_j()[j], 1, j) + var_j()[j]) / 2
+                    pad = create_pad(var_i.mesh.dim)
+                    slicer = inner_slicer(var_i.mesh.dim)
 
-                    f_val_p = (m_val_p + m_val_p.abs()) * var_i()[i] / 2 - (
+                    var_i_pad = fill_pad(pad(var_i()[i]), j, 1, slicer)
+                    var_j_pad = fill_pad(pad(var_j()[j]), j, 1, slicer)
+
+                    m_val_p = (torch.roll(var_j_pad, -1, j) + var_j_pad) / 2
+                    m_val_m = (torch.roll(var_j_pad, 1, j) + var_j_pad) / 2
+
+                    f_val_p = (m_val_p + m_val_p.abs()) * var_i_pad / 2 - (
                         m_val_p - m_val_p.abs()
-                    ) * torch.roll(var_i()[i], -1, j) / 2
+                    ) * torch.roll(var_i_pad, -1, j) / 2
 
                     f_val_m = (m_val_m + m_val_m.abs()) * torch.roll(
-                        var_i()[i], 1, j
-                    ) / 2 - (m_val_p - m_val_p.abs()) * var_i()[i] / 2
+                        var_i_pad, 1, j
+                    ) / 2 - (m_val_p - m_val_p.abs()) * var_i_pad / 2
 
-                    d_val += (f_val_p - f_val_m) / dx[j]
+                    d_val += ((f_val_p - f_val_m) / dx[j])[slicer]
 
                 elif limiter == "quick":
+                    pad = create_pad(var_i.mesh.dim, 2)
+                    slicer = inner_slicer(var_i.mesh.dim, 2)
+
                     pass
                 else:
                     raise ValueError("FDM: Unknown limiter.")
@@ -98,17 +117,25 @@ class FDM:
         grad: dict[int, dict[str, Tensor]] = {}
         dx = var.dx
 
+        pad = create_pad(var.mesh.dim)
+        slicer = inner_slicer(var.mesh.dim)
+
         for i in range(var.dim):
+
             g_val: dict[str, Tensor] = {}
+
             for j in range(var.mesh.dim):
 
+                var_padded = fill_pad(pad(var()[i]), j, 1, slicer)
                 g_val.update(
                     {
                         DIR[j]: (
-                            torch.roll(var()[i], -1, j)
-                            - torch.roll(var()[i], 1, j)
-                        )
-                        / (2 * dx[j])
+                            (
+                                torch.roll(var_padded, -1, j)
+                                - torch.roll(var_padded, 1, j)
+                            )
+                            / (2 * dx[j])
+                        )[slicer]
                     }
                 )
             grad[i] = g_val
@@ -129,6 +156,8 @@ class FDM:
         laplacian: dict[int, Tensor] = {}
 
         dx = var.dx
+        pad = create_pad(var.mesh.dim)
+        slicer = inner_slicer(var.mesh.dim)
 
         for i in range(var.dim):
 
@@ -136,16 +165,22 @@ class FDM:
 
             for j in range(var.mesh.dim):
                 ddx = dx[j] ** 2
+                var_padded = fill_pad(pad(var()[i]), j, 1, slicer)
+
                 l_val += (
                     (
-                        torch.roll(var()[i], -1, j)
-                        - 2 * var()[i]
-                        + torch.roll(var()[i], 1, j)
+                        torch.roll(var_padded, -1, j)
+                        - 2 * var_padded
+                        + torch.roll(var_padded, 1, j)
                     )
                     / ddx
                     * gamma
-                )
+                )[slicer]
 
             laplacian.update({i: l_val})
 
         return laplacian
+
+
+def _treat_edge(order: int):
+    pass

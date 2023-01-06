@@ -13,16 +13,15 @@ from pyapes.core.variables import Field
 
 
 @pytest.mark.parametrize(
-    ["domain", "spacing", "dim"],
+    ["domain", "spacing"],
     [
-        [Box[0:1], [0.2], 1],
-        [Box[0:1, 0:1], [0.2, 0.2], 2],
-        [Box[0:1, 0:1, 0:1], [0.2, 0.2, 0.2], 3],
+        [Box[0:1], [0.2]],
+        [Box[0:1, 0:1], [0.2, 0.2]],
+        [Box[0:1, 0:1, 0:1], [0.2, 0.2, 0.2]],
     ],
 )
-def test_fdm_ops(domain: Box, spacing: list[float], dim: int) -> None:
+def test_fdm_ops(domain: Box, spacing: list[float]) -> None:
 
-    from pyapes.core.variables.bcs import BC_HD
     from pyapes.core.solver.fdm import FDM
 
     mesh = Mesh(domain, None, spacing)
@@ -62,7 +61,7 @@ def test_fdm_ops(domain: Box, spacing: list[float], dim: int) -> None:
         * 2.0
     )
 
-    assert_close(div[0], target)
+    assert_close(div[0][~mesh.t_mask], target[~mesh.t_mask])
 
     fdm.update_config("div", "limiter", "upwind")
 
@@ -70,4 +69,4 @@ def test_fdm_ops(domain: Box, spacing: list[float], dim: int) -> None:
 
     target = (var_i()[0] - torch.roll(var_i()[0], 1, 0)) / dx[0] * 2.0
 
-    assert_close(div[0], target)
+    assert_close(div[0][~mesh.t_mask], target[~mesh.t_mask])
