@@ -5,6 +5,15 @@ Usage of fvm and fvc is a bit different than openFOAM.
 Here, fvc returns dictionary of `torch.Tensor` as a result of discretization,
 on the other hand, fvm returns operation matrix, `Aop` of each individual discretization scheme.
 
+Desired usage of solver module is as follows:
+
+    >>> fdm = FDM(config)   // initialize FDM discretization
+    >>> solver = Solver(config)  // initialize solver
+    >>> solver.set_eq(fdm.ddt(var_i) + ...
+        fdm.div(var_i, var_j) - fdm.laplacian(c, var_i), var_i) == ...
+        fdm.tensor(var) )// set PDE
+    >>> solver.solve() // solve PDE
+
 """
 from __future__ import annotations
 
@@ -82,24 +91,18 @@ class Solver:
     """`pyapes` finite volume method solver module.
 
     Example:
-
-        >>> solver = Solver(config)
-        >>> fvm = solver.fvm
-        >>> fvc = solver.fvc
-        >>> solver.set_eq(fvm.grad(var) + fvm.div(var, var) - fvm.laplacian(c, var), var)
-        >>> fvc.solve(fvc.laplacian(P) == rhs)
-        >>> var = fvm.solve(fvm.eq == -P)
+    -> Add once everything is ready.
 
     Args:
         config: solver configuration.
-        fvc: Volume node based discretization.
     """
 
     config: dict
+    """Solver configuration."""
 
     def set_eq(self, eq: Discretizer) -> None:
         """Construct PDE to solve.
-        (Actually just store data for future self.solve function call)
+        (Actually construct Aop and RHS of the equation)
 
         Args:
             op: operation for the discretization

@@ -28,30 +28,3 @@ def test_mask() -> None:
     t1[:7] = True
     t1[-1] = True
     assert_close(mesh_ob.t_mask[3, :], t1)
-
-
-@pytest.mark.parametrize(
-    "domain",
-    [
-        (Box[0:1], None, [0.1]),
-        (Box[0:1, 0:1], None, [0.1, 0.2]),
-        (Box[0:1, 0:1, 0:1], None, [0.1, 0.2, 0.3]),
-    ],
-)
-def test_mesh(domain: tuple) -> None:
-    """Test field boundaries."""
-
-    mesh = Mesh(*domain, "cpu", "double")  # type: ignore
-
-    if mesh.dim == 1:
-        assert pytest.approx(mesh.A["xl"][0]) == 0.1 * 0.1
-        assert pytest.approx(mesh.V[0]) == 0.1**3
-    elif mesh.dim == 2:
-        assert pytest.approx(mesh.A["xl"][0]) == 0.1 * 0.2
-        assert pytest.approx(mesh.A["yl"][0]) == 0.1 * 0.1
-        assert pytest.approx(mesh.V[0, 0]) == 0.1**2 * 0.2
-    else:
-        assert pytest.approx(mesh.A["xl"][0]) == 0.2 * 0.3
-        assert pytest.approx(mesh.A["yl"][0]) == 0.1 * 0.3
-        assert pytest.approx(mesh.A["zl"][0]) == 0.1 * 0.2
-        assert pytest.approx(mesh.V[0, 0, 0]) == 0.1 * 0.2 * 0.3

@@ -12,6 +12,21 @@ from torch.nn import ConstantPad3d
 def fill_pad(
     var_padded: Tensor, dim: int, pad_length: int, slicer: tuple
 ) -> Tensor:
+    """Fill padded tensor with values from inner part.
+
+    Note:
+        - It copies the edge of the inner part and fill the padded part with the copied values.
+        - Repeat process over `pad_length` times.
+
+    Args:
+        var_padded (Tensor): padded tensor. Filled with zeros (usually).
+        dim (int): dimension to apply fill padding.
+        pad_length (int): length of padding in one side.
+        slicer (tuple): inner part slicer
+
+    Returns:
+        Tensor: padded tensor with values from inner part.
+    """
 
     var_inner = var_padded[slicer].clone()
     for _ in range(pad_length):

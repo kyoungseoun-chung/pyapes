@@ -25,12 +25,32 @@ class FDM:
         if self.config is not None:
             self.config[scheme][target] = val
         else:
-            warnings.warn("FDM: No config is specified.")
+            raise AttributeError("FDM: No config is specified.")
 
-    def tensor(self, val: Tensor) -> Tensor:
-        """Simply assign a given tensor and return. Mostly used for the RHS in `FVM`."""
+    def ddt(self, var: Field) -> dict[int, Tensor]:
+        """Time derivative of a given field."""
 
-        return val
+        try:
+            dt = var.dt
+        except AttributeError:
+            raise AttributeError("FDM: No time step is specified.")
+
+        ddt: dict[int, Tensor] = {}
+
+        for i in range(var.dim):
+            ddt.update({i: (var()[i] - var.VARo[i]) / dt})
+
+        return ddt
+
+    def rhs(self, var: Field) -> dict[int, Tensor]:
+        """Simply assign a given field to RHS of PDE."""
+
+        rhs: dict[int, Tensor] = {}
+
+        for i in range(var.dim):
+            rhs.update({i: var()[i]})
+
+        return rhs
 
     def div(self, var_i: Field, var_j: Field) -> dict[int, Tensor]:
         """Divergence of two fields.
@@ -180,7 +200,3 @@ class FDM:
             laplacian.update({i: l_val})
 
         return laplacian
-
-
-def _treat_edge(order: int):
-    pass

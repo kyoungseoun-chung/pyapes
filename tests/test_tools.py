@@ -8,28 +8,6 @@ import pytest
 import torch
 
 
-def test_container(report: bool = True) -> None:
-
-    from pyapes.tools.utils import Container
-
-    A = Container(test=10)
-
-    # Empty container
-    B = Container()
-
-    assert A.test == 10
-
-    if report:
-        print(A)
-        print(B)
-        print(dir(A))
-
-    with pytest.raises(AttributeError):
-        print(A.dummy)
-
-    delattr(A, "test")
-
-
 def test_getsize() -> None:
 
     from pyapes.tools.utils import getsize

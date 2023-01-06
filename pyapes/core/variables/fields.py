@@ -79,6 +79,22 @@ class Field:
 
         self.set_bcs()
 
+    def set_dt(self, dt: float) -> None:
+        """Set time step. Explicitly set dt for clarity."""
+        self._dt = dt
+
+    def save_old(self) -> None:
+        """Save old value to `VARo`."""
+        self._VARo = self.VAR.clone()
+
+    @property
+    def VARo(self) -> Tensor:
+        return self._VARo
+
+    @property
+    def dt(self) -> float:
+        return self._dt
+
     @property
     def dx(self) -> Tensor:
         """Mesh spacing."""

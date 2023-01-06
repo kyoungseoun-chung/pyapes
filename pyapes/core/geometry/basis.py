@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Basis of geometries."""
-from enum import Enum
 from typing import Any
 from typing import Union
 
 DIR = ["x", "y", "z"]
 DIR_TO_NUM: dict[str, int] = {"x": 0, "y": 1, "z": 2}
 NUM_TO_DIR: dict[int, str] = {0: "x", 1: "y", 2: "z"}
-FDIR = ["xl", "xr", "yl", "yr", "zl", "zr"]
+FDIR = ["xl", "xr", "yl", "yr", "zl", "zr"]  # could be used for bc identifier?
 FDIR_TO_NUM: dict[str, int] = {
     "xl": 0,
     "xr": 1,
