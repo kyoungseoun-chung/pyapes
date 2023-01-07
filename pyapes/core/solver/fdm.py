@@ -1,202 +1,229 @@
 #!/usr/bin/env python3
-import warnings
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Optional
+from dataclasses import field
+from typing import Callable
+from typing import TypedDict
 
 import torch
 from torch import Tensor
 
-from pyapes.core.geometry.basis import DIR
-from pyapes.core.solver.tools import create_pad
-from pyapes.core.solver.tools import fill_pad
-from pyapes.core.solver.tools import inner_slicer
+from pyapes.core.solver.fdc import FDC
 from pyapes.core.variables import Field
+
+
+class OPStype(TypedDict):
+    """Typed dict for the operation types."""
+
+    name: str
+    Aop: Callable[..., Tensor]
+    inputs: tuple[float, Field] | tuple[Field, Field, dict] | tuple[Field]
+    var: Field
+    sign: float | int
+
+
+@dataclass(eq=False)
+class Discretizer:
+    """Base class of FVM discretization."""
+
+    # Init relevant attributes
+    _ops: dict[int, OPStype] = field(default_factory=dict)
+    _rhs: Tensor | None = None
+    _config: dict[str, dict[str, str]] = field(default_factory=dict)
+
+    @property
+    def ops(self) -> dict[int, OPStype]:
+        """Collection of operators used in `pyapes.core.solver.Solver().set_eq()`"""
+        return self._ops
+
+    @property
+    def rhs(self) -> Tensor | None:
+        """RHS of `set_eq()`"""
+        return self._rhs
+
+    @property
+    def var(self) -> Field:
+        """Primary Field variable to be discretized."""
+        raise NotImplementedError
+
+    def update_config(self, config: dict[str, dict[str, str]]) -> None:
+        """Update solver configuration.
+
+        Args:
+            config: solver configuration.
+        """
+        self._config = config
+
+    @property
+    def config(self) -> dict[str, dict[str, str]]:
+        return self._config
+
+    def __eq__(self, other: Tensor | float) -> Discretizer:
+
+        if isinstance(other, Tensor):
+            self._rhs = other
+        else:
+            self._rhs = torch.zeros_like(self.var()) + other
+
+        return self
+
+    def __add__(self, other: Discretizer) -> Discretizer:
+
+        idx = list(self._ops.keys())
+        self._ops.update({idx[-1] + 1: other.ops[0]})
+
+        return self
+
+    def __sub__(self, other: Discretizer) -> Discretizer:
+
+        idx = list(self._ops.keys())
+        other.ops[0]["sign"] = -1
+        self._ops.update({idx[-1] + 1: other.ops[0]})
+
+        return self
+
+
+@dataclass(eq=False)
+class Grad(Discretizer):
+    r"""Variable discretization: Gradient
+
+    .. math::
+
+        \frac{\partial \Phi}{\partial x_j} = \frac{1}{V_C}\sum \Phi_f \vec{n}_f \vec{S}_f
+
+    Args:
+        var: Field object to be discretized ($\Phi$).
+
+    """
+
+    def __call__(self, var: Field) -> Grad:
+
+        self._var = var
+        self._ops[0] = {
+            "name": self.__class__.__name__,
+            "Aop": self.Aop,
+            "inputs": (var,),
+            "var": var,
+            "sign": 1.0,
+        }
+        return self
+
+    @staticmethod
+    def Aop(var: Field) -> Tensor:
+
+        fdc = FDC()
+
+        return fdc.grad(var)
+
+
+# Ddt is not yet functional
+
+
+@dataclass(eq=False)
+class Div(Discretizer):
+    r"""Variable discretization: Divergence
+
+    Note:
+        - Currently supports `central difference`, and `upwind` schemes.
+
+    .. math::
+
+        \frac{\partial}{\partial x_j}
+        \left(
+            u_j \phi_i
+        \right)
+
+    Args:
+        var_i: Field object to be discretized ($\Phi_i$)
+        var_j: convective variable ($\vec{u}_j$)
+    """
+
+    def __call__(self, var_i: Field, var_j: Field) -> Div:
+
+        self._var_i = var_i
+        self._var_j = var_j
+        self._ops[0] = {
+            "name": self.__class__.__name__,
+            "Aop": self.Aop,
+            "inputs": (var_i, var_j, self.config),
+            "var": var_i,
+            "sign": 1.0,
+        }
+
+        return self
+
+    @staticmethod
+    def Aop(
+        var_i: Field, var_j: Field, config: dict[str, dict[str, str]]
+    ) -> Tensor:
+
+        # Div operator need config options
+        fdc = FDC()
+        fdc.update_config("div", "limiter", config["div"]["limiter"])
+
+        return fdc.div(var_i, var_j)
+
+
+@dataclass(eq=False)
+class Laplacian(Discretizer):
+    r"""Variable discretization: Laplacian
+
+    .. math::
+
+        \frac{\partial}{\partial x_j}
+        \left(
+            \Gamma^\Phi \frac{\partial \Phi}{\partial x_j}
+        \right)
+
+
+    Args:
+        coeff: coefficient of the Laplacian operator ($\Gamma^\Phi$)
+        var: Field object to be discretized ($\Phi$)
+    """
+
+    def __call__(self, coeff: float, var: Field) -> Laplacian:
+
+        self._coeff = coeff
+        self._var = var
+        self._ops[0] = {
+            "name": self.__class__.__name__,
+            "Aop": self.Aop,
+            "inputs": (coeff, var),
+            "var": var,
+            "sign": 1.0,
+        }
+
+        return self
+
+    @staticmethod
+    def Aop(gamma: float, var: Field) -> Tensor:
+
+        # Laplacian operator does not need config options
+        fdc = FDC()
+
+        return fdc.laplacian(gamma, var)
 
 
 @dataclass
 class FDM:
-    """Collection of the operators for explicit finite difference discretizations."""
+    """Collection of the operators for finite difference discretizations"""
 
-    config: Optional[dict[str, dict[str, str]]] = None
+    div: Div = Div()
+    Laplacian: Laplacian = Laplacian()
+    grad: Grad = Grad()
 
-    def update_config(self, scheme: str, target: str, val: str):
-        """Update config values."""
-
-        if self.config is not None:
-            self.config[scheme][target] = val
-        else:
-            raise AttributeError("FDM: No config is specified.")
-
-    def ddt(self, var: Field) -> dict[int, Tensor]:
-        """Time derivative of a given field."""
-
-        try:
-            dt = var.dt
-        except AttributeError:
-            raise AttributeError("FDM: No time step is specified.")
-
-        ddt: dict[int, Tensor] = {}
-
-        for i in range(var.dim):
-            ddt.update({i: (var()[i] - var.VARo[i]) / dt})
-
-        return ddt
-
-    def rhs(self, var: Field) -> dict[int, Tensor]:
-        """Simply assign a given field to RHS of PDE."""
-
-        rhs: dict[int, Tensor] = {}
-
-        for i in range(var.dim):
-            rhs.update({i: var()[i]})
-
-        return rhs
-
-    def div(self, var_i: Field, var_j: Field) -> dict[int, Tensor]:
-        """Divergence of two fields.
-        Note:
-            - To avoid the checkerboard problem, flux limiter is used. It supports `none`, `upwind` and `quick` limiter. (here, `none` is equivalent to the second order central difference.)
-        """
-
-        if self.config is not None and "limiter" in self.config["div"]:
-            limiter = self.config["div"]["limiter"]
-        else:
-            warnings.warn(
-                "FDM: no limiter is specified. Use `none` as default."
-            )
-            limiter = "none"
-
-        div: dict[int, Tensor] = {}
-
-        dx = var_j.dx
-
-        for i in range(var_i.dim):
-
-            d_val = torch.zeros_like(var_i()[i])
-
-            for j in range(var_j.dim):
-
-                if limiter == "none":
-                    """Central difference scheme."""
-
-                    pad = create_pad(var_i.mesh.dim)
-                    slicer = inner_slicer(var_i.mesh.dim)
-
-                    m_val = fill_pad(
-                        pad(var_i()[i] * var_j()[j]), j, 1, slicer
-                    )
-
-                    d_val += (
-                        (torch.roll(m_val, -1, j) - torch.roll(m_val, 1, j))
-                        / (2 * dx[j])
-                    )[slicer]
-
-                elif limiter == "upwind":
-
-                    pad = create_pad(var_i.mesh.dim)
-                    slicer = inner_slicer(var_i.mesh.dim)
-
-                    var_i_pad = fill_pad(pad(var_i()[i]), j, 1, slicer)
-                    var_j_pad = fill_pad(pad(var_j()[j]), j, 1, slicer)
-
-                    m_val_p = (torch.roll(var_j_pad, -1, j) + var_j_pad) / 2
-                    m_val_m = (torch.roll(var_j_pad, 1, j) + var_j_pad) / 2
-
-                    f_val_p = (m_val_p + m_val_p.abs()) * var_i_pad / 2 - (
-                        m_val_p - m_val_p.abs()
-                    ) * torch.roll(var_i_pad, -1, j) / 2
-
-                    f_val_m = (m_val_m + m_val_m.abs()) * torch.roll(
-                        var_i_pad, 1, j
-                    ) / 2 - (m_val_p - m_val_p.abs()) * var_i_pad / 2
-
-                    d_val += ((f_val_p - f_val_m) / dx[j])[slicer]
-
-                elif limiter == "quick":
-                    pad = create_pad(var_i.mesh.dim, 2)
-                    slicer = inner_slicer(var_i.mesh.dim, 2)
-
-                    pass
-                else:
-                    raise ValueError("FDM: Unknown limiter.")
-
-            div.update({i: d_val})
-
-        return div
-
-    def grad(self, var: Field) -> dict[int, dict[str, Tensor]]:
-        r"""Explicit discretization: Gradient
+    def set_config(self, config: dict[str, dict[str, str]]) -> None:
+        """Set the configuration options for the discretization operators.
 
         Args:
-            var: Field object to be discretized ($\Phi$).
+            config: configuration options for the discretization operators.
 
         Returns:
-            dict[int, dict[str, Tensor]]: returns jacobian of input Field. if `var.dim` is 1, it will be equivalent to `grad` of scalar field.
+            FDM: self
         """
 
-        grad: dict[int, dict[str, Tensor]] = {}
-        dx = var.dx
+        self.config = config
 
-        pad = create_pad(var.mesh.dim)
-        slicer = inner_slicer(var.mesh.dim)
-
-        for i in range(var.dim):
-
-            g_val: dict[str, Tensor] = {}
-
-            for j in range(var.mesh.dim):
-
-                var_padded = fill_pad(pad(var()[i]), j, 1, slicer)
-                g_val.update(
-                    {
-                        DIR[j]: (
-                            (
-                                torch.roll(var_padded, -1, j)
-                                - torch.roll(var_padded, 1, j)
-                            )
-                            / (2 * dx[j])
-                        )[slicer]
-                    }
-                )
-            grad[i] = g_val
-
-        return grad
-
-    def laplacian(self, gamma: float, var: Field) -> dict[int, Tensor]:
-        r"""Explicit discretization: Laplacian
-
-        Args:
-            var: Field object to be discretized ($\Phi$).
-
-        Returns:
-            dict[int, Tensor]: resulting `torch.Tensor`. `int` represents variable dimension, and `str` indicates `Mesh` dimension.
-
-        """
-
-        laplacian: dict[int, Tensor] = {}
-
-        dx = var.dx
-        pad = create_pad(var.mesh.dim)
-        slicer = inner_slicer(var.mesh.dim)
-
-        for i in range(var.dim):
-
-            l_val = torch.zeros_like(var()[i])
-
-            for j in range(var.mesh.dim):
-                ddx = dx[j] ** 2
-                var_padded = fill_pad(pad(var()[i]), j, 1, slicer)
-
-                l_val += (
-                    (
-                        torch.roll(var_padded, -1, j)
-                        - 2 * var_padded
-                        + torch.roll(var_padded, 1, j)
-                    )
-                    / ddx
-                    * gamma
-                )[slicer]
-
-            laplacian.update({i: l_val})
-
-        return laplacian
+        # Div operator requires config
+        self.div.update_config(config)

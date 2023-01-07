@@ -20,9 +20,10 @@ from pyapes.core.variables import Field
         [Box[0:1, 0:1, 0:1], [0.2, 0.2, 0.2]],
     ],
 )
-def test_fdm_ops(domain: Box, spacing: list[float]) -> None:
+def test_fdc_ops(domain: Box, spacing: list[float]) -> None:
+    """Test FDC module that discretizes current field values."""
 
-    from pyapes.core.solver.fdm import FDM
+    from pyapes.core.solver.fdc import FDC
 
     mesh = Mesh(domain, None, spacing)
 
@@ -31,15 +32,15 @@ def test_fdm_ops(domain: Box, spacing: list[float]) -> None:
 
     var.set_var_tensor(mesh.X**2)
 
-    fdm = FDM({"div": {"limiter": "none"}})
+    fdc = FDC({"div": {"limiter": "none"}})
 
-    grad = fdm.grad(var)
+    grad = fdc.grad(var)
 
     # Check interior
     target = (2 * mesh.X)[~mesh.t_mask]
-    assert_close(grad[0]["x"][~mesh.t_mask], target)
+    assert_close(grad[0][0][~mesh.t_mask], target)
 
-    laplacian = fdm.laplacian(1.0, var)
+    laplacian = fdc.laplacian(1.0, var)
 
     # Check interior
     target = (2 + (mesh.X) * 0.0)[~mesh.t_mask]
@@ -52,7 +53,7 @@ def test_fdm_ops(domain: Box, spacing: list[float]) -> None:
     var_i.set_var_tensor(torch.rand(var_i().shape))
     var_j = Field("test", 1, mesh, None, init_val=2.0)
 
-    div = fdm.div(var_i, var_j)
+    div = fdc.div(var_i, var_j)
     dx = mesh.dx
 
     target = (
@@ -63,10 +64,35 @@ def test_fdm_ops(domain: Box, spacing: list[float]) -> None:
 
     assert_close(div[0][~mesh.t_mask], target[~mesh.t_mask])
 
-    fdm.update_config("div", "limiter", "upwind")
+    fdc.update_config("div", "limiter", "upwind")
 
-    div = fdm.div(var_i, var_j)
+    div = fdc.div(var_i, var_j)
 
     target = (var_i()[0] - torch.roll(var_i()[0], 1, 0)) / dx[0] * 2.0
 
     assert_close(div[0][~mesh.t_mask], target[~mesh.t_mask])
+
+
+@pytest.mark.parametrize(
+    ["domain", "spacing"],
+    [
+        [Box[0:1], [0.2]],
+        [Box[0:1, 0:1], [0.2, 0.2]],
+        [Box[0:1, 0:1, 0:1], [0.2, 0.2, 0.2]],
+    ],
+)
+def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
+    """Test FDM module."""
+
+    from pyapes.core.solver.fdm import FDM
+
+    mesh = Mesh(domain, None, spacing)
+
+    # Field boundaries are all set to zero
+    var = Field("test", 1, mesh, None)
+
+    var.set_var_tensor(mesh.X**2)
+
+    fdm = FDM()
+
+    pass
