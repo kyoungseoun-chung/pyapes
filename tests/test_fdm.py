@@ -94,5 +94,3 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
     var.set_var_tensor(mesh.X**2)
 
     fdm = FDM()
-
-    pass
