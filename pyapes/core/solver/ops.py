@@ -1,19 +1,9 @@
 #!/usr/bin/env python3
-"""Module for the various solvers.
+"""OpenFoam inspired FDM solver.
 
-Usage of fvm and fvc is a bit different than openFOAM.
-Here, fvc returns dictionary of `torch.Tensor` as a result of discretization,
-on the other hand, fvm returns operation matrix, `Aop` of each individual discretization scheme.
-
-Desired usage of solver module is as follows:
-Solver and FDM have separate configurations.
-
-    >>> fdm = FDM(config)   // initialize FDM discretization
-    >>> solver = Solver(config)  // initialize solver
-    >>> solver.set_eq(fdm.ddt(var_i) + ...
-        fdm.div(var_i, var_j) - fdm.laplacian(c, var_i), var_i) == ...
-        fdm.tensor(var) )// set PDE
-    >>> solver.solve() // solve PDE
+Usage of `fdm` and `fdc` is resemble to `fvm` and `fvc` in the OpenFoam.
+Here, `fdc` returns an explicit discretization of `Field` variable,
+on the other hand, `fdm` returns operation matrix, `Aop` of each discretization scheme.
 
 """
 from __future__ import annotations
@@ -31,11 +21,20 @@ from pyapes.core.variables import Field
 class Solver:
     """`pyapes` finite volume method solver module.
 
+    Note:
+        - Solver and FDM have separate configurations.
+
     Example:
-    -> Add once everything is ready.
+
+        >>> fdm = FDM(config)   // initialize FDM discretization
+        >>> solver = Solver(config)  // initialize solver
+        >>> solver.set_eq(fdm.ddt(var_i) + ...
+            fdm.div(var_i, var_j) - fdm.laplacian(c, var_i), var_i) == ...
+            fdm.tensor(var) )// set PDE
+        >>> solver.solve() // solve PDE
 
     Args:
-        config: solver configuration.
+        config: solver configuration. Contains solver method, tolerance, max iteration, etc.
     """
 
     config: dict[str, dict[str, str | float | int | bool]] | None = None

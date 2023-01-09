@@ -23,15 +23,21 @@ The code was inspired by [airborne_covid19](https://gitlab.ethz.ch/ifd-pdf/airbo
 - Generically expressed (OpenFOAM-like, human-readable formulation)
 
 ```python3
->>> var = Field(...)
->>> solver = Solver(config)
->>> fvm = solver.fvm  # discretization for the implicit field
->>> fvc = solver.fvc  # discretization for the explicit field
->>> solver.set_eq(
-fvm.Ddt(var) + fvm.Div(var, u) + fvm.Laplacian(var) \
-== fvc.Grad(var) + fvc.Source(var)
-)
->>> solver()
+# Set discretizer and solver. *_config should be dictionary
+fdm = FDM(fdm_config)
+solver = Solver(solver_config)
+
+# Set Fields
+var_i = Field(...)
+var_j = Field(...)
+rhs = Field(...) # or torch.Tensor (shape should match with Field()) or float
+
+# Construct equation
+solver.set_eq(fdm.ddt(var_i) + ...
+fdm.div(var_i, var_j) - fdm.laplacian(c, var_i), var_i) == fdm.rhs(var) )// set PDE
+
+# solve the equation
+solver.solve()
 ```
 
 ## Installation

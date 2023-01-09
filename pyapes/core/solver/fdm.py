@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
+"""Module contains interface for FDM discretization.
+
+* Each discretization class (`div`, `laplacian`, `ddt`, etc.) calls 'FDC` class. Therefore, all discretization schemes only work for `cg` related solver where `Aop` is equivalent to the discretization of target variable in target PDE.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
 from dataclasses import field
 from typing import Callable
-from typing import Optional
 from typing import TypedDict
 
 import torch
@@ -26,7 +29,12 @@ class OPStype(TypedDict):
 
 @dataclass(eq=False)
 class Discretizer:
-    """Base class of FVM discretization."""
+    """Base class of FDM discretization.
+
+    * `__eq__` method assign RHS of the equation.
+    * `__add__` and `__sub__` method add discretization of the equation.
+        * Unlike `__add__`, `__sub__` method updates the sign of the discretization. And later applied when `Solver` class calls `Aop` method.
+    """
 
     # Init relevant attributes
     _ops: dict[int, OPStype] = field(default_factory=dict)
@@ -128,7 +136,6 @@ class Grad(Discretizer):
         return fdc.grad(var)
 
 
-# Ddt is not yet functional
 class Ddt(Discretizer):
     r"""Variable discretization: Time derivative.
 
@@ -168,7 +175,8 @@ class Div(Discretizer):
     r"""Variable discretization: Divergence
 
     Note:
-        - Currently supports `central difference`, and `upwind` schemes.
+        - Currently supports `central difference`, and `upwind` schemes. Therefore, `self.config` must be defined prior to calling `Div()` and `self.config` must contain `scheme` key either `upwind` or `none`.
+        - `quick` scheme is not yet supported but work in progress.
 
     .. math::
 
