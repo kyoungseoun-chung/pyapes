@@ -6,6 +6,7 @@ Here, fvc returns dictionary of `torch.Tensor` as a result of discretization,
 on the other hand, fvm returns operation matrix, `Aop` of each individual discretization scheme.
 
 Desired usage of solver module is as follows:
+Solver and FDM have separate configurations.
 
     >>> fdm = FDM(config)   // initialize FDM discretization
     >>> solver = Solver(config)  // initialize solver
@@ -18,6 +19,7 @@ Desired usage of solver module is as follows:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 import torch
 from torch import Tensor
@@ -26,7 +28,7 @@ from pyapes.core.solver.fdm import Discretizer
 from pyapes.core.variables import Field
 
 
-@dataclass
+@dataclass(repr=False)
 class Solver:
     """`pyapes` finite volume method solver module.
 
@@ -37,7 +39,7 @@ class Solver:
         config: solver configuration.
     """
 
-    config: dict
+    config: dict[str, dict[str, str | float | int | bool]] | None = None
     """Solver configuration."""
 
     def set_eq(self, eq: Discretizer) -> None:
@@ -61,7 +63,8 @@ class Solver:
         Therefore, from the system of equation `Ax = b`, Aop will be `-Ax`.
         """
 
-        res = torch.zeros_like(self.eqs[0]["var"]())
+        res = torch.zeros_like(self.var())
+
         for op in self.eqs:
             res += (
                 self.eqs[op]["Aop"](*self.eqs[op]["inputs"])
@@ -69,6 +72,12 @@ class Solver:
             )
 
         return res
+
+    def __repr__(self) -> str:
+        desc = ""
+        for i, op in enumerate(self.eqs):
+            desc += f"{i} - {self.eqs[op]['name']}, input: {self.eqs[op]['inputs']}"
+        return desc
 
     def __call__(self) -> Field:
 

@@ -109,6 +109,10 @@ class Mesh:
                         self.t_mask, self.o_mask[o_idx][om]
                     )
 
+    def __repr__(self) -> str:
+        desc = f"{self.domain} with dx={self.dx.tolist()}"
+        return desc
+
     @property
     def _depth(self) -> float:
         """Depth of mesh. If the mesh is 1D or 2D, takes `self.dx[0]` as a reference size."""

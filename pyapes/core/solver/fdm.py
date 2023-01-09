@@ -19,7 +19,6 @@ class OPStype(TypedDict):
     name: str
     Aop: Callable[..., Tensor]
     inputs: tuple[float, Field] | tuple[Field, Field, dict] | tuple[Field]
-    var: Field
     sign: float | int
 
 
@@ -104,10 +103,13 @@ class Grad(Discretizer):
             "name": self.__class__.__name__,
             "Aop": self.Aop,
             "inputs": (var,),
-            "var": var,
             "sign": 1.0,
         }
         return self
+
+    @property
+    def var(self) -> Field:
+        return self._var
 
     @staticmethod
     def Aop(var: Field) -> Tensor:
@@ -147,11 +149,14 @@ class Div(Discretizer):
             "name": self.__class__.__name__,
             "Aop": self.Aop,
             "inputs": (var_i, var_j, self.config),
-            "var": var_i,
             "sign": 1.0,
         }
 
         return self
+
+    @property
+    def var(self) -> Field:
+        return self._var_i
 
     @staticmethod
     def Aop(
@@ -190,11 +195,14 @@ class Laplacian(Discretizer):
             "name": self.__class__.__name__,
             "Aop": self.Aop,
             "inputs": (coeff, var),
-            "var": var,
             "sign": 1.0,
         }
 
         return self
+
+    @property
+    def var(self) -> Field:
+        return self._var
 
     @staticmethod
     def Aop(gamma: float, var: Field) -> Tensor:
@@ -210,7 +218,7 @@ class FDM:
     """Collection of the operators for finite difference discretizations"""
 
     div: Div = Div()
-    Laplacian: Laplacian = Laplacian()
+    laplacian: Laplacian = Laplacian()
     grad: Grad = Grad()
 
     def set_config(self, config: dict[str, dict[str, str]]) -> None:

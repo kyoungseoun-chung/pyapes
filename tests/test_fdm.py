@@ -85,12 +85,38 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
     """Test FDM module."""
 
     from pyapes.core.solver.fdm import FDM
+    from pyapes.core.solver.ops import Solver
 
     mesh = Mesh(domain, None, spacing)
 
     # Field boundaries are all set to zero
-    var = Field("test", 1, mesh, None)
+    var_i = Field("test", 1, mesh, None)
+    var_j = Field("test", 1, mesh, None, init_val=3.0)
 
-    var.set_var_tensor(mesh.X**2)
+    var_i.set_var_tensor(2 * mesh.X**2)
 
     fdm = FDM()
+    solver = Solver(None)
+    fdm.set_config({"div": {"limiter": "upwind"}})
+
+    # Poisson equation.
+    solver.set_eq(fdm.laplacian(2.0, var_i) == 0.0)
+
+    target = (
+        (
+            torch.roll(var_i()[0], -1, 0)
+            - 2 * var_i()
+            + torch.roll(var_i()[0], 1, 0)
+        )
+        / (mesh.dx[0] ** 2)
+        * 2.0
+    )
+
+    assert_close(solver.Aop()[0][~mesh.t_mask], target[0][~mesh.t_mask])
+
+    var_i.set_var_tensor(4 * mesh.X**2)
+
+    # Test call by reference
+    assert_close(solver.Aop()[0][~mesh.t_mask], target[0][~mesh.t_mask] * 2)
+
+    pass
