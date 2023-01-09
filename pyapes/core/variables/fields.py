@@ -91,6 +91,10 @@ class Field:
     def VARo(self) -> Tensor:
         return self._VARo
 
+    @VARo.setter
+    def VARo(self, other: Tensor) -> None:
+        self._VARo = other
+
     @property
     def dt(self) -> float:
         return self._dt

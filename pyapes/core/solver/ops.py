@@ -19,7 +19,6 @@ Solver and FDM have separate configurations.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 import torch
 from torch import Tensor
@@ -67,9 +66,9 @@ class Solver:
 
         for op in self.eqs:
 
-            if self.eqs[op]["name"] == "ddt":
+            if self.eqs[op]["name"].lower() == "ddt":
                 continue
-            elif op > 1 and self.eqs[op]["name"] == "ddt":
+            elif op > 1 and self.eqs[op]["name"].lower() == "ddt":
                 raise ValueError(
                     "FDM: ddt is not allowed in the middle of the equation!"
                 )
@@ -79,11 +78,11 @@ class Solver:
                 * self.eqs[op]["sign"]
             )
 
-        if self.eqs[0]["name"] == "ddt":
+        if self.eqs[0]["name"].lower() == "ddt":
             assert self.eqs[0]["other"] is not None, "FDM: dt is not defined!"
 
             if self.rhs is not None:
-                self.rhs += self.eqs[0]["other"]["dt"]
+                self.rhs *= self.eqs[0]["other"]["dt"]
 
             res *= self.eqs[0]["other"]["dt"]
             res += self.eqs[0]["Aop"](*self.eqs[0]["inputs"])

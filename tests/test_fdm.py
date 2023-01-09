@@ -139,9 +139,32 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
         t_div[~mesh.t_mask] + t_laplacian[~mesh.t_mask],
     )
 
-    var_i.set_dt(0.01)
+    dt = 0.01
+    var_i.set_dt(dt)
+    var_old = torch.rand_like(var_i())
+    var_i.VARo = var_old
+    rhs = torch.rand_like(var_i())
+
     solver.set_eq(
         fdm.ddt(var_i) + fdm.div(var_i, var_j) + fdm.laplacian(3.0, var_i)
-        == 2.0
+        == rhs
     )
-    pass
+    t_div = (var_i()[0] - torch.roll(var_i()[0], 1, 0)) / mesh.dx[0] * 5.0
+
+    t_laplacian = (
+        (
+            torch.roll(var_i()[0], -1, 0)
+            - 2 * var_i()[0]
+            + torch.roll(var_i()[0], 1, 0)
+        )
+        / (mesh.dx[0] ** 2)
+        * 3.0
+    )
+
+    d_t_var = var_i()[0] - var_old[0]
+
+    target = d_t_var + (t_div + t_laplacian) * dt
+    t_rhs = rhs * dt
+    assert_close(solver.Aop()[0][~mesh.t_mask], target[~mesh.t_mask])
+    if solver.rhs is not None:
+        assert_close(solver.rhs, t_rhs)
