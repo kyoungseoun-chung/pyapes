@@ -113,7 +113,7 @@ poetry install
     - [x] `test_variables.py`
     - [x] `test_fdm.py`: Check all operators
     - [ ] `test_solver.py`: Check with practical examples
-  - PDF solver examples
+  - Test with examples
     - [ ] The Poisson equation
     - [ ] The advection-diffusion equation
     - [ ] The Euler equation

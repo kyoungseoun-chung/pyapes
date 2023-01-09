@@ -23,7 +23,6 @@ def solve(
     rhs: Tensor,
     config: dict,
     mesh: Mesh,
-    ops: dict[int, dict[str, Union[Flux, str]]],
 ) -> tuple[Field, dict]:
     r"""Solve Poisson equation on the rectangular grid.
 
@@ -38,18 +37,14 @@ def solve(
     """
 
     if config["method"] == "cg":
-        res, report = cg(var, rhs, ops, config, mesh)
+        res, report = cg(var, rhs, config, mesh)
     elif config["method"] == "bicgstab":
-        res, report = bicgstab(var, rhs, ops, config, mesh)
+        pass
+        # res, report = bicgstab(var, rhs, config, mesh)
     else:
         raise NotImplementedError
 
     return res, report
-
-
-# WIP: Need implementation!
-def _Aop(ops: dict[int, dict[str, Union[Flux, str]]]) -> Tensor:
-    pass
 
 
 def cg(
@@ -67,6 +62,7 @@ def cg(
     tolerance = config["tol"]
     max_it = config["max_it"]
     report = config["report"]
+    Aop = config["Aop"]
 
     # Parameter initialization
     # Initial residue

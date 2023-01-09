@@ -9,12 +9,13 @@ on the other hand, `fdm` returns operation matrix, `Aop` of each discretization 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable
 
 import torch
 from torch import Tensor
 
 from pyapes.core.solver.fdm import Discretizer
-from pyapes.core.variables import Field
+from pyapes.core.solver.linalg import solve
 
 
 @dataclass(repr=False)
@@ -37,7 +38,9 @@ class Solver:
         config: solver configuration. Contains solver method, tolerance, max iteration, etc.
     """
 
-    config: dict[str, dict[str, str | float | int | bool]] | None = None
+    config: None | (
+        dict[str, dict[str, str | float | int | bool | Callable]]
+    ) = None
     """Solver configuration."""
 
     def set_eq(self, eq: Discretizer) -> None:
@@ -88,20 +91,24 @@ class Solver:
 
         return res
 
+    def solve(self) -> None:
+        """Solve the PDE."""
+
+        assert (
+            self.var is not None and self.rhs is not None
+        ), "Solver: target variable or rhs is missing. Did't you forget to set equation?"
+
+        assert self.config is not None, "Solver: config is missing!"
+
+        self.config["fdm"]["Aop"] = self.Aop
+
+        # TODO: Currently broken
+        solve(self.var, self.rhs, self.config, self.var.mesh)
+
     def __repr__(self) -> str:
         desc = ""
-        for i, op in enumerate(self.eqs):
-            desc += f"{i} - {self.eqs[op]['name']}, input: {self.eqs[op]['inputs']}\n"
+        for op in self.eqs:
+            desc += f"{op} - {self.eqs[op]['name']}, input: {self.eqs[op]['inputs']}\n"
 
         desc += f"{len(self.eqs)+1} - RHS, input: {self.rhs}\n"
         return desc
-
-    def __call__(self) -> Field:
-
-        assert self.var is not None, "Solver: target variable is not defined!"
-
-        Aop = torch.zeros_like(self.var())
-        for eq in self.eqs:
-            pass
-
-        raise NotImplementedError
