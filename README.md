@@ -3,9 +3,7 @@
 
 # pyapes
 
-**PY**thon **A**wesome **P**artial differential **E**quation **S**olver (general purpose finite volume PDE solver)
-
-The code was inspired by [airborne_covid19](https://gitlab.ethz.ch/ifd-pdf/airborne-transmission/airborne_covid19).
+**PY**thon **A**wesome **P**artial differential **E**quation **S**olver (general purpose finite difference PDE solver)
 
 ![python](http://ForTheBadge.com/images/badges/made-with-python.svg)
 
@@ -22,23 +20,27 @@ The code was inspired by [airborne_covid19](https://gitlab.ethz.ch/ifd-pdf/airbo
   - Use of `torch.Tensor`. User can choose either `torch.device("cpu")` or `torch.device("cuda")`.
 - Generically expressed (OpenFOAM-like, human-readable formulation)
 
-```python3
-# Set discretizer and solver. *_config should be dictionary
-fdm = FDM(fdm_config)
-solver = Solver(solver_config)
+  ```python3
+  # Set discretizer and solver. *_config should be dictionary
+  fdm = FDM(fdm_config)
+  solver = Solver(solver_config)
 
-# Set Fields
-var_i = Field(...)
-var_j = Field(...)
-rhs = Field(...) # or torch.Tensor (shape should match with Field()) or float
+  # Set Fields
+  var_i = Field(...)
+  var_j = Field(...)
+  rhs = Field(...) # or torch.Tensor (shape should match with Field()) or float
 
-# Construct equation
-solver.set_eq(fdm.ddt(var_i) + ...
-fdm.div(var_i, var_j) - fdm.laplacian(c, var_i), var_i) == fdm.rhs(var) )// set PDE
-
-# solve the equation
-solver.solve()
-```
+  # Construct equation
+  dt = 0.01
+  var_i.set_dt(dt)
+  solver.set_eq(
+    fdm.ddt(var_i)
+    + fdm.div(var_i, var_j) - fdm.laplacian(c, var_i), var_i)
+    == fdm.rhs(var)
+  )
+  # solve the equation
+  solver.solve()
+  ```
 
 ## Installation
 
@@ -82,34 +84,38 @@ poetry install
 
 - Refactoring the code:
   - Better data structure
-    - [ ] Revised `FDM`
+    - [x] Revised `FDM`
     - ~~Flux class~~
     - ~~`FVC` for explicit discretization~~
     - ~~`FVM` for implicit discretization~~
   - BCs
-    - [x] Dirichlet
+    - [ ] Dirichlet
     - [ ] Neumann
     - [ ] Symmetry
     - [ ] Periodic
     - [ ] Inflow/Outflow
-  - Discretization
-    - [x] `Grad`
-    - [x] `Laplacian`
-    - [ ] `Div`
-    - [ ] `Ddt`
+  - Discretizations
+    - Spatial
+      - [x] `Grad`
+      - [x] `Laplacian`
+      - [x] `Div`
+    - Temporal
+      - [x] `Ddt`
 - Need different derivative order at the cell face
   - Additional features
     - [ ] High order time discretization
     - [ ] Immersed body BC
-    - [ ] Flux limiters
+    - [x] Flux limiters
+      - High-order flux limiter (`quick`) is WIP.
 - Testing and validation
   - Create test files
     - [x] `test_mesh.py`
     - [x] `test_variables.py`
-    - [ ] `test_fvc.py`
-    - [ ] `test_fvm.py`
+    - [x] `test_fdm.py`: Check all operators
+    - [ ] `test_solver.py`: Check with practical examples
   - PDF solver examples
-    - [ ] The diffusion equation
+    - [ ] The Poisson equation
+    - [ ] The advection-diffusion equation
     - [ ] The Euler equation
     - [ ] The Navier-Stokes equation at low Reynolds numbers
     - [ ] The Black-Scholes equation
