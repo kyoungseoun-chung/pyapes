@@ -66,17 +66,36 @@ class Solver:
         res = torch.zeros_like(self.var())
 
         for op in self.eqs:
+
+            if self.eqs[op]["name"] == "ddt":
+                continue
+            elif op > 1 and self.eqs[op]["name"] == "ddt":
+                raise ValueError(
+                    "FDM: ddt is not allowed in the middle of the equation!"
+                )
+
             res += (
                 self.eqs[op]["Aop"](*self.eqs[op]["inputs"])
                 * self.eqs[op]["sign"]
             )
+
+        if self.eqs[0]["name"] == "ddt":
+            assert self.eqs[0]["other"] is not None, "FDM: dt is not defined!"
+
+            if self.rhs is not None:
+                self.rhs += self.eqs[0]["other"]["dt"]
+
+            res *= self.eqs[0]["other"]["dt"]
+            res += self.eqs[0]["Aop"](*self.eqs[0]["inputs"])
 
         return res
 
     def __repr__(self) -> str:
         desc = ""
         for i, op in enumerate(self.eqs):
-            desc += f"{i} - {self.eqs[op]['name']}, input: {self.eqs[op]['inputs']}"
+            desc += f"{i} - {self.eqs[op]['name']}, input: {self.eqs[op]['inputs']}\n"
+
+        desc += f"{len(self.eqs)+1} - RHS, input: {self.rhs}\n"
         return desc
 
     def __call__(self) -> Field:

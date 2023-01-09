@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from dataclasses import field
 from typing import Callable
+from typing import Optional
 from typing import TypedDict
 
 import torch
@@ -20,6 +21,7 @@ class OPStype(TypedDict):
     Aop: Callable[..., Tensor]
     inputs: tuple[float, Field] | tuple[Field, Field, dict] | tuple[Field]
     sign: float | int
+    other: dict[str, float] | None
 
 
 @dataclass(eq=False)
@@ -58,12 +60,18 @@ class Discretizer:
     def config(self) -> dict[str, dict[str, str]]:
         return self._config
 
-    def __eq__(self, other: Tensor | float) -> Discretizer:
+    def __eq__(self, other: Field | Tensor | float) -> Discretizer:
 
         if isinstance(other, Tensor):
             self._rhs = other
+        elif isinstance(other, Field):
+            self._rhs = other()
         else:
             self._rhs = torch.zeros_like(self.var()) + other
+
+        assert (
+            self._rhs.shape == self.var().shape
+        ), f"Discretizer: RHS shape {self._rhs.shape} does not match {self.var().shape}!"
 
         return self
 
@@ -104,6 +112,7 @@ class Grad(Discretizer):
             "Aop": self.Aop,
             "inputs": (var,),
             "sign": 1.0,
+            "other": None,
         }
         return self
 
@@ -120,9 +129,41 @@ class Grad(Discretizer):
 
 
 # Ddt is not yet functional
+class Ddt(Discretizer):
+    r"""Variable discretization: Time derivative.
+
+    Note:
+        - Currently only support `Euler Implicit`.
+    """
+
+    def __call__(self, var: Field) -> Ddt:
+
+        try:
+            dt = var.dt
+        except AttributeError:
+            raise AttributeError("FDM: No time step is specified.")
+
+        self._var = var
+        self._ops[0] = {
+            "name": self.__class__.__name__,
+            "Aop": self.Aop,
+            "inputs": (var,),
+            "sign": 1.0,
+            "other": {"dt": dt},
+        }
+
+        return self
+
+    @property
+    def var(self) -> Field:
+        return self._var
+
+    @staticmethod
+    def Aop(var: Field) -> Tensor:
+
+        return FDC().ddt(var)
 
 
-@dataclass(eq=False)
 class Div(Discretizer):
     r"""Variable discretization: Divergence
 
@@ -150,6 +191,7 @@ class Div(Discretizer):
             "Aop": self.Aop,
             "inputs": (var_i, var_j, self.config),
             "sign": 1.0,
+            "other": None,
         }
 
         return self
@@ -170,7 +212,6 @@ class Div(Discretizer):
         return fdc.div(var_i, var_j)
 
 
-@dataclass(eq=False)
 class Laplacian(Discretizer):
     r"""Variable discretization: Laplacian
 
@@ -196,6 +237,7 @@ class Laplacian(Discretizer):
             "Aop": self.Aop,
             "inputs": (coeff, var),
             "sign": 1.0,
+            "other": None,
         }
 
         return self
@@ -206,20 +248,35 @@ class Laplacian(Discretizer):
 
     @staticmethod
     def Aop(gamma: float, var: Field) -> Tensor:
-
-        # Laplacian operator does not need config options
-        fdc = FDC()
-
-        return fdc.laplacian(gamma, var)
+        return FDC().laplacian(gamma, var)
 
 
-@dataclass
+class RHS(Discretizer):
+    r"""Simple interface to return RHS of PDE."""
+
+    def __call__(self, var: Field | Tensor | float) -> Field | Tensor | float:
+        return FDC().rhs(var)
+
+
 class FDM:
-    """Collection of the operators for finite difference discretizations"""
+    """Collection of the operators for finite difference discretizations.
+
+    Spatial discretization supports for:
+
+        * `div`: Divergence (central difference, upwind)
+        * `laplacian`: Laplacian (central difference)
+        * `grad`: Gradient (central difference, but poorly treats the edges. You must set proper boundary conditions.)
+
+    `rhs` simply return `torch.Tensor`.
+
+    And temporal discretization using Euler Implicit can be accessed via `ddt`.
+    """
 
     div: Div = Div()
     laplacian: Laplacian = Laplacian()
     grad: Grad = Grad()
+    rhs: RHS = RHS()
+    ddt: Ddt = Ddt()
 
     def set_config(self, config: dict[str, dict[str, str]]) -> None:
         """Set the configuration options for the discretization operators.

@@ -14,7 +14,6 @@ from pyapes.core.solver.tools import inner_slicer
 from pyapes.core.variables import Field
 
 
-# NOTE: I think return should be tensor which dimension is matched with input variable?
 @dataclass
 class FDC:
     """Collection of the operators for explicit finite difference discretizations."""
@@ -27,17 +26,16 @@ class FDC:
         if self.config is not None:
             self.config[scheme][target] = val
         else:
-            raise AttributeError("FDM: No config is specified.")
+            self.config = {scheme: {target: val}}
 
-    def ddt(self, var: Field) -> dict[int, Tensor]:
-        """Time derivative of a given field."""
+    def ddt(self, var: Field) -> Tensor:
+        """Time derivative of a given field.
 
-        try:
-            dt = var.dt
-        except AttributeError:
-            raise AttributeError("FDM: No time step is specified.")
+        Note:
+            - If `var` does not have old `VARo`, attribute, current `VAR` will be treated as `VARo`.
+        """
 
-        ddt: dict[int, Tensor] = {}
+        ddt = []
 
         for i in range(var.dim):
             try:
@@ -45,19 +43,14 @@ class FDC:
             except AttributeError:
                 # If not saved, use current value (treat for the first iteration)
                 var_o = var()[i]
-            ddt.update({i: (var()[i] - var_o) / dt})
+            ddt.append(var()[i] - var_o)
 
-        return ddt
+        return torch.stack(ddt)
 
-    def rhs(self, var: Field) -> dict[int, Tensor]:
+    def rhs(self, var: Field | Tensor | float) -> Field | Tensor | float:
         """Simply assign a given field to RHS of PDE."""
 
-        rhs: dict[int, Tensor] = {}
-
-        for i in range(var.dim):
-            rhs.update({i: var()[i]})
-
-        return rhs
+        return var
 
     def div(self, var_i: Field, var_j: Field) -> Tensor:
         """Divergence of two fields.

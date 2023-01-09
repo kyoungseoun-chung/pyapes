@@ -91,7 +91,7 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
 
     # Field boundaries are all set to zero
     var_i = Field("test", 1, mesh, None)
-    var_j = Field("test", 1, mesh, None, init_val=3.0)
+    var_j = Field("test", 1, mesh, None, init_val=5.0)
 
     var_i.set_var_tensor(2 * mesh.X**2)
 
@@ -100,23 +100,48 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
     fdm.set_config({"div": {"limiter": "upwind"}})
 
     # Poisson equation.
-    solver.set_eq(fdm.laplacian(2.0, var_i) == 0.0)
+    solver.set_eq(fdm.laplacian(2.0, var_i) == fdm.rhs(0.0))
 
     target = (
         (
             torch.roll(var_i()[0], -1, 0)
-            - 2 * var_i()
+            - 2 * var_i()[0]
             + torch.roll(var_i()[0], 1, 0)
         )
         / (mesh.dx[0] ** 2)
         * 2.0
     )
 
-    assert_close(solver.Aop()[0][~mesh.t_mask], target[0][~mesh.t_mask])
+    assert_close(solver.Aop()[0][~mesh.t_mask], target[~mesh.t_mask])
+    assert_close(torch.zeros_like(solver.Aop()), solver.rhs)
 
     var_i.set_var_tensor(4 * mesh.X**2)
 
     # Test call by reference
-    assert_close(solver.Aop()[0][~mesh.t_mask], target[0][~mesh.t_mask] * 2)
+    assert_close(solver.Aop()[0][~mesh.t_mask], target[~mesh.t_mask] * 2)
 
+    solver.set_eq(fdm.div(var_i, var_j) + fdm.laplacian(3.0, var_i) == 2.0)
+
+    t_div = (var_i()[0] - torch.roll(var_i()[0], 1, 0)) / mesh.dx[0] * 5.0
+
+    t_laplacian = (
+        (
+            torch.roll(var_i()[0], -1, 0)
+            - 2 * var_i()[0]
+            + torch.roll(var_i()[0], 1, 0)
+        )
+        / (mesh.dx[0] ** 2)
+        * 3.0
+    )
+
+    assert_close(
+        solver.Aop()[0][~mesh.t_mask],
+        t_div[~mesh.t_mask] + t_laplacian[~mesh.t_mask],
+    )
+
+    var_i.set_dt(0.01)
+    solver.set_eq(
+        fdm.ddt(var_i) + fdm.div(var_i, var_j) + fdm.laplacian(3.0, var_i)
+        == 2.0
+    )
     pass
