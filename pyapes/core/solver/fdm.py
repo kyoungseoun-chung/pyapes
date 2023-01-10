@@ -2,6 +2,9 @@
 """Module contains interface for FDM discretization.
 
 * Each discretization class (`div`, `laplacian`, `ddt`, etc.) calls 'FDC` class. Therefore, all discretization schemes only work for `cg` related solver where `Aop` is equivalent to the discretization of target variable in target PDE.
+
+Note:
+    - I might need to integrate custom operator. (see `pystops.math.corrector`)
 """
 from __future__ import annotations
 
@@ -286,15 +289,14 @@ class RHS(Discretizer):
 class FDM:
     """Collection of the operators for finite difference discretizations.
 
-    Spatial discretization supports for:
+    Note:
+        * Spatial discretization supports for:
+            * `div`: Divergence (central difference, upwind)
+            * `laplacian`: Laplacian (central difference)
+            * `grad`: Gradient (central difference, but poorly treats the edges. You must set proper boundary conditions.)
+        * `rhs` simply return `torch.Tensor`.
+        * And temporal discretization using Euler Implicit can be accessed via `ddt`.
 
-        * `div`: Divergence (central difference, upwind)
-        * `laplacian`: Laplacian (central difference)
-        * `grad`: Gradient (central difference, but poorly treats the edges. You must set proper boundary conditions.)
-
-    `rhs` simply return `torch.Tensor`.
-
-    And temporal discretization using Euler Implicit can be accessed via `ddt`.
     """
 
     div: Div = Div()

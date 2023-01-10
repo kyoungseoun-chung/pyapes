@@ -71,7 +71,7 @@ def cg(
 
     # Initial values
     Ad = torch.zeros_like(rhs)
-    var_new = _apply_bc_otf(var, mesh).copy()
+    var_new = _apply_bc_otf(var, mesh).copy(name="var_new")
 
     slicer = inner_slicer(mesh.dim)
 
@@ -80,13 +80,13 @@ def cg(
     for i in range(mesh.dim):
         r[i] = pad(-rhs[i][slicer] - Aop(var_new)[i][slicer])
 
-    d = var_new.copy()
+    d = var_new.copy(name="d")
     d.set_var_tensor(r.clone())
     # d = r.clone()
 
     while tol > tolerance:
 
-        var_old = var_new.copy()
+        var_old = var_new.copy(name="var_old")
         # CG steps
         # Laplacian of the search direction
         for i in range(mesh.dim):
@@ -112,7 +112,8 @@ def cg(
         d.set_var_tensor(r + beta * d())
 
         # Apply BCs
-        var_new = _apply_bc_otf(var_new, mesh).copy()
+        # var_new = _apply_bc_otf(var_new, mesh).copy()
+        var_new.set_var_tensor(_apply_bc_otf(var_new, mesh)())
 
         # Check validity of tolerance
         tol = _tolerance_check(var_new(), var_old())
@@ -267,9 +268,10 @@ def _apply_bc_otf(var: Field, mesh: Mesh) -> Field:
             raise NotImplementedError
 
         # Apply BC
-        for bc, m in zip(var.bcs, var.masks):
-            mask = var.masks[m]
-            bc.apply(mask, mesh.grid)
+        for d in range(var.dim):
+            for bc, m in zip(var.bcs, var.masks[d]):
+                mask = var.masks[d][m]
+                bc.apply(mask, mesh.grid, d)
 
     return var
 

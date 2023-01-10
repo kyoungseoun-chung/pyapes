@@ -16,6 +16,7 @@ from pyapes.core.variables.bcs import BC_config_type
 from pyapes.core.variables.bcs import BC_FACTORY
 from pyapes.core.variables.bcs import BC_type
 from pyapes.core.variables.bcs import BC_val_type
+from pyapes.core.variables.bcs import domain_mask
 
 
 @dataclass
@@ -37,6 +38,8 @@ class Field:
 
     name: str
     dim: int
+    """Variable dimension. e.g. Scalar field has dim=1, 3D Vector field has dim=3, etc.
+    Warning! This is not the same as the dimension of the mesh!"""
     mesh: Mesh
     bc_config: dict[str, list[BC_config_type] | None] | None
     init_val: int | float | list[float] | list[int] | Tensor | None = None
@@ -80,6 +83,7 @@ class Field:
                 self.bc_config["obstacle"] = None
 
         self.set_bcs()
+        self.set_masks()
 
     def set_dt(self, dt: float) -> None:
         """Set time step. Explicitly set dt for clarity."""
@@ -122,16 +126,25 @@ class Field:
     def VAR(self, other: Tensor) -> None:
         self._VAR = other
 
-    def copy(self) -> Field:
+    def copy(self, name: str | None = None) -> Field:
         """Copy entire object."""
 
-        return copy.deepcopy(self)
+        copied = copy.deepcopy(self)
 
-    def zeros_like(self) -> Field:
+        if name is not None:
+            copied.name = name
+
+        return copied
+
+    def zeros_like(self, name: str | None = None) -> Field:
         """Deep copy buy init all values to zero."""
 
         copied = copy.deepcopy(self)
         copied._VAR = torch.zeros_like(self.VAR)
+
+        if name is not None:
+            copied.name = name
+
         return copied
 
     @property
@@ -248,6 +261,14 @@ class Field:
 
         return self.copy()
 
+    def set_masks(self) -> None:
+        """Setting boundary masks."""
+
+        self.masks, self.masks_obj = domain_mask(self.mesh, self.dim)
+        # self.mask_set, self.mask_inner = obstacle_inner_mask(
+        #     self.mesh, self.masks
+        # )
+
     def set_bcs(self) -> None:
         """Setting BCs from the given configurations.
         If there is no `Mesh.config.objs`, it will set `bcs` and `masks` to
@@ -255,8 +276,6 @@ class Field:
         """
 
         self.bcs: list[BC_type] = []
-        self.masks = dict()
-        self.mask_inner = dict()
 
         # Setting boundary objects
         if self.bc_config is not None:

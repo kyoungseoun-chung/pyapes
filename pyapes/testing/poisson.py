@@ -57,7 +57,7 @@ def poisson_exact_nd(mesh: Mesh) -> Tensor:
         )
 
 
-def poisson_bcs(dim: int = 3) -> list[BC_config_type]:
+def poisson_bcs(dim: int = 3, debug: bool = False) -> list[BC_config_type]:
     """Construct boundary configuration for the N-D Poisson equation."""
 
     bc_config = []
@@ -74,7 +74,7 @@ def poisson_bcs(dim: int = 3) -> list[BC_config_type]:
             {
                 "bc_face": FDIR[i],  # for debugging purposes
                 "bc_type": "dirichlet",
-                "bc_val": bc_val,
+                "bc_val": 4.44 if debug else bc_val,
             }
         )
 

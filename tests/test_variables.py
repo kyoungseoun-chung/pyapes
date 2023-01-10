@@ -12,6 +12,7 @@ from pyapes.core.geometry.basis import FDIR
 from pyapes.core.mesh import Mesh
 from pyapes.core.variables import Field
 from pyapes.core.variables.bcs import BC_config_type
+from pyapes.core.variables.bcs import homogeneous_bcs
 
 
 def create_test_field_bcs(
@@ -106,3 +107,39 @@ def test_fields(domain: Box, spacing: list[float], dim: int) -> None:
 
     zeroed_copied_var = var.zeros_like()
     assert_close(zeroed_copied_var(), test_tensor * 0)
+
+    copied_var_name = var.copy(name="test_copy")
+    assert copied_var_name.name == "test_copy"
+
+    zeroed_copied_var_name = var.zeros_like(name="test_zeros_like")
+    assert zeroed_copied_var_name.name == "test_zeros_like"
+
+
+@pytest.mark.parametrize(
+    ["domain", "spacing", "dim"],
+    [
+        [Box[0:1], [0.1], 1],
+        [Box[0:1, 0:1], [0.1, 0.1], 2],
+        [Box[0:1, 0:1, 0:1], [0.1, 0.1, 0.1], 3],
+    ],
+)
+def test_masks(domain: Box, spacing: list[float], dim: int) -> None:
+    """Test field boundaries."""
+
+    bc_val: float = 4.44
+    # First, check without callable function for the bc
+    f_bc_config = homogeneous_bcs(dim, bc_val, "dirichlet")
+
+    mesh = Mesh(domain, None, spacing, "cpu", "double")  # type: ignore
+
+    var = Field("var", 1, mesh, {"domain": f_bc_config, "obstacle": None})
+
+    if dim == 1:
+        var()[0][0] = bc_val
+    elif dim == 2:
+        var()[0][0, :] = bc_val
+    else:
+        var()[0][0, :, :] = bc_val
+
+    mask_xl = var.masks[0]["d-xl"]
+    assert_close(var()[0][mask_xl].mean().item(), bc_val)

@@ -89,7 +89,7 @@ def test_poisson_nd(domain: Box, spacing: list[float], dim: int) -> None:
     # Construct mesh
     mesh = Mesh(domain, None, spacing)
 
-    f_bc = poisson_bcs(dim)  # BC config
+    f_bc = poisson_bcs(dim, debug=True)  # BC config
 
     # Target variable
     var = Field("p", 1, mesh, {"domain": f_bc, "obstacle": None})
