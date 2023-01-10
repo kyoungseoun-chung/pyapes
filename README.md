@@ -80,6 +80,41 @@ poetry install
     - Supports one or all of Jacobi, Conjugated gradient (CG), CG-Newton, and Gauss-Seidel (need verification) method.
   - Distributed computing
 
+## Examples
+
+### The 1D Poisson equation
+
+For the clarity, below code snippet is vastly simplified. See `./demos/poisson.py` file for more details
+
+```python
+# Only shows relevant modules
+from pyapes.core.geometry import Box
+from pyapes.core.mesh import Mesh
+from pyapes.core.solver.fdm import FDM
+from pyapes.core.solver.ops import Solver
+from pyapes.core.variables import Field
+...
+
+# Construct mesh
+mesh = Mesh(Box[0:1], None, [0.02])
+
+# Construct scalar field to be solved
+var = Field("p", 1, mesh, {"domain": f_bc, "obstacle": None})
+
+# Set solver and FDM discretizer
+solver = Solver({"fdm": {"method": "cg", "tol": 1e-6, "max_it": 1000, "report" True}})
+fdm = FDM()
+
+# ∇^2 p = r
+solver.set_eq(fdm.laplacian(1.0, var) == fdm.rhs(rhs))
+# Solve for constructed equation
+res, report = solver.solve() # res is resulting field, and report contains information regarding solver convergence
+```
+
+Resulting in
+
+![1d-poisson-result](./assets/demo_figs/poisson_1d.png)
+
 ## Todos
 
 - Refactoring the code:
@@ -89,7 +124,7 @@ poetry install
     - ~~`FVC` for explicit discretization~~
     - ~~`FVM` for implicit discretization~~
   - BCs
-    - [ ] Dirichlet
+    - [x] Dirichlet
     - [ ] Neumann
     - [ ] Symmetry
     - [ ] Periodic
@@ -114,7 +149,7 @@ poetry install
     - [x] `test_fdm.py`: Check all operators
     - [ ] `test_solver.py`: Check with practical examples
   - Test with examples
-    - [ ] The Poisson equation
+    - [x] The Poisson equation
     - [ ] The advection-diffusion equation
     - [ ] The Euler equation
     - [ ] The Navier-Stokes equation at low Reynolds numbers
