@@ -13,22 +13,26 @@ from torch import Tensor
 
 from pyapes.core.geometry.basis import FDIR
 from pyapes.core.mesh import Mesh
+from pyapes.core.variables import Field
 from pyapes.core.variables.bcs import BC_config_type
 
 
-def poisson_rhs_nd(mesh: Mesh) -> Tensor:
+def poisson_rhs_nd(mesh: Mesh, var: Field) -> Tensor:
     """RHS of the poisson equation given by the references."""
 
+    rhs = torch.zeros_like(var())
+
     if mesh.dim == 1:
-        return 1.0 - 2.0 * mesh.X**2
+        rhs[0] = 1.0 - 2.0 * mesh.X**2
     elif mesh.dim == 2:
-        return 6.0 * mesh.X * mesh.Y * (1.0 - mesh.Y) - 2.0 * (mesh.X**3)
+        rhs[0] = 6.0 * mesh.X * mesh.Y * (1.0 - mesh.Y) - 2.0 * (mesh.X**3)
     else:
-        return (
+        rhs[0] = (
             torch.sin(pi * mesh.X)
             * torch.sin(pi * mesh.Y)
             * torch.sin(pi * mesh.Z)
         )
+    return rhs
 
 
 def poisson_exact_nd(mesh: Mesh) -> Tensor:

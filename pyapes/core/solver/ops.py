@@ -39,9 +39,7 @@ class Solver:
         config: solver configuration. Contains solver method, tolerance, max iteration, etc.
     """
 
-    config: None | (
-        dict[str, dict[str, str | float | int | bool | Callable]]
-    ) = None
+    config: None | (dict[str, dict[str, str | float | int | bool]]) = None
     """Solver configuration."""
 
     def set_eq(self, eq: Discretizer) -> None:
@@ -96,7 +94,7 @@ class Solver:
 
         return res
 
-    def solve(self) -> None:
+    def solve(self) -> tuple[Field, dict[str, int | float | bool]]:
         """Solve the PDE."""
 
         assert (
@@ -105,10 +103,11 @@ class Solver:
 
         assert self.config is not None, "Solver: config is missing!"
 
-        self.config["fdm"]["Aop"] = self.Aop
+        res, report = solve(
+            self.var, self.rhs, self.Aop, self.config["fdm"], self.var.mesh
+        )
 
-        # TODO: Currently broken
-        solve(self.var, self.rhs, self.config, self.var.mesh)
+        return res, report
 
     def __repr__(self) -> str:
         desc = ""

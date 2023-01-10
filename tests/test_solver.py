@@ -5,6 +5,7 @@ from torch.testing import assert_close  # type: ignore
 
 from pyapes.core.geometry import Box
 from pyapes.core.mesh import Mesh
+from pyapes.core.solver.fdm import FDM
 from pyapes.core.solver.ops import Solver
 from pyapes.core.variables import Field
 from pyapes.testing.poisson import poisson_bcs
@@ -89,14 +90,14 @@ def test_poisson_nd(domain: Box, spacing: list[float], dim: int) -> None:
     mesh = Mesh(domain, None, spacing)
 
     f_bc = poisson_bcs(dim)  # BC config
-    rhs = poisson_rhs_nd(mesh)  # RHS
-    sol_ex = poisson_exact_nd(mesh)  # exact solution
 
     # Target variable
-    var = Field("test", 1, mesh, {"domain": f_bc, "obstacle": None})
+    var = Field("p", 1, mesh, {"domain": f_bc, "obstacle": None})
+    rhs = poisson_rhs_nd(mesh, var)  # RHS
+    sol_ex = poisson_exact_nd(mesh)  # exact solution
 
     solver_config = {
-        "fvc": {
+        "fdm": {
             "method": "cg",
             "tol": 1e-5,
             "max_it": 1000,
@@ -105,10 +106,9 @@ def test_poisson_nd(domain: Box, spacing: list[float], dim: int) -> None:
     }
 
     solver = Solver(solver_config)
-    # fvc = solver.fvc
-    # fvm = solver.fvm
+    fdm = FDM()
 
-    # solver.set_eq(fvm.laplacian(1.0, var) == fvc.tensor(rhs))
-    # cg_sol = solver()
+    solver.set_eq(fdm.laplacian(1.0, var) == fdm.rhs(rhs))
+    res, report = solver.solve()
 
-    # assert_close(cg_sol()[0], sol_ex, rtol=0.1, atol=0.01)
+    pass
