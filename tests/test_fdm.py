@@ -9,6 +9,8 @@ from torch.testing import assert_close  # type: ignore
 
 from pyapes.core.geometry import Box
 from pyapes.core.mesh import Mesh
+from pyapes.core.solver.fdm import FDM
+from pyapes.core.solver.ops import Solver
 from pyapes.core.variables import Field
 
 
@@ -84,9 +86,6 @@ def test_fdc_ops(domain: Box, spacing: list[float]) -> None:
 def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
     """Test FDM module."""
 
-    from pyapes.core.solver.fdm import FDM
-    from pyapes.core.solver.ops import Solver
-
     mesh = Mesh(domain, None, spacing)
 
     # Field boundaries are all set to zero
@@ -97,6 +96,7 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
 
     fdm = FDM()
     solver = Solver(None)
+
     fdm.set_config({"div": {"limiter": "upwind"}})
 
     # Poisson equation.
@@ -112,15 +112,15 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
         * 2.0
     )
 
-    assert_close(solver.Aop()[0][~mesh.t_mask], target[~mesh.t_mask])
-    assert_close(torch.zeros_like(solver.Aop()), solver.rhs)
+    assert_close(solver.Aop(var_i)[0][~mesh.t_mask], target[~mesh.t_mask])
+    assert_close(torch.zeros_like(solver.Aop(var_i)), solver.rhs)
 
     var_i.set_var_tensor(4 * mesh.X**2)
 
     # Test call by reference
-    assert_close(solver.Aop()[0][~mesh.t_mask], target[~mesh.t_mask] * 2)
+    assert_close(solver.Aop(var_i)[0][~mesh.t_mask], target[~mesh.t_mask] * 2)
 
-    solver.set_eq(fdm.div(var_i, var_j) + fdm.laplacian(3.0, var_i) == 2.0)
+    solver.set_eq(fdm.div(var_j, var_i) + fdm.laplacian(3.0, var_i) == 2.0)
 
     t_div = (var_i()[0] - torch.roll(var_i()[0], 1, 0)) / mesh.dx[0] * 5.0
 
@@ -134,10 +134,10 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
         * 3.0
     )
 
-    assert_close(
-        solver.Aop()[0][~mesh.t_mask],
-        t_div[~mesh.t_mask] + t_laplacian[~mesh.t_mask],
-    )
+    target = t_div[~mesh.t_mask] + t_laplacian[~mesh.t_mask]
+
+    assert fdm.config["div"]["limiter"] == "upwind"
+    assert_close(solver.Aop(var_i)[0][~mesh.t_mask], target)
 
     dt = 0.01
     var_i.set_dt(dt)
@@ -146,7 +146,7 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
     rhs = torch.rand_like(var_i())
 
     solver.set_eq(
-        fdm.ddt(var_i) + fdm.div(var_i, var_j) + fdm.laplacian(3.0, var_i)
+        fdm.ddt(var_i) + fdm.div(var_j, var_i) + fdm.laplacian(3.0, var_i)
         == rhs
     )
     t_div = (var_i()[0] - torch.roll(var_i()[0], 1, 0)) / mesh.dx[0] * 5.0
@@ -165,6 +165,8 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
 
     target = d_t_var + (t_div + t_laplacian) * dt
     t_rhs = rhs * dt
-    assert_close(solver.Aop()[0][~mesh.t_mask], target[~mesh.t_mask])
+
+    assert fdm.config["div"]["limiter"] == "upwind"
+    assert_close(solver.Aop(var_i)[0][~mesh.t_mask], target[~mesh.t_mask])
     if solver.rhs is not None:
         assert_close(solver.rhs, t_rhs)

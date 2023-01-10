@@ -98,3 +98,11 @@ def test_fields(domain: Box, spacing: list[float], dim: int) -> None:
 
     assert len(var.bcs) == 2 * dim
     assert var.bcs[0].__class__.__name__ == "Dirichlet"
+
+    # Test Field copy
+    var += 2.5
+    copied_var = var.copy()
+    assert_close(copied_var(), test_tensor * 0 + 2.5)
+
+    zeroed_copied_var = var.zeros_like()
+    assert_close(zeroed_copied_var(), test_tensor * 0)

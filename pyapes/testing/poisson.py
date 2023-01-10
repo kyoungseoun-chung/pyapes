@@ -54,7 +54,7 @@ def poisson_exact_nd(mesh: Mesh) -> Tensor:
 
 
 def poisson_bcs(dim: int = 3) -> list[BC_config_type]:
-    """Currently we only have patches."""
+    """Construct boundary configuration for the N-D Poisson equation."""
 
     bc_config = []
 

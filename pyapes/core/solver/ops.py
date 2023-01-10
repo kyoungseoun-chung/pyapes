@@ -16,6 +16,7 @@ from torch import Tensor
 
 from pyapes.core.solver.fdm import Discretizer
 from pyapes.core.solver.linalg import solve
+from pyapes.core.variables import Field
 
 
 @dataclass(repr=False)
@@ -59,7 +60,11 @@ class Solver:
         # RHS of the equation
         self.rhs = eq.rhs
 
-    def Aop(self) -> Tensor:
+        # Restting ops and rhs to avoid unnecessary copy when fdm is used multiple times in separate solvers
+        eq.ops = {}
+        eq.rhs = None
+
+    def Aop(self, target: Field) -> Tensor:
         """Return tensor of discretized operation used for the Conjugated gradient method.
         Therefore, from the system of equation `Ax = b`, Aop will be `-Ax`.
         """
@@ -76,7 +81,7 @@ class Solver:
                 )
 
             res += (
-                self.eqs[op]["Aop"](*self.eqs[op]["inputs"])
+                self.eqs[op]["Aop"](*self.eqs[op]["param"], target)
                 * self.eqs[op]["sign"]
             )
 
@@ -87,7 +92,7 @@ class Solver:
                 self.rhs *= self.eqs[0]["other"]["dt"]
 
             res *= self.eqs[0]["other"]["dt"]
-            res += self.eqs[0]["Aop"](*self.eqs[0]["inputs"])
+            res += self.eqs[0]["Aop"](*self.eqs[0]["param"], target)
 
         return res
 

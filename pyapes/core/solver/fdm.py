@@ -22,7 +22,9 @@ class OPStype(TypedDict):
 
     name: str
     Aop: Callable[..., Tensor]
-    inputs: tuple[float, Field] | tuple[Field, Field, dict] | tuple[Field]
+    # inputs: tuple[float, Field] | tuple[Field, Field, dict] | tuple[Field]
+    target: Field
+    param: tuple[float] | tuple[Field, dict[str, dict[str, str]]] | tuple[None]
     sign: float | int
     other: dict[str, float] | None
 
@@ -46,10 +48,18 @@ class Discretizer:
         """Collection of operators used in `pyapes.core.solver.Solver().set_eq()`"""
         return self._ops
 
+    @ops.setter
+    def ops(self, other: dict) -> None:
+        self._ops = other
+
     @property
     def rhs(self) -> Tensor | None:
         """RHS of `set_eq()`"""
         return self._rhs
+
+    @rhs.setter
+    def rhs(self, other: Tensor | None) -> None:
+        self._rhs = other
 
     @property
     def var(self) -> Field:
@@ -99,7 +109,6 @@ class Discretizer:
         return self
 
 
-@dataclass(eq=False)
 class Grad(Discretizer):
     r"""Variable discretization: Gradient
 
@@ -118,7 +127,9 @@ class Grad(Discretizer):
         self._ops[0] = {
             "name": self.__class__.__name__,
             "Aop": self.Aop,
-            "inputs": (var,),
+            # "inputs": (var,),
+            "target": var,
+            "param": (None,),
             "sign": 1.0,
             "other": None,
         }
@@ -129,7 +140,7 @@ class Grad(Discretizer):
         return self._var
 
     @staticmethod
-    def Aop(var: Field) -> Tensor:
+    def Aop(_, var: Field) -> Tensor:
 
         fdc = FDC()
 
@@ -154,7 +165,9 @@ class Ddt(Discretizer):
         self._ops[0] = {
             "name": self.__class__.__name__,
             "Aop": self.Aop,
-            "inputs": (var,),
+            # "inputs": (var,),
+            "target": var,
+            "param": (None,),
             "sign": 1.0,
             "other": {"dt": dt},
         }
@@ -166,7 +179,7 @@ class Ddt(Discretizer):
         return self._var
 
     @staticmethod
-    def Aop(var: Field) -> Tensor:
+    def Aop(_, var: Field) -> Tensor:
 
         return FDC().ddt(var)
 
@@ -186,18 +199,20 @@ class Div(Discretizer):
         \right)
 
     Args:
-        var_i: Field object to be discretized ($\Phi_i$)
-        var_j: convective variable ($\vec{u}_j$)
+        var_j: Field object to be discretized ($\Phi_i$)
+        var_i: convective variable ($\vec{u}_j$)
     """
 
-    def __call__(self, var_i: Field, var_j: Field) -> Div:
+    def __call__(self, var_j: Field, var_i: Field) -> Div:
 
         self._var_i = var_i
         self._var_j = var_j
         self._ops[0] = {
             "name": self.__class__.__name__,
             "Aop": self.Aop,
-            "inputs": (var_i, var_j, self.config),
+            # "inputs": (var_i, var_j, self.config),
+            "target": var_i,
+            "param": (var_j, self.config),
             "sign": 1.0,
             "other": None,
         }
@@ -210,14 +225,14 @@ class Div(Discretizer):
 
     @staticmethod
     def Aop(
-        var_i: Field, var_j: Field, config: dict[str, dict[str, str]]
+        var_j: Field, config: dict[str, dict[str, str]], var_i: Field
     ) -> Tensor:
 
         # Div operator need config options
         fdc = FDC()
         fdc.update_config("div", "limiter", config["div"]["limiter"])
 
-        return fdc.div(var_i, var_j)
+        return fdc.div(var_j, var_i)
 
 
 class Laplacian(Discretizer):
@@ -243,7 +258,9 @@ class Laplacian(Discretizer):
         self._ops[0] = {
             "name": self.__class__.__name__,
             "Aop": self.Aop,
-            "inputs": (coeff, var),
+            # "inputs": (coeff, var),
+            "target": var,
+            "param": (coeff,),
             "sign": 1.0,
             "other": None,
         }

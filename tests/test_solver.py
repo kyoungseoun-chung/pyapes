@@ -81,15 +81,18 @@ def test_solver_tools(dim: int) -> None:
 )
 def test_poisson_nd(domain: Box, spacing: list[float], dim: int) -> None:
     """Test poisson in N-D cases.
-
-    Reference:
-        - 1D: https://farside.ph.utexas.edu/teaching/329/lectures/node66.html
-        - 2D: https://farside.ph.utexas.edu/teaching/329/lectures/node71.html
-        - 3D: Zhi Shi et al (2012) (https://doi.org/10.1016/j.apm.2011.11.078)
+    Note:
+        - See `pyapes.testing.poisson` for more details.
     """
 
+    # Construct mesh
     mesh = Mesh(domain, None, spacing)
-    f_bc = poisson_bcs(dim)
+
+    f_bc = poisson_bcs(dim)  # BC config
+    rhs = poisson_rhs_nd(mesh)  # RHS
+    sol_ex = poisson_exact_nd(mesh)  # exact solution
+
+    # Target variable
     var = Field("test", 1, mesh, {"domain": f_bc, "obstacle": None})
 
     solver_config = {
@@ -104,9 +107,6 @@ def test_poisson_nd(domain: Box, spacing: list[float], dim: int) -> None:
     solver = Solver(solver_config)
     # fvc = solver.fvc
     # fvm = solver.fvm
-
-    # rhs = poisson_rhs_nd(mesh)
-    # sol_ex = poisson_exact_nd(mesh)
 
     # solver.set_eq(fvm.laplacian(1.0, var) == fvc.tensor(rhs))
     # cg_sol = solver()

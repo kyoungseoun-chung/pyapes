@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import copy
 from dataclasses import dataclass
 from typing import Any
@@ -36,8 +38,8 @@ class Field:
     name: str
     dim: int
     mesh: Mesh
-    bc_config: Optional[dict[str, Union[list[BC_config_type], None]]]
-    init_val: Optional[int | float | list[float] | list[int] | Tensor] = None
+    bc_config: dict[str, list[BC_config_type] | None] | None
+    init_val: int | float | list[float] | list[int] | Tensor | None = None
     object_interp: bool = False
 
     def __post_init__(self):
@@ -120,10 +122,17 @@ class Field:
     def VAR(self, other: Tensor) -> None:
         self._VAR = other
 
-    def copy(self):
+    def copy(self) -> Field:
         """Copy entire object."""
 
         return copy.deepcopy(self)
+
+    def zeros_like(self) -> Field:
+        """Deep copy buy init all values to zero."""
+
+        copied = copy.deepcopy(self)
+        copied._VAR = torch.zeros_like(self.VAR)
+        return copied
 
     @property
     def size(self) -> torch.Size:
@@ -141,9 +150,7 @@ class Field:
 
         return torch.sum(self.VAR, dim=dim)
 
-    def set_var_tensor(
-        self, val: Tensor, insert: Optional[int] = None
-    ) -> None:
+    def set_var_tensor(self, val: Tensor, insert: int | None = None) -> None:
         """Set variable with a given Tensor.
 
         Examples:
@@ -166,7 +173,7 @@ class Field:
                 else:
                     self._VAR[i] = val
 
-    def __getitem__(self, idx: Union[int, slice]) -> torch.Tensor:
+    def __getitem__(self, idx: int | slice) -> torch.Tensor:
 
         if isinstance(idx, slice):
             return self.VAR
@@ -178,7 +185,7 @@ class Field:
 
         return self.VAR
 
-    def __add__(self, other: Any) -> Any:
+    def __add__(self, other: Any) -> Field:
 
         if isinstance(other, Field):
             self.VAR += other()
@@ -208,7 +215,7 @@ class Field:
 
         return self.copy()
 
-    def __sub__(self, other: Any) -> Any:
+    def __sub__(self, other: Any) -> Field:
 
         if isinstance(other, Field):
             self.VAR -= other()
@@ -217,7 +224,7 @@ class Field:
 
         return self.copy()
 
-    def __mul__(self, other: Any) -> Any:
+    def __mul__(self, other: Any) -> Field:
 
         if isinstance(other, Field):
             self.VAR *= other()
@@ -230,7 +237,7 @@ class Field:
 
         return self.copy()
 
-    def __truediv__(self, other: Any) -> Any:
+    def __truediv__(self, other: Any) -> Field:
 
         if isinstance(other, Field):
             mask = other().gt(0.0)

@@ -52,7 +52,7 @@ class FDC:
 
         return var
 
-    def div(self, var_i: Field, var_j: Field) -> Tensor:
+    def div(self, var_j: Field, var_i: Field) -> Tensor:
         """Divergence of two fields.
         Note:
             - To avoid the checkerboard problem, flux limiter is used. It supports `none`, `upwind` and `quick` limiter. (here, `none` is equivalent to the second order central difference.)
