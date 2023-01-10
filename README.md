@@ -11,7 +11,7 @@
 
 `pyapes` is designed to solve various engineering problems in rectangular grid.
 
-`pyapes` (should be/have) is/has
+The goal of `pyapes` (should be/have) is
 
 - Cross-platform
   - Both tested on Mac and Linux (Arch)
@@ -19,28 +19,6 @@
 - GPU acceleration in a structured grid with [PyTorch](https://pytorch.org)
   - Use of `torch.Tensor`. User can choose either `torch.device("cpu")` or `torch.device("cuda")`.
 - Generically expressed (OpenFOAM-like, human-readable formulation)
-
-  ```python3
-  # Set discretizer and solver. *_config should be dictionary
-  fdm = FDM(fdm_config)
-  solver = Solver(solver_config)
-
-  # Set Fields
-  var_i = Field(...)
-  var_j = Field(...)
-  rhs = Field(...) # or torch.Tensor (shape should match with Field()) or float
-
-  # Construct equation
-  dt = 0.01
-  var_i.set_dt(dt)
-  solver.set_eq(
-    fdm.ddt(var_i)
-    + fdm.div(var_i, var_j) - fdm.laplacian(c, var_i), var_i)
-    == fdm.rhs(var)
-  )
-  # solve the equation
-  solver.solve()
-  ```
 
 ## Installation
 
@@ -66,19 +44,18 @@ poetry install
   - `tqdm >= 4.62.3`
   - `rich >= 10.12.0`
 
-## Features (Planning)
+## Implemented Features
 
-- GPU enabled computation (using `torch`)
-- ~~Finite Volume Method~~ → FDM
-  - ~~Support spatial discretization in `FVC` and `FVM` manner~~
-    - `Grad`, `Laplacian`, `Div` (`FVM` only)
-  - Implicit time integration in `Ddt`
-    - The backward Euler and the Crank-Nicolson
-  - Flux limiters for advection term: `QUICK` and `Upwind`
-  - Immersed body boundary conditions
-  - Linear system solvers
-    - Supports one or all of Jacobi, Conjugated gradient (CG), CG-Newton, and Gauss-Seidel (need verification) method.
-  - Distributed computing
+- CPU/GPU computation using `torch`
+- FDM Discretizations
+  - Spatial: `Grad`, `Laplacian`, `Div`
+  - Temporal: `Ddt`
+- Boundary conditions:
+  - `Dirichlet`
+- Testing and demonstration
+  - `Mesh`, `Field`, `FDM`
+  - `Solver`
+    - for the Poisson equation.
 
 ## Examples
 
@@ -119,25 +96,11 @@ Resulting in
 
 ## Todos
 
-- Refactoring the code:
-  - Better data structure
-    - [x] Revised `FDM`
-    - ~~Flux class~~
-    - ~~`FVC` for explicit discretization~~
-    - ~~`FVM` for implicit discretization~~
-  - BCs
-    - [x] Dirichlet
-    - [ ] Neumann
-    - [ ] Symmetry
-    - [ ] Periodic
-    - [ ] Inflow/Outflow
-  - Discretizations
-    - Spatial
-      - [x] `Grad`
-      - [x] `Laplacian`
-      - [x] `Div`
-    - Temporal
-      - [x] `Ddt`
+- Boundary conditions
+  - [ ] Neumann
+  - [ ] Symmetry
+  - [ ] Periodic
+  - [ ] Inflow/Outflow
 - Need different derivative order at the cell face
   - Additional features
     - [ ] High order time discretization
@@ -146,14 +109,9 @@ Resulting in
       - High-order flux limiter (`quick`) is WIP.
 - Testing and validation
   - Create test files
-    - [x] `test_mesh.py`
-    - [x] `test_variables.py`
-    - [x] `test_fdm.py`: Check all operators
-    - [ ] `test_solver.py`: Check with practical examples
-  - Test with examples
-    - [x] The Poisson equation
-    - [ ] The advection-diffusion equation
-    - [ ] The Euler equation
-    - [ ] The Navier-Stokes equation at low Reynolds numbers
-    - [ ] The Black-Scholes equation
+    - `test_solver.py`
+      - [ ] The advection-diffusion equation
+      - [ ] The Euler equation
+      - [ ] The Navier-Stokes equation at low Reynolds numbers
+      - [ ] The Black-Scholes equation
 - Publish to pypi.org
