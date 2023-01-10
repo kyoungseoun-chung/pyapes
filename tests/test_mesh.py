@@ -19,7 +19,7 @@ def test_mask() -> None:
     assert_close(mesh.t_mask[:, -1], target)
     assert_close(mesh.t_mask[-1, :], target)
 
-    # with out object
+    # with object
     mesh_ob = Mesh(Box[0:1, 0:1], [Box[0.3:0.6, 0.0:0.6]], [0.1, 0.1])
 
     target = torch.zeros_like(mesh.t_mask[0])

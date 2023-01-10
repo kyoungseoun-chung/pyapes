@@ -16,7 +16,6 @@ from pyapes.core.variables.bcs import BC_config_type
 from pyapes.core.variables.bcs import BC_FACTORY
 from pyapes.core.variables.bcs import BC_type
 from pyapes.core.variables.bcs import BC_val_type
-from pyapes.core.variables.bcs import domain_mask
 
 
 @dataclass
@@ -83,7 +82,11 @@ class Field:
                 self.bc_config["obstacle"] = None
 
         self.set_bcs()
-        self.set_masks()
+
+    @property
+    def mesh_axis(self) -> list[int]:
+
+        return [i + 1 for i in range(self.mesh.dim)]
 
     def set_dt(self, dt: float) -> None:
         """Set time step. Explicitly set dt for clarity."""
@@ -260,14 +263,6 @@ class Field:
             raise TypeError("Field: you can only divide by Field!")
 
         return self.copy()
-
-    def set_masks(self) -> None:
-        """Setting boundary masks."""
-
-        self.masks, self.masks_obj = domain_mask(self.mesh, self.dim)
-        # self.mask_set, self.mask_inner = obstacle_inner_mask(
-        #     self.mesh, self.masks
-        # )
 
     def set_bcs(self) -> None:
         """Setting BCs from the given configurations.

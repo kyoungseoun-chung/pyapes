@@ -89,7 +89,7 @@ def test_poisson_nd(domain: Box, spacing: list[float], dim: int) -> None:
     # Construct mesh
     mesh = Mesh(domain, None, spacing)
 
-    f_bc = poisson_bcs(dim, debug=True)  # BC config
+    f_bc = poisson_bcs(dim)  # BC config
 
     # Target variable
     var = Field("p", 1, mesh, {"domain": f_bc, "obstacle": None})
@@ -99,7 +99,7 @@ def test_poisson_nd(domain: Box, spacing: list[float], dim: int) -> None:
     solver_config = {
         "fdm": {
             "method": "cg",
-            "tol": 1e-5,
+            "tol": 1e-6,
             "max_it": 1000,
             "report": True,
         }
@@ -110,5 +110,9 @@ def test_poisson_nd(domain: Box, spacing: list[float], dim: int) -> None:
 
     solver.set_eq(fdm.laplacian(1.0, var) == fdm.rhs(rhs))
     res, report = solver.solve()
+
+    tol = torch.linalg.norm(res()[0] - sol_ex)
+
+    assert_close(res()[0], sol_ex)
 
     pass

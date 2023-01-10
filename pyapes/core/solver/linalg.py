@@ -77,7 +77,8 @@ def cg(
 
     # Initial residue
     r = torch.zeros_like(var())
-    for i in range(mesh.dim):
+
+    for i in range(var.dim):
         r[i] = pad(-rhs[i][slicer] - Aop(var_new)[i][slicer])
 
     d = var_new.copy(name="d")
@@ -89,23 +90,25 @@ def cg(
         var_old = var_new.copy(name="var_old")
         # CG steps
         # Laplacian of the search direction
-        for i in range(mesh.dim):
+        for i in range(var.dim):
             Ad[i] = pad(Aop(d)[i][slicer])
 
         # Magnitude of the jump
-        alpha = torch.sum(r * r) / torch.sum(d() * Ad)
+        alpha = torch.sum(r * r, dim=var.mesh_axis) / torch.sum(
+            d() * Ad, var.mesh_axis
+        )
 
         # Iterated solution
         var_new.set_var_tensor(var_old() + alpha * d())
 
         # Intermediate computation
-        beta_denom = torch.sum(r * r)
+        beta_denom = torch.sum(r * r, dim=var.mesh_axis)
 
         # Update residual
         r -= alpha * Ad
 
         # Compute beta
-        beta = torch.sum(r * r) / beta_denom
+        beta = torch.sum(r * r, dim=var.mesh_axis) / beta_denom
 
         # Update search direction
         # d = r + beta * d
@@ -136,7 +139,7 @@ def cg(
     res_report = _write_report(itr, tol, itr < max_it)
 
     # Update variable
-    var.VAR = var_new  # type: ignore
+    var.VAR = var_new()  # type: ignore
 
     return var, res_report
 
@@ -269,9 +272,8 @@ def _apply_bc_otf(var: Field, mesh: Mesh) -> Field:
 
         # Apply BC
         for d in range(var.dim):
-            for bc, m in zip(var.bcs, var.masks[d]):
-                mask = var.masks[d][m]
-                bc.apply(mask, mesh.grid, d)
+            for bc in var.bcs:
+                bc.apply(var(), mesh.grid, d)
 
     return var
 
@@ -293,12 +295,15 @@ def _tolerance_check(var_new: Tensor, var_old: Tensor) -> float:
     Raise:
         RuntimeError: if unrealistic value detected.
     """
+    dim = var_new.shape[0]
 
-    tol = torch.linalg.norm(var_new - var_old)
+    tol = torch.zeros(dim, dtype=var_new.dtype)
+    for d in range(dim):
+        tol[d] = torch.linalg.norm(var_new[d] - var_old[d])
 
     # Check validity of tolerance
     if torch.isnan(tol) or torch.isinf(tol):
         msg = f"Invalid tolerance detected! tol: {tol}"
         raise RuntimeError(msg)
 
-    return tol.item()
+    return torch.max(tol).item()
