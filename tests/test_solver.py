@@ -8,6 +8,7 @@ from pyapes.core.mesh import Mesh
 from pyapes.core.solver.fdm import FDM
 from pyapes.core.solver.ops import Solver
 from pyapes.core.variables import Field
+from pyapes.core.variables.bcs import homogeneous_bcs
 from pyapes.testing.poisson import poisson_bcs
 from pyapes.testing.poisson import poisson_exact_nd
 from pyapes.testing.poisson import poisson_rhs_nd
@@ -96,19 +97,32 @@ def test_poisson_nd(domain: Box, spacing: list[float], dim: int) -> None:
     rhs = poisson_rhs_nd(mesh, var)  # RHS
     sol_ex = poisson_exact_nd(mesh)  # exact solution
 
-    solver_config = {
-        "fdm": {
-            "method": "cg",
-            "tol": 1e-6,
-            "max_it": 1000,
-            "report": True,
-        }
-    }
-
-    solver = Solver(solver_config)
+    solver = Solver(
+        {"fdm": {"method": "cg", "tol": 1e-6, "max_it": 1000, "report": True}}
+    )
     fdm = FDM()
 
     solver.set_eq(fdm.laplacian(1.0, var) == fdm.rhs(rhs))
     solver.solve()
 
     assert_close(var()[0], sol_ex, rtol=0.1, atol=0.01)
+
+
+def test_advection_diffussion_1d() -> None:
+    # Construct mesh
+    mesh = Mesh(Box[0:1], None, [0.02])
+    f_bc = homogeneous_bcs(1, 0.0, "dirichlet")
+
+    # Target variable
+    var = Field("U", 1, mesh, {"domain": f_bc, "obstacle": None})
+
+    solver = Solver(
+        {"fdm": {"method": "cg", "tol": 1e-6, "max_it": 1000, "report": True}}
+    )
+    fdm = FDM()
+    fdm.set_config({"div": {"limiter": "none"}})
+
+    epsilon = 0.1
+    solver.set_eq(fdm.grad(var) - fdm.laplacian(epsilon, var) == fdm.rhs(1.0))
+    report = solver.solve()
+    pass

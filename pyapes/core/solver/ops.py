@@ -78,10 +78,16 @@ class Solver:
                     "FDM: ddt is not allowed in the middle of the equation!"
                 )
 
-            res += (
+            Ax = (
                 self.eqs[op]["Aop"](*self.eqs[op]["param"], target)
                 * self.eqs[op]["sign"]
             )
+
+            if self.eqs[op]["name"].lower() == "grad":
+                # If operator is grad, re-shape to match the size of the target variable
+                Ax = Ax.view(self.var.size)
+
+            res += Ax
 
         if self.eqs[0]["name"].lower() == "ddt":
             assert self.eqs[0]["other"] is not None, "FDM: dt is not defined!"

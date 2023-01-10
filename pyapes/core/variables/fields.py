@@ -152,7 +152,7 @@ class Field:
 
     @property
     def size(self) -> torch.Size:
-        """Return self.VAR size. Return time is torch.Size which is subclass of
+        """Return self.VAR size. Return type is torch.Size which is subclass of
         `tuple`."""
 
         return self.VAR.size()

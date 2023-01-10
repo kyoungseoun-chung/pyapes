@@ -139,6 +139,29 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
     assert fdm.config["div"]["limiter"] == "upwind"
     assert_close(solver.Aop(var_i)[0][~mesh.t_mask], target)
 
+    # Test 1D Advection Diffusion to see fdm.grad and fdm.div are interchangeable for this case.
+    if mesh.dim == 1:
+
+        solver.set_eq(fdm.grad(var_i) - fdm.laplacian(3.0, var_i) == 2.0)
+
+        t_grad = (
+            torch.roll(var_i()[0], -1, 0) - torch.roll(var_i()[0], 1, 0)
+        ) / (2 * mesh.dx[0])
+
+        t_laplacian = (
+            (
+                torch.roll(var_i()[0], -1, 0)
+                - 2 * var_i()[0]
+                + torch.roll(var_i()[0], 1, 0)
+            )
+            / (mesh.dx[0] ** 2)
+            * 3.0
+        )
+
+        target = t_grad[~mesh.t_mask] - t_laplacian[~mesh.t_mask]
+        assert_close(solver.Aop(var_i)[0][~mesh.t_mask], target)
+
+    # Transient advection diffusion equation test
     dt = 0.01
     var_i.set_dt(dt)
     var_old = torch.rand_like(var_i())

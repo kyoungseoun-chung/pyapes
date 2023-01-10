@@ -300,10 +300,15 @@ class FDM:
     """
 
     div: Div = Div()
+    """Divergence operator: `div(var_j, var_i)`."""
     laplacian: Laplacian = Laplacian()
+    """Laplacian operator: `laplacian(coeff, var)`."""
     grad: Grad = Grad()
+    """Gradient operator: `grad(var)`."""
     rhs: RHS = RHS()
+    """Assign RHS of PDE: `rhs(var)`."""
     ddt: Ddt = Ddt()
+    """Time discretization: `ddt(var)`."""
 
     def set_config(self, config: dict[str, dict[str, str]]) -> None:
         """Set the configuration options for the discretization operators.
