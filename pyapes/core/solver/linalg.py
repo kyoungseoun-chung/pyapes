@@ -76,26 +76,31 @@ def cg(
     slicer = inner_slicer(mesh.dim)
 
     # Initial residue
+    # Ax - b = r
     r = torch.zeros_like(var())
-
     for i in range(var.dim):
-        r[i] = pad(-rhs[i][slicer] - Aop(var_new)[i][slicer])
+        # Pad data for later BC application
+        r[i] = pad(-rhs[i][slicer] + Aop(var_new)[i][slicer])
 
     d = var_new.copy(name="d")
     d.set_var_tensor(r.clone())
-    # d = r.clone()
 
     while tol > tolerance:
 
         var_old = var_new.copy(name="var_old")
+
         # CG steps
         # Laplacian of the search direction
         for i in range(var.dim):
-            Ad[i] = pad(Aop(d)[i][slicer])
+            Ad[i] = -pad(Aop(d)[i][slicer])
 
         # Magnitude of the jump
-        alpha = torch.sum(r * r, dim=var.mesh_axis) / torch.sum(
-            d() * Ad, var.mesh_axis
+        alpha = torch.nan_to_num(
+            torch.sum(r * r, dim=var.mesh_axis)
+            / torch.sum(d() * Ad, dim=var.mesh_axis),
+            nan=0.0,
+            posinf=0.0,
+            neginf=0.0,
         )
 
         # Iterated solution
