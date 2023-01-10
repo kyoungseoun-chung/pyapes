@@ -113,7 +113,7 @@ class Solver:
     def __repr__(self) -> str:
         desc = ""
         for op in self.eqs:
-            desc += f"{op} - {self.eqs[op]['name']}, input: {self.eqs[op]['inputs']}\n"
+            desc += f"{op} - {self.eqs[op]['name']}, target: {self.eqs[op]['target']}, param: {self.eqs[op]['param']}\n"
 
         desc += f"{len(self.eqs)+1} - RHS, input: {self.rhs}\n"
         return desc

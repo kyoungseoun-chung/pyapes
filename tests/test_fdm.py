@@ -55,7 +55,7 @@ def test_fdc_ops(domain: Box, spacing: list[float]) -> None:
     var_i.set_var_tensor(torch.rand(var_i().shape))
     var_j = Field("test", 1, mesh, None, init_val=2.0)
 
-    div = fdc.div(var_i, var_j)
+    div = fdc.div(var_j, var_i)
     dx = mesh.dx
 
     target = (
@@ -68,7 +68,7 @@ def test_fdc_ops(domain: Box, spacing: list[float]) -> None:
 
     fdc.update_config("div", "limiter", "upwind")
 
-    div = fdc.div(var_i, var_j)
+    div = fdc.div(var_j, var_i)
 
     target = (var_i()[0] - torch.roll(var_i()[0], 1, 0)) / dx[0] * 2.0
 
@@ -89,8 +89,8 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
     mesh = Mesh(domain, None, spacing)
 
     # Field boundaries are all set to zero
-    var_i = Field("test", 1, mesh, None)
-    var_j = Field("test", 1, mesh, None, init_val=5.0)
+    var_i = Field("test_Fi", 1, mesh, None)
+    var_j = Field("test_Fj", 1, mesh, None, init_val=5.0)
 
     var_i.set_var_tensor(2 * mesh.X**2)
 
