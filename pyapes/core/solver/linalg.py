@@ -23,7 +23,7 @@ def solve(
     Aop: Callable[[Field], Tensor],
     config: dict[str, str | int | float | bool],
     mesh: Mesh,
-) -> tuple[Field, dict[str, int | float | bool]]:
+) -> dict[str, int | float | bool]:
     r"""Solve Poisson equation on the rectangular grid.
 
     Warning:
@@ -37,14 +37,14 @@ def solve(
     """
 
     if config["method"] == "cg":
-        res, report = cg(var, rhs, Aop, config, mesh)
+        report = cg(var, rhs, Aop, config, mesh)
     elif config["method"] == "bicgstab":
         # res, report = bicgstab(var, rhs, config, mesh)
         raise NotImplementedError
     else:
         raise NotImplementedError
 
-    return res, report
+    return report
 
 
 def cg(
@@ -53,7 +53,7 @@ def cg(
     Aop: Callable[[Field], Tensor],
     config: dict,
     mesh: Mesh,
-) -> tuple[Field, dict]:
+) -> dict[str, int | float | bool]:
     """Conjugate gradient descent method."""
 
     # Padding for different dimensions
@@ -146,7 +146,7 @@ def cg(
     # Update variable
     var.VAR = var_new()  # type: ignore
 
-    return var, res_report
+    return res_report
 
 
 # WIP: NOT YET VALIDATED!

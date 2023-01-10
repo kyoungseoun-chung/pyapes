@@ -41,14 +41,14 @@ def poisson():
     fdm = FDM()
 
     solver.set_eq(fdm.laplacian(1.0, var) == fdm.rhs(rhs))
-    res, report = solver.solve()
+    report = solver.solve()
 
     _, ax = plt.subplots()
 
     ax.plot(
         mesh.X, sol_ex, label="Exact", marker="x", linestyle="None", color="r"
     )
-    ax.plot(mesh.X, res()[0], label="Numerical", color="b", linestyle="--")
+    ax.plot(mesh.X, var()[0], label="Numerical", color="b", linestyle="--")
     ax.set_xlim(0, 1)
     ax.set_ylim(0.75, 0.9)
     ax.set_yticks([0.75, 0.8, 0.85, 0.9])

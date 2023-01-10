@@ -109,6 +109,6 @@ def test_poisson_nd(domain: Box, spacing: list[float], dim: int) -> None:
     fdm = FDM()
 
     solver.set_eq(fdm.laplacian(1.0, var) == fdm.rhs(rhs))
-    res, _ = solver.solve()
+    solver.solve()
 
-    assert_close(res()[0], sol_ex, rtol=0.1, atol=0.01)
+    assert_close(var()[0], sol_ex, rtol=0.1, atol=0.01)

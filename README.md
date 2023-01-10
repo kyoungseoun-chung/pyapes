@@ -100,6 +100,8 @@ mesh = Mesh(Box[0:1], None, [0.02])
 
 # Construct scalar field to be solved
 var = Field("p", 1, mesh, {"domain": f_bc, "obstacle": None})
+# Set RHS of PDE
+rhs = torch.Tensor(...)
 
 # Set solver and FDM discretizer
 solver = Solver({"fdm": {"method": "cg", "tol": 1e-6, "max_it": 1000, "report" True}})
@@ -107,8 +109,8 @@ fdm = FDM()
 
 # ∇^2 p = r
 solver.set_eq(fdm.laplacian(1.0, var) == fdm.rhs(rhs))
-# Solve for constructed equation
-res, report = solver.solve() # res is resulting field, and report contains information regarding solver convergence
+# Solve for var
+report = solver.solve() # report contains information regarding solver convergence
 ```
 
 Resulting in

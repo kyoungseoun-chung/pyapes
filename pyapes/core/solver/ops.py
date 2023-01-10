@@ -94,7 +94,7 @@ class Solver:
 
         return res
 
-    def solve(self) -> tuple[Field, dict[str, int | float | bool]]:
+    def solve(self) -> dict[str, int | float | bool]:
         """Solve the PDE."""
 
         assert (
@@ -103,11 +103,11 @@ class Solver:
 
         assert self.config is not None, "Solver: config is missing!"
 
-        res, report = solve(
+        report = solve(
             self.var, self.rhs, self.Aop, self.config["fdm"], self.var.mesh
         )
 
-        return res, report
+        return report
 
     def __repr__(self) -> str:
         desc = ""
