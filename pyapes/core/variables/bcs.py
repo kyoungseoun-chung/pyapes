@@ -12,7 +12,6 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Callable
 from typing import get_args
-from typing import Optional
 from typing import Union
 
 import torch
@@ -152,7 +151,7 @@ def _bc_val_type_check(bc_val: BC_val_type):
 
 
 def homogeneous_bcs(
-    dim: int, bc_val: Optional[float], bc_type: str
+    dim: int, bc_val: float | list[float] | None, bc_type: str
 ) -> list[BC_config_type]:
     """Simple pre-defined boundary condition.
     Args:
@@ -164,7 +163,11 @@ def homogeneous_bcs(
     bc_config = []
     for i in range(dim * 2):
         bc_config.append(
-            {"bc_face": FDIR[i], "bc_type": bc_type, "bc_val": bc_val}
+            {
+                "bc_face": FDIR[i],
+                "bc_type": bc_type,
+                "bc_val": bc_val[i] if isinstance(bc_val, list) else bc_val,
+            }
         )
     return bc_config
 

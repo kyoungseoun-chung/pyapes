@@ -12,6 +12,7 @@ import torch
 from torch import Tensor
 
 from pyapes.core.mesh import Mesh
+from pyapes.core.solver.fdm import OPStype
 from pyapes.core.solver.tools import create_pad
 from pyapes.core.solver.tools import inner_slicer
 from pyapes.core.variables import Field
@@ -20,7 +21,8 @@ from pyapes.core.variables import Field
 def solve(
     var: Field,
     rhs: Tensor,
-    Aop: Callable[[Field], Tensor],
+    Aop: Callable[[Field, Tensor, dict[int, OPStype]], Tensor],
+    eqs: dict[int, OPStype],
     config: dict[str, str | int | float | bool],
     mesh: Mesh,
 ) -> dict[str, int | float | bool]:
@@ -37,7 +39,7 @@ def solve(
     """
 
     if config["method"] == "cg":
-        report = cg(var, rhs, Aop, config, mesh)
+        report = cg(var, rhs, Aop, eqs, config, mesh)
     elif config["method"] == "bicgstab":
         # res, report = bicgstab(var, rhs, config, mesh)
         raise NotImplementedError
@@ -50,7 +52,8 @@ def solve(
 def cg(
     var: Field,
     rhs: Tensor,
-    Aop: Callable[[Field], Tensor],
+    Aop: Callable[[Field, Tensor, dict[int, OPStype]], Tensor],
+    eqs: dict[int, OPStype],
     config: dict,
     mesh: Mesh,
 ) -> dict[str, int | float | bool]:
@@ -80,7 +83,7 @@ def cg(
     r = torch.zeros_like(var())
     for i in range(var.dim):
         # Pad data for later BC application
-        r[i] = pad(-rhs[i][slicer] + Aop(var_new)[i][slicer])
+        r[i] = pad(-rhs[i][slicer] + Aop(var_new, rhs, eqs)[i][slicer])
 
     d = var_new.copy(name="d")
     d.set_var_tensor(r.clone())
@@ -90,9 +93,10 @@ def cg(
         var_old = var_new.copy(name="var_old")
 
         # CG steps
-        # Laplacian of the search direction
+        # Act of operational matrix in the search direction
+
         for i in range(var.dim):
-            Ad[i] = -pad(Aop(d)[i][slicer])
+            Ad[i] = -pad(Aop(d, rhs, eqs)[i][slicer])
 
         # Magnitude of the jump
         alpha = torch.nan_to_num(
@@ -150,11 +154,11 @@ def cg(
 
 
 # WIP: NOT YET VALIDATED!
-'''
 def bicgstab(
     var: Field,
     rhs: Tensor,
-    ops: dict[int, dict[str, Union[Flux, str]]],
+    Aop: Callable[[Field, Tensor, dict[int, OPStype]], Tensor],
+    eqs: dict[int, OPStype],
     config: dict,
     mesh: Mesh,
 ) -> tuple[Field, dict]:
@@ -178,22 +182,28 @@ def bicgstab(
     # Initial residue
     itr = 0
 
-    var_new = _apply_bc_otf(var, var(), mesh).clone()
+    var_new = _apply_bc_otf(var, mesh).copy(name="var_new")
 
     slicer = inner_slicer(mesh.dim)
 
     # Initial residue
-    r = pad(-rhs[slicer] - _Aop(ops))
+    r = torch.zeros_like(var())
+    for i in range(var.dim):
+        # Pad data for later BC application
+        r[i] = pad(-rhs[i][slicer] + Aop(var_new, rhs, eqs)[i][slicer])
+
     r0 = r.clone()
-    v = torch.zeros_like(rhs)[slicer]
+    v = torch.zeros_like(rhs)
     p = torch.zeros_like(v)
+    t = torch.zeros_like(v)
 
     rho = 1.0
     alpha = 1.0
     omega = 1.0
 
-    rho_next = torch.sum(r * r)
-    tol = torch.sqrt(rho_next).item()
+    rho_next = torch.sum(r * r, dim=var.mesh_axis)
+
+    tol = torch.sqrt(rho_next.max()).item()
 
     finished: bool = False
 
@@ -206,10 +216,12 @@ def bicgstab(
         p *= beta
         p -= beta * omega * v - r
 
-        v = _Aop(ops) * p
+        for i in range(var.dim):
+            v[i] = -pad(Aop(var_new, rhs, eqs)[i][slicer]) * p[i]
+
         itr += 1
 
-        alpha = rho / torch.sum(r0 * v)
+        alpha = rho / torch.sum(r0 * v, dim=var.mesh_axis)
         s = r - alpha * v
 
         tol = torch.linalg.norm(s)
@@ -225,7 +237,8 @@ def bicgstab(
             warnings.warn(msg, RuntimeWarning)
             break
 
-        t = _Aop(ops) * s
+        for i in range(var.dim):
+            t[i] = -Aop(var_new, rhs, eqs)[i][slicer] * s[i]
         omega = torch.sum(t * s) / torch.sum(t * t)
         rho_next = -omega * torch.sum(r0 * t)
 
@@ -259,7 +272,6 @@ def bicgstab(
     var.VAR = var_new  # type: ignore
 
     return var, res_report
-'''
 
 
 def _apply_bc_otf(var: Field, mesh: Mesh) -> Field:

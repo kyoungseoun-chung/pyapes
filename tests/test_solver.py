@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from math import exp
+
 import pytest
 import torch
 from torch.testing import assert_close  # type: ignore
@@ -110,19 +112,23 @@ def test_poisson_nd(domain: Box, spacing: list[float], dim: int) -> None:
 
 def test_advection_diffussion_1d() -> None:
     # Construct mesh
-    mesh = Mesh(Box[0:1], None, [0.02])
+    mesh = Mesh(Box[0:1], None, [0.05])
+
     f_bc = homogeneous_bcs(1, 0.0, "dirichlet")
 
     # Target variable
-    var = Field("U", 1, mesh, {"domain": f_bc, "obstacle": None})
+    var = Field("U", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=0.5)
 
     solver = Solver(
-        {"fdm": {"method": "cg", "tol": 1e-6, "max_it": 1000, "report": True}}
+        {"fdm": {"method": "cg", "tol": 1e-5, "max_it": 1000, "report": True}}
     )
     fdm = FDM()
-    fdm.set_config({"div": {"limiter": "none"}})
 
     epsilon = 0.1
-    solver.set_eq(fdm.grad(var) - fdm.laplacian(epsilon, var) == fdm.rhs(1.0))
+
+    sol_ex = mesh.X - (
+        torch.exp(-(1 - mesh.X) / epsilon) - exp(-1 / epsilon)
+    ) / (1 - exp(-1 / epsilon))
+    solver.set_eq(fdm.grad(var) - fdm.laplacian(epsilon, var) == 1.0)
     report = solver.solve()
     pass

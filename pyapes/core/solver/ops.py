@@ -15,6 +15,7 @@ import torch
 from torch import Tensor
 
 from pyapes.core.solver.fdm import Discretizer
+from pyapes.core.solver.fdm import OPStype
 from pyapes.core.solver.linalg import solve
 from pyapes.core.variables import Field
 
@@ -62,43 +63,14 @@ class Solver:
         eq.ops = {}
         eq.rhs = None
 
-    def Aop(self, target: Field) -> Tensor:
-        """Return tensor of discretized operation used for the Conjugated gradient method.
-        Therefore, from the system of equation `Ax = b`, Aop will be `-Ax`.
-        """
+    def Aop(self, var: Field) -> Tensor:
+        """Aop interface mostly for debuging."""
 
-        res = torch.zeros_like(self.var())
+        assert (
+            self.rhs is not None
+        ), "Solver: rhs is missing. Did't you forget to set equation?"
 
-        for op in self.eqs:
-
-            if self.eqs[op]["name"].lower() == "ddt":
-                continue
-            elif op > 1 and self.eqs[op]["name"].lower() == "ddt":
-                raise ValueError(
-                    "FDM: ddt is not allowed in the middle of the equation!"
-                )
-
-            Ax = (
-                self.eqs[op]["Aop"](*self.eqs[op]["param"], target)
-                * self.eqs[op]["sign"]
-            )
-
-            if self.eqs[op]["name"].lower() == "grad":
-                # If operator is grad, re-shape to match the size of the target variable
-                Ax = Ax.view(self.var.size)
-
-            res += Ax
-
-        if self.eqs[0]["name"].lower() == "ddt":
-            assert self.eqs[0]["other"] is not None, "FDM: dt is not defined!"
-
-            if self.rhs is not None:
-                self.rhs *= self.eqs[0]["other"]["dt"]
-
-            res *= self.eqs[0]["other"]["dt"]
-            res += self.eqs[0]["Aop"](*self.eqs[0]["param"], target)
-
-        return res
+        return _Aop(var, self.rhs, self.eqs)
 
     def solve(self) -> dict[str, int | float | bool]:
         """Solve the PDE."""
@@ -109,11 +81,17 @@ class Solver:
 
         assert self.config is not None, "Solver: config is missing!"
 
-        report = solve(
-            self.var, self.rhs, self.Aop, self.config["fdm"], self.var.mesh
+        # Iterative linalg solver
+        self.report = solve(
+            self.var,
+            self.rhs,
+            _Aop,
+            self.eqs,
+            self.config["fdm"],
+            self.var.mesh,
         )
 
-        return report
+        return self.report
 
     def __repr__(self) -> str:
         desc = ""
@@ -122,3 +100,41 @@ class Solver:
 
         desc += f"{len(self.eqs)+1} - RHS, input: {self.rhs}\n"
         return desc
+
+
+def _Aop(target: Field, rhs: Tensor, eqs: dict[int, OPStype]) -> Tensor:
+    """Return tensor of discretized operation used for the Conjugated gradient method.
+    Therefore, from the system of equation `Ax = b`, Aop will be `-Ax`.
+
+    Note:
+        - This function is intentionally separated from `Solver` class to make the `solve` process more transparent. (`rhs` and `eqs` are explicitly passed to the function)
+    """
+
+    res = torch.zeros_like(target())
+
+    for op in eqs:
+
+        if eqs[op]["name"].lower() == "ddt":
+            continue
+        elif op > 1 and eqs[op]["name"].lower() == "ddt":
+            raise ValueError(
+                "FDM: ddt is not allowed in the middle of the equation!"
+            )
+
+        Ax = eqs[op]["Aop"](*eqs[op]["param"], target) * eqs[op]["sign"]
+
+        if eqs[op]["name"].lower() == "grad":
+            # If operator is grad, re-shape to match the size of the target variable
+            Ax = Ax.view(target.size)
+
+        res += Ax
+
+    if eqs[0]["name"].lower() == "ddt":
+
+        assert eqs[0]["other"] is not None, "FDM: dt is not defined!"
+
+        rhs *= eqs[0]["other"]["dt"]
+        res *= eqs[0]["other"]["dt"]
+        res += eqs[0]["Aop"](*eqs[0]["param"], target)
+
+    return res
