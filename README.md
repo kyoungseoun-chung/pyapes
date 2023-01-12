@@ -59,9 +59,37 @@ poetry install
 
 ## Examples
 
+> For the clarity, below code snippets are vastly simplified. See `./demos/poisson.py` file for more details
+
 ### The 1D Poisson equation
 
-For the clarity, below code snippet is vastly simplified. See `./demos/poisson.py` file for more details
+Problem description:
+
+The 1D Poisson equation is given
+
+$
+\frac{d^2 p(x)}{dx^2} = f(x),~\text{where}~x\in[0, 1]
+$
+
+with the right-hand-side,
+
+$
+f(x) = 1 - 2 x^2,
+$
+
+and the Dirichlet boundary condition,
+
+$
+p(0) = \frac{7}{9},~p(1) = \frac{8}{9}.
+$
+
+From the given equation, the corresponding exact solution is
+
+$
+p(x) = \frac{7}{9} - \frac{2}{9}x + \frac{x^2}{2} - \frac{x^4}{6}.
+$
+
+Numerical solution:
 
 ```python
 # Only shows relevant modules
@@ -87,12 +115,61 @@ fdm = FDM()
 # ∇^2 p = r
 solver.set_eq(fdm.laplacian(1.0, var) == fdm.rhs(rhs))
 # Solve for var
-report = solver.solve() # report contains information regarding solver convergence
+solver.solve() # solver convergence can be checked by accessing member, `solver.report`
 ```
 
-Resulting in
+Results:
 
 ![1d-poisson-result](./assets/demo_figs/poisson_1d.png)
+
+### The 1D advection-diffusion equation
+
+#### Problem description
+
+Problem description:
+
+The 1D Poisson equation is given
+
+$
+\frac{du(x)}{dx} - \epsilon\frac{d^2 u(x)}{dx^2} = 1,~\text{where}~x\in[0, 1]
+$
+
+with the Dirichlet boundary condition
+
+$
+u(0) = u(1) = 0.
+$
+From the given equation, the corresponding exact solution is
+
+$
+u(x) = x - \frac{e^{- \frac{1-x}{\epsilon}} - e^{-\frac{1}{\epsilon}}}{1-e^{-\frac{1}{\epsilon}}}.
+$
+
+Numerical solution:
+
+```python
+# Modules imported are similar to the previous example
+...
+
+# Construct mesh
+mesh = Mesh(Box[0:1], None, [0.02])
+
+# Construct scalar field to be solved
+var = Field("u", 1, mesh, {"domain": f_bc, "obstacle": None})
+
+# Set solver and FDM discretizer
+solver = Solver({"fdm": {"method": "bicgstab", "tol": 1e-6, "max_it": 1000, "report" True}})
+fdm = FDM()
+
+# ∇u - 𝞮∇^2 u = 1
+solver.set_eq(fdm.grad(var) - fdm.laplacian(epsilon, var) == 1.0)
+# Solve for var
+solver.solve() # solver convergence can be checked by accessing member, `solver.report`
+```
+
+Results:
+
+![1d-poisson-result](./assets/demo_figs/advection_diffusion_1d.png)
 
 ## Todos
 
