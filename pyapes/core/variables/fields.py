@@ -41,7 +41,9 @@ class Field:
     Warning! This is not the same as the dimension of the mesh!"""
     mesh: Mesh
     bc_config: dict[str, list[BC_config_type] | None] | None
-    init_val: int | float | list[float] | list[int] | Tensor | None = None
+    init_val: int | float | list[float] | list[
+        int
+    ] | Tensor | str | None = None
     object_interp: bool = False
 
     def __post_init__(self):
@@ -71,6 +73,11 @@ class Field:
                 ), "Field: init_val should match with Field dimension!"
                 for d in range(self.dim):
                     self.VAR[d] += self.init_val[d]
+            elif (
+                isinstance(self.init_val, str)
+                and self.init_val.lower() == "random"
+            ):
+                self.VAR = torch.rand_like(self.VAR)
             else:
                 raise ValueError("Field: unsupported data type!")
 

@@ -49,18 +49,19 @@ poetry install
 - CPU/GPU computation using `torch`
 - FDM Discretizations
   - Spatial: `Grad`, `Laplacian`, `Div`
+    - Supports flux limiter `upwind` for the `Div` operator
   - Temporal: `Ddt`
 - Boundary conditions:
-  - `Dirichlet`
+  - Supports `Dirichlet`, `Neumann`, `Periodic`, and `Symmetry`
 - Testing and demonstration
   - `Mesh`, `Field`, `FDM`
   - `Solver`
-    - the Poisson equation.
-    - the advection-diffusion equation
+    - The Poisson equation
+    - The advection-diffusion equation
 
 ## Examples
 
-> For the clarity, below code snippets are vastly simplified. See `./demos/poisson.py` file for more details
+> For the clarity, below code snippets are vastly simplified. See `./demos/` folder for more details
 
 ### The 1D Poisson equation
 
@@ -174,22 +175,18 @@ Results:
 ## Todos
 
 - Boundary conditions
-  - [ ] Neumann
-  - [ ] Symmetry
-  - [ ] Periodic
   - [ ] Inflow/Outflow
 - Need different derivative order at the cell face
   - Additional features
     - [ ] High order time discretization
     - [ ] Immersed body BC
-    - [x] Flux limiters
-      - High-order flux limiter (`quick`) is WIP.
+    - [ ] Higher order flux limiters (`quick`)
 - Testing and validation
   - [ ] `Ddt` class (implementation is tested but haven't validated with practical test cases)
   - [ ] Tests in higher dimension.
   - Create test files
     - `test_solver.py`
-      - [ ] The Euler equation
+      - [ ] The Burgers' equation
       - [ ] The Navier-Stokes equation at low Reynolds numbers
       - [ ] The Black-Scholes equation
 - Publish to pypi.org

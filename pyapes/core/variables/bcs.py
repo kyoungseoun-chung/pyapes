@@ -27,6 +27,7 @@ BC_val_type = Union[
     list[int],
     list[float],
     Callable[[tuple[Tensor, ...], Tensor], Tensor],
+    None,
 ]
 """BC value type."""
 BC_config_type = dict[str, Union[str, BC_val_type]]
@@ -67,9 +68,9 @@ class BC(ABC):
         self.bc_face_dim = DIR_TO_NUM[self.bc_face[0]]
 
         if self.bc_face[-1] == "l":
-            self.bc_sign = -1.0
+            self.bc_n_dir: int = -1
         else:
-            self.bc_sign = 1.0
+            self.bc_n_dir: int = 1
 
     @abstractmethod
     def apply(
@@ -92,10 +93,6 @@ class Dirichlet(BC):
         self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int
     ) -> None:
 
-        assert not isinstance(
-            self.bc_val, dict
-        ), f"BC: {self.__class__.__name__} does not support dict type boundary value."
-
         if callable(self.bc_val):
             var[var_dim, self.bc_mask] = self.bc_val(grid, self.bc_mask)
         elif isinstance(self.bc_val, list):
@@ -105,38 +102,66 @@ class Dirichlet(BC):
 
 
 class Neumann(BC):
-    r"""Apply Neumann boundary conditions."""
+    r"""Apply Neumann boundary conditions.
+
+    Note:
+        - Gradient is calculated using the 1st order forward difference.
+    """
 
     def apply(
-        self, var: Tensor, grid: tuple[Tensor, ...], var_dim=int
+        self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int
     ) -> None:
         """Apply BC"""
 
-        raise NotImplementedError
+        mask_prev = torch.roll(self.bc_mask, -self.bc_n_dir, self.bc_face_dim)
+
+        sign = float(self.bc_n_dir)
+        # NOTE: Only works for uniform grid!
+        dx = sign * (
+            grid[self.bc_face_dim][self.bc_mask]
+            - grid[self.bc_face_dim][mask_prev]
+        )
+        if callable(self.bc_val):
+            c_bc_val = self.bc_val(grid, self.bc_mask)
+            var[var_dim, self.bc_mask] = (
+                sign * dx * c_bc_val + var[var_dim, mask_prev]
+            )
+        elif isinstance(self.bc_val, list):
+            var[var_dim, self.bc_mask] = (
+                sign * dx * self.bc_val[var_dim] + var[var_dim, mask_prev]
+            )
+        else:
+            var[var_dim, self.bc_mask] = (
+                sign * dx * self.bc_val + var[var_dim, mask_prev]
+            )
 
 
 class Symmetry(BC):
     r"""Apply Neumann boundary conditions."""
 
-    def apply(self, var: Tensor, *_) -> None:
-        """Apply BC"""
-        dim = var.size(0)
+    def apply(
+        self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int
+    ) -> None:
 
-        for d in range(dim):
+        assert grid
 
-            if self.bc_face[1] == "l":
-                opp_face = self.bc_face.replace("l", "r")
-            else:
-                opp_face = self.bc_face.replace("r", "l")
+        mask_prev = torch.roll(self.bc_mask, -self.bc_n_dir, self.bc_face_dim)
+        var[var_dim, self.bc_mask] = var[var_dim, mask_prev]
 
 
 class Periodic(BC):
     r"""Apply Periodic boundary conditions."""
 
-    def apply(self, *_) -> None:
-        """Apply BC"""
-        # Do nothing
-        pass
+    def apply(
+        self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int
+    ) -> None:
+
+        assert grid
+
+        mask_forward = torch.roll(
+            self.bc_mask, self.bc_n_dir, self.bc_face_dim
+        )
+        var[var_dim, self.bc_mask] = var[var_dim, mask_forward]
 
 
 def _bc_val_type_check(bc_val: BC_val_type):
