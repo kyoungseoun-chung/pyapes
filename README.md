@@ -125,8 +125,6 @@ Results:
 
 ### The 1D advection-diffusion equation
 
-#### Problem description
-
 Problem description:
 
 The 1D Poisson equation is given
