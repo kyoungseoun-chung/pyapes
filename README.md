@@ -123,7 +123,7 @@ Results:
 
 ![1d-poisson-result](./assets/demo_figs/poisson_1d.png)
 
-### The 1D advection-diffusion equation
+### The 1D steady-state advection-diffusion equation
 
 Problem description:
 
@@ -138,6 +138,7 @@ with the Dirichlet boundary condition
 $$
 u(0) = u(1) = 0.
 $$
+
 From the given equation, the corresponding exact solution is
 
 $$
@@ -184,6 +185,8 @@ Results:
     - [x] Flux limiters
       - High-order flux limiter (`quick`) is WIP.
 - Testing and validation
+  - [ ] `Ddt` class (implementation is tested but haven't validated with practical test cases)
+  - [ ] Tests in higher dimension.
   - Create test files
     - `test_solver.py`
       - [ ] The Euler equation
