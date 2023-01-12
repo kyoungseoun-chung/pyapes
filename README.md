@@ -55,7 +55,8 @@ poetry install
 - Testing and demonstration
   - `Mesh`, `Field`, `FDM`
   - `Solver`
-    - for the Poisson equation.
+    - the Poisson equation.
+    - the advection-diffusion equation
 
 ## Examples
 
@@ -67,27 +68,27 @@ Problem description:
 
 The 1D Poisson equation is given
 
-$
+$$
 \frac{d^2 p(x)}{dx^2} = f(x),~\text{where}~x\in[0, 1]
-$
+$$
 
 with the right-hand-side,
 
-$
+$$
 f(x) = 1 - 2 x^2,
-$
+$$
 
 and the Dirichlet boundary condition,
 
-$
+$$
 p(0) = \frac{7}{9},~p(1) = \frac{8}{9}.
-$
+$$
 
 From the given equation, the corresponding exact solution is
 
-$
+$$
 p(x) = \frac{7}{9} - \frac{2}{9}x + \frac{x^2}{2} - \frac{x^4}{6}.
-$
+$$
 
 Numerical solution:
 
@@ -130,20 +131,20 @@ Problem description:
 
 The 1D Poisson equation is given
 
-$
+$$
 \frac{du(x)}{dx} - \epsilon\frac{d^2 u(x)}{dx^2} = 1,~\text{where}~x\in[0, 1]
-$
+$$
 
 with the Dirichlet boundary condition
 
-$
+$$
 u(0) = u(1) = 0.
-$
+$$
 From the given equation, the corresponding exact solution is
 
-$
+$$
 u(x) = x - \frac{e^{- \frac{1-x}{\epsilon}} - e^{-\frac{1}{\epsilon}}}{1-e^{-\frac{1}{\epsilon}}}.
-$
+$$
 
 Numerical solution:
 
@@ -187,7 +188,6 @@ Results:
 - Testing and validation
   - Create test files
     - `test_solver.py`
-      - [ ] The advection-diffusion equation
       - [ ] The Euler equation
       - [ ] The Navier-Stokes equation at low Reynolds numbers
       - [ ] The Black-Scholes equation
