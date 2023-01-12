@@ -42,7 +42,7 @@ def solve(
         report = cg(var, rhs, Aop, eqs, config, mesh)
     elif config["method"] == "bicgstab":
         # res, report = bicgstab(var, rhs, config, mesh)
-        raise NotImplementedError
+        report = bicgstab(var, rhs, Aop, eqs, config, mesh)
     else:
         raise NotImplementedError
 
@@ -153,7 +153,6 @@ def cg(
     return res_report
 
 
-# WIP: NOT YET VALIDATED!
 def bicgstab(
     var: Field,
     rhs: Tensor,
@@ -161,7 +160,7 @@ def bicgstab(
     eqs: dict[int, OPStype],
     config: dict,
     mesh: Mesh,
-) -> tuple[Field, dict]:
+) -> dict[str, int | float | bool]:
     """Bi-conjugated gradient stabilized method.
 
     Referenced from
@@ -193,9 +192,11 @@ def bicgstab(
         r[i] = pad(-rhs[i][slicer] + Aop(var_new, rhs, eqs)[i][slicer])
 
     r0 = r.clone()
-    v = torch.zeros_like(rhs)
-    p = torch.zeros_like(v)
-    t = torch.zeros_like(v)
+    v = torch.zeros_like(var())
+    t = torch.zeros_like(var())
+
+    p = var.copy(name="p")
+    s = var.copy(name="s")
 
     rho = 1.0
     alpha = 1.0
@@ -213,21 +214,30 @@ def bicgstab(
         rho = rho_next
 
         # Update p in-place
-        p *= beta
-        p -= beta * omega * v - r
+        p_dummy = p()
+        p_dummy *= beta
+        p_dummy -= beta * omega * v - r
+        p.set_var_tensor(p_dummy)
 
         for i in range(var.dim):
-            v[i] = -pad(Aop(var_new, rhs, eqs)[i][slicer]) * p[i]
+            v[i] = -pad(Aop(p, rhs, eqs)[i][slicer])
 
         itr += 1
 
-        alpha = rho / torch.sum(r0 * v, dim=var.mesh_axis)
-        s = r - alpha * v
+        alpha = torch.nan_to_num(
+            rho / torch.sum(r0 * v, dim=var.mesh_axis),
+            nan=0.0,
+            posinf=0.0,
+            neginf=0.0,
+        )
+        s.set_var_tensor(r - alpha * v)
 
-        tol = torch.linalg.norm(s)
+        tol = _tolerance_check(r, alpha * v)
 
         if tol <= tolerance:
-            var_new += alpha * p
+            var_new.set_var_tensor(var_new() + alpha * p())
+            # Apply BCs
+            var_new.set_var_tensor(_apply_bc_otf(var_new, mesh)())
             finished = True
             continue
 
@@ -238,18 +248,28 @@ def bicgstab(
             break
 
         for i in range(var.dim):
-            t[i] = -Aop(var_new, rhs, eqs)[i][slicer] * s[i]
-        omega = torch.sum(t * s) / torch.sum(t * t)
-        rho_next = -omega * torch.sum(r0 * t)
+            t[i] = -pad(Aop(s, rhs, eqs)[i][slicer])
+
+        omega = torch.nan_to_num(
+            torch.sum(t * s(), dim=var.mesh_axis)
+            / torch.sum(t * t, dim=var.mesh_axis),
+            nan=0.0,
+            posinf=0.0,
+            neginf=0.0,
+        )
+        rho_next = -omega * torch.sum(r0 * t, dim=var.mesh_axis)
 
         # Update residual
-        r = s - omega * t
+        r = s() - omega * t
 
         # Update solution in-place-ish. Note that 'z *= omega' alters s if
         # precon = None. That's ok since s is no longer needed in this iter.
         # 'q *= alpha' would alter p.
-        s *= omega
-        var_new += s + alpha * p
+        s.set_var_tensor(s() * omega)
+        var_new.set_var_tensor(var_new() + s() + alpha * p())
+
+        # Apply BCs
+        var_new.set_var_tensor(_apply_bc_otf(var_new, mesh)())
 
         tol = torch.linalg.norm(r)
 
@@ -269,9 +289,9 @@ def bicgstab(
     res_report = _write_report(itr, tol, itr < max_it)
 
     # Update variable
-    var.VAR = var_new  # type: ignore
+    var.VAR = var_new()  # type: ignore
 
-    return var, res_report
+    return res_report
 
 
 def _apply_bc_otf(var: Field, mesh: Mesh) -> Field:

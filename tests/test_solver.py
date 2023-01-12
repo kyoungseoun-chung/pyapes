@@ -123,213 +123,23 @@ def test_advection_diffussion_1d() -> None:
     var = Field("U", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=0.5)
 
     solver = Solver(
-        {"fdm": {"method": "cg", "tol": 1e-5, "max_it": 1000, "report": True}}
+        {
+            "fdm": {
+                "method": "bicgstab",
+                "tol": 1e-5,
+                "max_it": 1000,
+                "report": True,
+            }
+        }
     )
     fdm = FDM()
 
-    epsilon = 0.1
+    epsilon = 0.5
 
     sol_ex = mesh.X - (
         torch.exp(-(1 - mesh.X) / epsilon) - exp(-1 / epsilon)
     ) / (1 - exp(-1 / epsilon))
     solver.set_eq(fdm.grad(var) - fdm.laplacian(epsilon, var) == 1.0)
     solver.solve()
-    pass
 
-
-def test_cg_AD_1d_simple() -> None:
-
-    x = torch.linspace(0, 1, 101)
-    dx = (x[1] - x[0]).item()
-    var = torch.zeros_like(x)
-    rhs = torch.ones_like(x)
-
-    sol_ex = x - (torch.exp(-(1 - x) / 0.1) - exp(-1 / 0.1)) / (
-        1 - exp(-1 / 0.1)
-    )
-
-    var_cg, tol_cg, itr_cg = cg_1d(var.clone(), rhs, dx)
-    var_b, tol_b, itr_b = bicgstab_AD_1d(var.clone(), rhs, dx)
-
-    pass
-
-
-def Aop_AD_1d(var: Tensor, dx: float) -> Tensor:
-    """Aop for 1D advection-diffusion equation."""
-
-    adv = (torch.roll(var, -1, 0) - torch.roll(var, 1, 0)) / (2 * dx)
-    diff = (torch.roll(var, -1, 0) - 2 * var + torch.roll(var, 1, 0)) / dx**2
-
-    return adv - 0.1 * diff
-
-
-def bicgstab_AD_1d(
-    var: Tensor, rhs: Tensor, dx: float
-) -> tuple[Tensor, float, int]:
-    """Bi-conjugated gradient stabilized method."""
-
-    # Padding for different dimensions
-    pad = create_pad(1)
-
-    tolerance = 1e-6
-    max_it = 1000
-
-    # Parameter initialization
-    # Initial residue
-    itr = 0
-
-    var_new = var.clone()
-
-    slicer = inner_slicer(1)
-
-    # Initial residue
-    r = pad(-rhs[slicer] + Aop_AD_1d(var_new, dx)[slicer])
-
-    r0 = r.clone()
-    v = torch.zeros_like(rhs)
-    p = torch.zeros_like(v)
-    t = torch.zeros_like(v)
-
-    rho = 1.0
-    alpha = 1.0
-    omega = 1.0
-
-    rho_next = torch.sum(r * r)
-    tol = torch.sqrt(rho_next.max()).item()
-
-    finished: bool = False
-
-    while not finished:
-
-        beta = rho_next / rho * alpha / omega
-        rho = rho_next
-
-        # Update p in-place
-        p *= beta
-        p -= beta * omega * v - r
-
-        v = -pad(Aop_AD_1d(p, dx)[slicer])
-
-        itr += 1
-
-        alpha = torch.nan_to_num(
-            rho / torch.sum(r0 * v), nan=0.0, posinf=0.0, neginf=0.0
-        )
-        s = r - alpha * v
-
-        tol = torch.linalg.norm(s)
-
-        if tol <= tolerance:
-            var_new += alpha * p
-            finished = True
-            continue
-
-        if itr >= max_it:
-            break
-
-        t = -pad(Aop_AD_1d(s, dx)[slicer])
-        omega = torch.nan_to_num(
-            torch.sum(t * s) / torch.sum(t * t),
-            nan=0.0,
-            posinf=0.0,
-            neginf=0.0,
-        )
-        rho_next = -omega * torch.sum(r0 * t)
-
-        # Update residual
-        r = s - omega * t
-
-        # Update solution in-place-ish. Note that 'z *= omega' alters s if
-        # precon = None. That's ok since s is no longer needed in this iter.
-        # 'q *= alpha' would alter p.
-        s *= omega
-        var_new += s + alpha * p
-
-        # BC
-        var_new[0] = 0.0
-        var_new[-1] = 0.0
-
-        tol = torch.linalg.norm(r)
-
-        if tol <= tolerance:
-            finished = True
-
-        if itr >= max_it:
-            break
-
-    return var_new, tol, itr
-
-
-def cg_1d(var: Tensor, rhs: Tensor, dx: float) -> tuple[Tensor, float, int]:
-
-    # Padding for different dimensions
-    pad = create_pad(1)
-
-    tolerance = 1e-6
-    max_it = 1000
-
-    # Parameter initialization
-    # Initial residue
-    tol = 1.0
-    # Initial iterations
-    itr = 0
-
-    # Initial values
-    Ad = torch.zeros_like(rhs)
-    var_new = var.clone()
-
-    slicer = inner_slicer(1)
-
-    # Initial residue
-    r = pad(-rhs[slicer] + Aop_AD_1d(var_new, dx)[slicer])
-
-    d = r.clone()
-
-    while tol > tolerance:
-
-        var_old = var_new.clone()
-        # CG steps
-        # Aop in the search direction
-        Ad = -pad(Aop_AD_1d(d, dx)[slicer])
-
-        # Magnitude of the jump
-        # Treat zero
-        alpha = torch.nan_to_num(
-            torch.sum(r * r) / torch.sum(d * Ad),
-            nan=0.0,
-            posinf=0.0,
-            neginf=0.0,
-        )
-
-        # Iterated solution
-        var_new = var_old + alpha * d
-
-        # Intermediate computation
-        beta_denom = torch.sum(r * r)
-
-        # Update residual
-        r -= alpha * Ad
-
-        # Compute beta
-        beta = torch.nan_to_num(
-            torch.sum(r * r) / beta_denom, nan=0.0, posinf=0.0, neginf=0.0
-        )
-
-        # Update search direction
-        d = r + beta * d
-
-        # BC
-        var_new[0] = 0.0
-        var_new[-1] = 0.0
-
-        # Check validity of tolerance
-        tol = torch.linalg.norm(var_new - var_old)
-
-        # Add iteration counts
-        itr += 1
-
-        if itr > max_it:
-            # Convergence is not achieved
-            break
-
-    return var_new, tol, itr
+    assert_close(var()[0], sol_ex, rtol=0.1, atol=0.01)
