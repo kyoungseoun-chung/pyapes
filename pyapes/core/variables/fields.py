@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
+"""Module contains the `Field` class."""
 from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
 from typing import Any
 from typing import cast
-from typing import Optional
 from typing import Union
 
 import torch
@@ -22,32 +22,36 @@ from pyapes.core.variables.bcs import BC_val_type
 class Field:
     """Field variable class.
 
-    >>> var = Field(...)
-    >>> var() # To get `Tensor` value of the Field
+    Examples:
+        >>> from pyapes.core.geometry import Box
+        >>> from pyapes.core.mesh import Mesh
+        >>> from pyapes.core.variables.bcs import homogeneous_bcs
 
-    Args:
-        name: name of variable.
-        dim: dimension of variable. 0 to be a scalar.
-        mesh: Mesh object.
-        bc_config: dictionary contains boundary conditions.
-        init_val: if it is given, Field will be homogeneously initialize with this value.
-        object_interp: if True, interpolate inside of object using the boundary value of the object.
+        >>> mesh = Mesh(Box[0 : 2 * pi], None, [21])
+        >>> f_bc = homogeneous_bcs(1, None, "periodic")
+        >>> var = Field("U", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=0.5)
 
     """
 
     name: str
+    """Name of the field variable."""
     dim: int
     """Variable dimension. e.g. Scalar field has dim=1, 3D Vector field has dim=3, etc.
     Warning! This is not the same as the dimension of the mesh!"""
     mesh: Mesh
+    """Mesh object."""
     bc_config: dict[str, list[BC_config_type] | None] | None
-    init_val: int | float | list[float] | list[
-        int
-    ] | Tensor | str | None = None
+    """Boundary configuration"""
+    init_val: int | float | list[float] | list[int] | Tensor | list[
+        Tensor
+    ] | str | None = None
+    """Assign initial value to the field by `init_val`."""
     object_interp: bool = False
+    """If object inside and `object_interp=True`, interpolate the inside value of the object."""
 
     def __post_init__(self):
 
+        # Initialize the variable as a zero tensor
         self._VAR = torch.zeros(
             self.dim,
             *self.mesh.nx,
@@ -56,29 +60,48 @@ class Field:
             requires_grad=False,
         )
 
+        # NOTE: Require refactoring
+        # NOTE: Also need load data from file
         # Initialization value
         if self.init_val is not None:
 
             if isinstance(self.init_val, float):
+
                 self.VAR += self.init_val
+
             elif isinstance(self.init_val, list):
+
                 assert self.dim == len(
                     self.init_val
                 ), "Field: init_val should match with Field dimension!"
-                for d in range(self.dim):
-                    self.VAR[d] += float(self.init_val[d])
+
+                if isinstance(self.init_val[0], float):
+                    for d in range(self.dim):
+                        self.VAR[d] += float(self.init_val[d])
+                elif isinstance(self.init_val[0], Tensor):
+                    for d in range(self.dim):
+                        self.VAR[d] += self.init_val[d]
+                else:
+                    raise ValueError(
+                        f"Field: {type(self.init_val[0])} is an unsupported init_val type!"
+                    )
+
             elif isinstance(self.init_val, Tensor):
+
                 assert self.dim == self.init_val.size(
                     0
                 ), "Field: init_val should match with Field dimension!"
                 for d in range(self.dim):
                     self.VAR[d] += self.init_val[d]
+
             elif (
                 isinstance(self.init_val, str)
                 and self.init_val.lower() == "random"
             ):
                 self.VAR = torch.rand_like(self.VAR)
+
             else:
+
                 raise ValueError("Field: unsupported data type!")
 
         if self.bc_config is not None:
@@ -95,9 +118,25 @@ class Field:
 
         return [i + 1 for i in range(self.mesh.dim)]
 
-    def set_dt(self, dt: float) -> None:
-        """Set time step. Explicitly set dt for clarity."""
+    def set_time(self, dt: float, init_val: float | None = None) -> None:
+        """Set field time stamp with `self.dt`. If `init` is provided, set time stamp to `init`."""
+
+        if init_val is not None:
+            self._t = init_val
+        else:
+            self._t = 0.0
+
         self._dt = dt
+
+    def update_time(self, dt: float | None = None) -> None:
+        """Update time step by `dt`. If `dt` is None, update by `self.dt`."""
+
+        self._t += self.dt if dt is None else dt
+
+    @property
+    def t(self) -> float:
+        """Time stamp of the field."""
+        return self._t
 
     def save_old(self) -> None:
         """Save old value to `VARo`."""
@@ -105,6 +144,7 @@ class Field:
 
     @property
     def VARo(self) -> Tensor:
+        """Old variable stored before the time integration."""
         return self._VARo
 
     @VARo.setter
@@ -113,6 +153,7 @@ class Field:
 
     @property
     def dt(self) -> float:
+        """Time step size."""
         return self._dt
 
     @property

@@ -35,10 +35,12 @@ class Mesh:
         dtype: Union[str, int] = "double",
     ):
 
-        assert device in TORCH_DEVICE
+        assert device in TORCH_DEVICE, "Mesh: device only accept cpu or cuda"
         self.device = TorchDevice(device).device
 
-        assert dtype in DTYPE_DOUBLE or dtype in DTYPE_SINGLE
+        assert (
+            dtype in DTYPE_DOUBLE or dtype in DTYPE_SINGLE
+        ), "Mesh: dtype only accept double or single"
         self.dtype = DType(dtype)
 
         self.domain = domain

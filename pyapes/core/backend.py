@@ -5,6 +5,7 @@ from typing import Union
 import torch
 
 TORCH_DEVICE = ["cpu", "cuda", "mps"]
+"""Available `torch` device. Supports `cpu` and `cuda`. `mps` is experimental (lack of too many core functions at this point)."""
 DTYPE_SINGLE = ["single", "s", 32]
 DTYPE_DOUBLE = ["double", "d", 64]
 

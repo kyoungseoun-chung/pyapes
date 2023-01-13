@@ -94,10 +94,8 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
 
     var_i.set_var_tensor(2 * mesh.X**2)
 
-    fdm = FDM()
     solver = Solver(None)
-
-    fdm.set_config({"div": {"limiter": "upwind"}})
+    fdm = FDM({"div": {"limiter": "upwind"}})
 
     # Poisson equation.
     solver.set_eq(fdm.laplacian(2.0, var_i) == fdm.rhs(0.0))

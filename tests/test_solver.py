@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from math import exp
+from math import pi
 
 import pytest
 import torch
@@ -10,10 +11,9 @@ from pyapes.core.geometry import Box
 from pyapes.core.mesh import Mesh
 from pyapes.core.solver.fdm import FDM
 from pyapes.core.solver.ops import Solver
-from pyapes.core.solver.tools import create_pad
-from pyapes.core.solver.tools import inner_slicer
 from pyapes.core.variables import Field
 from pyapes.core.variables.bcs import homogeneous_bcs
+from pyapes.testing.burgers import burger_exact_nd
 from pyapes.testing.poisson import poisson_bcs
 from pyapes.testing.poisson import poisson_exact_nd
 from pyapes.testing.poisson import poisson_rhs_nd
@@ -143,3 +143,52 @@ def test_advection_diffussion_1d() -> None:
     solver.solve()
 
     assert_close(var()[0], sol_ex, rtol=0.1, atol=0.01)
+
+
+def test_burger_1d() -> None:
+    # Construct mesh
+    mesh = Mesh(Box[0 : 2 * pi], None, [21])
+
+    solver = Solver(
+        {
+            "fdm": {
+                "method": "bicgstab",
+                "tol": 1e-5,
+                "max_it": 1000,
+                "report": True,
+            }
+        }
+    )
+    fdm = FDM({"div": {"limiter": "upwind"}})
+
+    # Viscosity
+    nu = 0.1
+    sim_end = 0.5
+    n_itr = 50
+    dt = sim_end / n_itr
+
+    res: list[Tensor] = []
+
+    # Set dt to variable
+    f_bc = homogeneous_bcs(1, None, "periodic")
+
+    # Target variable
+    init_val = burger_exact_nd(mesh, nu, 0.0)
+    var = Field(
+        "U", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=[init_val]
+    )
+
+    var.set_time(dt, 0.0)
+
+    for _ in range(n_itr):
+
+        res.append(var()[0].clone())
+
+        solver.set_eq(
+            fdm.ddt(var) + fdm.div(var, var) - fdm.laplacian(nu, var) == 1.0
+        )
+        solver.solve()
+        var.update_time()
+
+        sol_ex = burger_exact_nd(mesh, nu, var.t)
+        pass

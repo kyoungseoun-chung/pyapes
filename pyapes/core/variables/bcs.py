@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""New boundary conditions for FVM method. Therefore, all boundary conditions will be applied to the faces of `.fluxes.Flux` class.
+"""Module that contains boundary conditions for FDM method.
 
-Supporting types:
+Supporting conditions:
     * Dirichlet
     * Neumann
     * Symmetry
     * Periodic
+
+WIP:
+    * Inflow/Outflow
 """
 from abc import ABC
 from abc import abstractmethod
@@ -36,41 +39,42 @@ BC_config_type = dict[str, Union[str, BC_val_type]]
 
 @dataclass
 class BC(ABC):
-    """Base class of the boundary condition object.
-
-    Note:
-        - Only designed to be used for the scalar field not vector field.
-        - Therefore, we have leading dimension of 0 on var.
-
-    Args:
-        bc_id: BC id
-        bc_obj: BC object type (:py:mod:`Patch` or :py:mod:`InnerObject`)
-        bc_type: BC type either (:py:mod:`Neumann` or :py:mod:`Dirichlet`)
-        bc_val: values for the boundary condition. Either `list[float]` or
-            `float` or `Callable`
-        bc_mask: boundary mask according to the face of the mesh
-        bc_var_name: name of the variable
-        dtype: :py:mod:`DType`
-        device: torch.device. Either `cpu` or `cuda`
-    """
+    """Abstract base class of the boundary condition object."""
 
     bc_id: str
+    """BC id"""
     bc_val: BC_val_type
+    """Boundary values."""
     bc_face: str
+    """Face to assign bc. Convention follows `dim` + `l` or `r`. e.g. `x_l`"""
     bc_mask: Tensor
+    """Mask of the mesh where to apply BCs."""
     bc_var_name: str
+    """Target variable name."""
     dtype: DType
+    """Data type. Since we do not store `Mesh` object here, explicitly pass dtype."""
     device: torch.device
+    """Device. Since we do not store `Mesh` object here, explicitly pass device."""
 
     def __post_init__(self):
 
         _bc_val_type_check(self.bc_val)
-        self.bc_face_dim = DIR_TO_NUM[self.bc_face[0]]
+        self._bc_face_dim = DIR_TO_NUM[self.bc_face[0]]
 
         if self.bc_face[-1] == "l":
-            self.bc_n_dir: int = -1
+            self._bc_n_dir: int = -1
         else:
-            self.bc_n_dir: int = 1
+            self._bc_n_dir: int = 1
+
+    @property
+    def bc_face_dim(self) -> int:
+        """Dimension (e.g. `x`: `0`) that the bc is applied to. Used to roll the variable `Tensor`."""
+        return self._bc_face_dim
+
+    @property
+    def bc_n_dir(self) -> int:
+        """Normal direction of bc side. -1 for `l` side, 1 for `r` side."""
+        return self._bc_n_dir
 
     @abstractmethod
     def apply(
@@ -93,6 +97,8 @@ class Dirichlet(BC):
         self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int
     ) -> None:
 
+        assert self.bc_val is not None, "BC: bc_val is not specified!"
+
         if callable(self.bc_val):
             var[var_dim, self.bc_mask] = self.bc_val(grid, self.bc_mask)
         elif isinstance(self.bc_val, list):
@@ -113,14 +119,17 @@ class Neumann(BC):
     ) -> None:
         """Apply BC"""
 
+        assert self.bc_val is not None, "BC: bc_val is not specified!"
+
         mask_prev = torch.roll(self.bc_mask, -self.bc_n_dir, self.bc_face_dim)
 
         sign = float(self.bc_n_dir)
-        # NOTE: Only works for uniform grid!
+
         dx = sign * (
             grid[self.bc_face_dim][self.bc_mask]
             - grid[self.bc_face_dim][mask_prev]
         )
+
         if callable(self.bc_val):
             c_bc_val = self.bc_val(grid, self.bc_mask)
             var[var_dim, self.bc_mask] = (
@@ -165,8 +174,8 @@ class Periodic(BC):
 
 
 def _bc_val_type_check(bc_val: BC_val_type):
+    """Check whether the bc_val is of the correct type."""
 
-    # NOTE: NOT SURE ABOUT THIS.. TYPING CHECKING IS WEIRD HERE..
     if not isinstance(bc_val, Callable):
 
         if type(bc_val) not in get_args(BC_val_type):
@@ -179,10 +188,17 @@ def homogeneous_bcs(
     dim: int, bc_val: float | list[float] | None, bc_type: str
 ) -> list[BC_config_type]:
     """Simple pre-defined boundary condition.
+
+    Warning:
+        - Only works for `Box` type object.
+
     Args:
         dim: dimension of mesh
         bc_val: value at the boundary. Homogenous at the boundary surface.
         bc_type: Type of bc
+
+    Returns:
+        list[BC_config_type]: list of dictionary used to declare the boundary conditions.
     """
 
     bc_config = []

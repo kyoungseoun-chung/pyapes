@@ -24,12 +24,17 @@ class OPStype(TypedDict):
     """Typed dict for the operation types."""
 
     name: str
+    """Operator names"""
     Aop: Callable[..., Tensor]
-    # inputs: tuple[float, Field] | tuple[Field, Field, dict] | tuple[Field]
+    """Linear system operator. `Aop` is equivalent to `Ax` in `Ax = b`."""
     target: Field
+    """Target field to be discretized."""
     param: tuple[float] | tuple[Field, dict[str, dict[str, str]]] | tuple[None]
+    """Additional parameters other than target. e.g. `coeff` in `laplacian(coeff, var)`."""
     sign: float | int
+    """Sign to be applied."""
     other: dict[str, float] | None
+    """Additional information. e.g. `dt` in `Ddt`."""
 
 
 @dataclass(eq=False)
@@ -111,6 +116,12 @@ class Discretizer:
 
         return self
 
+    def __neg__(self) -> Discretizer:
+
+        self._ops[0]["sign"] = -1
+
+        return self
+
 
 class Grad(Discretizer):
     r"""Variable discretization: Gradient
@@ -130,7 +141,6 @@ class Grad(Discretizer):
         self._ops[0] = {
             "name": self.__class__.__name__,
             "Aop": self.Aop,
-            # "inputs": (var,),
             "target": var,
             "param": (None,),
             "sign": 1.0,
@@ -168,7 +178,6 @@ class Ddt(Discretizer):
         self._ops[0] = {
             "name": self.__class__.__name__,
             "Aop": self.Aop,
-            # "inputs": (var,),
             "target": var,
             "param": (None,),
             "sign": 1.0,
@@ -213,7 +222,6 @@ class Div(Discretizer):
         self._ops[0] = {
             "name": self.__class__.__name__,
             "Aop": self.Aop,
-            # "inputs": (var_i, var_j, self.config),
             "target": var_i,
             "param": (var_j, self.config),
             "sign": 1.0,
@@ -261,7 +269,6 @@ class Laplacian(Discretizer):
         self._ops[0] = {
             "name": self.__class__.__name__,
             "Aop": self.Aop,
-            # "inputs": (coeff, var),
             "target": var,
             "param": (coeff,),
             "sign": 1.0,
@@ -310,6 +317,18 @@ class FDM:
     ddt: Ddt = Ddt()
     """Time discretization: `ddt(var)`."""
 
+    def __init__(
+        self, config: dict[str, dict[str, str]] | None = None
+    ) -> None:
+        """Initialize FDM. If `config` is provided, `config` will be set via `self.set_config` function.
+
+        Args:
+            config (Optional[dict[str, dict[str, str]]]): configuration options for the discretization operators.
+        """
+
+        if config is not None:
+            self.set_config(config)
+
     def set_config(self, config: dict[str, dict[str, str]]) -> None:
         """Set the configuration options for the discretization operators.
 
@@ -322,5 +341,5 @@ class FDM:
 
         self.config = config
 
-        # Div operator requires config
+        # Currently only `Div`` operator requires config
         self.div.update_config(config)
