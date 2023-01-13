@@ -179,9 +179,9 @@ class Ddt(Discretizer):
             "name": self.__class__.__name__,
             "Aop": self.Aop,
             "target": var,
-            "param": (None,),
+            "param": (dt,),
             "sign": 1.0,
-            "other": {"dt": dt},
+            "other": None,
         }
 
         return self
@@ -191,9 +191,9 @@ class Ddt(Discretizer):
         return self._var
 
     @staticmethod
-    def Aop(_, var: Field) -> Tensor:
+    def Aop(dt: float, var: Field) -> Tensor:
 
-        return FDC().ddt(var)
+        return FDC().ddt(dt, var)
 
 
 class Div(Discretizer):

@@ -161,7 +161,7 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
 
     # Transient advection diffusion equation test
     dt = 0.01
-    var_i.set_dt(dt)
+    var_i.set_time(dt, 0.0)
     var_old = torch.rand_like(var_i())
     var_i.VARo = var_old
     rhs = torch.rand_like(var_i())
@@ -182,10 +182,10 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
         * 3.0
     )
 
-    d_t_var = var_i()[0] - var_old[0]
+    d_t_var = (var_i()[0] - var_old[0]) / dt
 
-    target = d_t_var + (t_div + t_laplacian) * dt
-    t_rhs = rhs * dt
+    target = d_t_var + (t_div + t_laplacian)
+    t_rhs = rhs
 
     assert fdm.config["div"]["limiter"] == "upwind"
     assert_close(solver.Aop(var_i)[0][~mesh.t_mask], target[~mesh.t_mask])

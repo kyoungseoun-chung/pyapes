@@ -70,7 +70,7 @@ class Solver:
             self.rhs is not None
         ), "Solver: rhs is missing. Did't you forget to set equation?"
 
-        return _Aop(var, self.rhs, self.eqs)
+        return _Aop(var, self.eqs)
 
     def solve(self) -> dict[str, int | float | bool]:
         """Solve the PDE."""
@@ -102,7 +102,7 @@ class Solver:
         return desc
 
 
-def _Aop(target: Field, rhs: Tensor, eqs: dict[int, OPStype]) -> Tensor:
+def _Aop(target: Field, eqs: dict[int, OPStype]) -> Tensor:
     """Return tensor of discretized operation used for the Conjugated gradient method.
     Therefore, from the system of equation `Ax = b`, Aop will be `-Ax`.
 
@@ -131,10 +131,6 @@ def _Aop(target: Field, rhs: Tensor, eqs: dict[int, OPStype]) -> Tensor:
 
     if eqs[0]["name"].lower() == "ddt":
 
-        assert eqs[0]["other"] is not None, "FDM: dt is not defined!"
-
-        rhs *= eqs[0]["other"]["dt"]
-        res *= eqs[0]["other"]["dt"]
         res += eqs[0]["Aop"](*eqs[0]["param"], target)
 
     return res

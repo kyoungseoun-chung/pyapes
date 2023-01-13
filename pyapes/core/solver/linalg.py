@@ -3,7 +3,7 @@
 Following methods are currently available to solve the linear system of equation:
 
 * CG (Conjugated Gradient)
-* BICGSTAB(Bi-Conjugated Gradient Stabilized) <- WIP
+* BICGSTAB (Bi-Conjugated Gradient Stabilized)
 """
 import warnings
 from typing import Callable
@@ -21,7 +21,7 @@ from pyapes.core.variables import Field
 def solve(
     var: Field,
     rhs: Tensor,
-    Aop: Callable[[Field, Tensor, dict[int, OPStype]], Tensor],
+    Aop: Callable[[Field, dict[int, OPStype]], Tensor],
     eqs: dict[int, OPStype],
     config: dict[str, str | int | float | bool],
     mesh: Mesh,
@@ -52,7 +52,7 @@ def solve(
 def cg(
     var: Field,
     rhs: Tensor,
-    Aop: Callable[[Field, Tensor, dict[int, OPStype]], Tensor],
+    Aop: Callable[[Field, dict[int, OPStype]], Tensor],
     eqs: dict[int, OPStype],
     config: dict,
     mesh: Mesh,
@@ -83,7 +83,7 @@ def cg(
     r = torch.zeros_like(var())
     for i in range(var.dim):
         # Pad data for later BC application
-        r[i] = pad(-rhs[i][slicer] + Aop(var_new, rhs, eqs)[i][slicer])
+        r[i] = pad(-rhs[i][slicer] + Aop(var_new, eqs)[i][slicer])
 
     d = var_new.copy(name="d")
     d.set_var_tensor(r.clone())
@@ -96,7 +96,7 @@ def cg(
         # Act of operational matrix in the search direction
 
         for i in range(var.dim):
-            Ad[i] = -pad(Aop(d, rhs, eqs)[i][slicer])
+            Ad[i] = -pad(Aop(d, eqs)[i][slicer])
 
         # Magnitude of the jump
         alpha = torch.nan_to_num(
@@ -156,18 +156,17 @@ def cg(
 def bicgstab(
     var: Field,
     rhs: Tensor,
-    Aop: Callable[[Field, Tensor, dict[int, OPStype]], Tensor],
+    Aop: Callable[[Field, dict[int, OPStype]], Tensor],
     eqs: dict[int, OPStype],
     config: dict,
     mesh: Mesh,
 ) -> dict[str, int | float | bool]:
     """Bi-conjugated gradient stabilized method.
 
-    Referenced from
-    - https://github.com/PythonOptimizers/pykrylov/blob/master/pykrylov/bicgstab/bicgstab.py
-    - https://en.wikipedia.org/wiki/Biconjugate_gradient_stabilized_method
-
-    And modified to use with torch rather than numpy.
+    References:
+        - https://github.com/PythonOptimizers/pykrylov/blob/master/pykrylov/bicgstab/bicgstab.py
+        - https://en.wikipedia.org/wiki/Biconjugate_gradient_stabilized_method
+        - And modified to use utilize `torch` rather than `numpy`.
     """
 
     # Padding for different dimensions
@@ -189,7 +188,7 @@ def bicgstab(
     r = torch.zeros_like(var())
     for i in range(var.dim):
         # Pad data for later BC application
-        r[i] = pad(-rhs[i][slicer] + Aop(var_new, rhs, eqs)[i][slicer])
+        r[i] = pad(-rhs[i][slicer] + Aop(var_new, eqs)[i][slicer])
 
     r0 = r.clone()
     v = torch.zeros_like(var())
@@ -220,7 +219,7 @@ def bicgstab(
         p.set_var_tensor(p_dummy)
 
         for i in range(var.dim):
-            v[i] = -pad(Aop(p, rhs, eqs)[i][slicer])
+            v[i] = -pad(Aop(p, eqs)[i][slicer])
 
         itr += 1
 
@@ -248,7 +247,7 @@ def bicgstab(
             break
 
         for i in range(var.dim):
-            t[i] = -pad(Aop(s, rhs, eqs)[i][slicer])
+            t[i] = -pad(Aop(s, eqs)[i][slicer])
 
         omega = torch.nan_to_num(
             torch.sum(t * s(), dim=var.mesh_axis)

@@ -147,7 +147,7 @@ def test_advection_diffussion_1d() -> None:
 
 def test_burger_1d() -> None:
     # Construct mesh
-    mesh = Mesh(Box[0 : 2 * pi], None, [21])
+    mesh = Mesh(Box[0 : 2 * pi], None, [101])
 
     solver = Solver(
         {
@@ -163,8 +163,8 @@ def test_burger_1d() -> None:
 
     # Viscosity
     nu = 0.1
-    sim_end = 0.5
-    n_itr = 50
+    sim_end = 0.1
+    n_itr = 10
     dt = sim_end / n_itr
 
     res: list[Tensor] = []
@@ -185,10 +185,11 @@ def test_burger_1d() -> None:
         res.append(var()[0].clone())
 
         solver.set_eq(
-            fdm.ddt(var) + fdm.div(var, var) - fdm.laplacian(nu, var) == 1.0
+            fdm.ddt(var) + fdm.div(var, var) - fdm.laplacian(nu, var) == 0.0
         )
         solver.solve()
         var.update_time()
 
         sol_ex = burger_exact_nd(mesh, nu, var.t)
-        pass
+
+        assert_close(var()[0], sol_ex, rtol=0.01, atol=0.001)

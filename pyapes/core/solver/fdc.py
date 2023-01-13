@@ -28,7 +28,7 @@ class FDC:
         else:
             self.config = {scheme: {target: val}}
 
-    def ddt(self, var: Field) -> Tensor:
+    def ddt(self, dt: float, var: Field) -> Tensor:
         """Time derivative of a given field.
 
         Note:
@@ -43,7 +43,7 @@ class FDC:
             except AttributeError:
                 # If not saved, use current value (treat for the first iteration)
                 var_o = var()[i]
-            ddt.append(var()[i] - var_o)
+            ddt.append((var()[i] - var_o) / dt)
 
         return torch.stack(ddt)
 
