@@ -159,7 +159,7 @@ def test_burger_1d() -> None:
             }
         }
     )
-    fdm = FDM({"div": {"limiter": "upwind"}})
+    fdm = FDM({"div": {"limiter": "none"}})
 
     # Viscosity
     nu = 0.1
@@ -178,7 +178,18 @@ def test_burger_1d() -> None:
         "U", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=[init_val]
     )
 
+    #####################
+    # Test spatial discretization
+    #####################
+    # solver.set_eq(fdm.div(var, var) - fdm.laplacian(nu, var) == 0.0)
+
+    # f_div = (
+    #     torch.roll(var()[0], -1, 0) - torch.roll(var()[0], 1, 0)
+    # ) / mesh.dx[0]
+
+    #####################
     var.set_time(dt, 0.0)
+    var.save_old()
 
     for _ in range(n_itr):
 

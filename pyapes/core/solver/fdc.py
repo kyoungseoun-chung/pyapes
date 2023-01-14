@@ -82,14 +82,18 @@ class FDC:
                     pad = create_pad(var_i.mesh.dim)
                     slicer = inner_slicer(var_i.mesh.dim)
 
-                    m_val = fill_pad(
-                        pad(var_i()[i] * var_j()[j]), j, 1, slicer
-                    )
+                    m_val = fill_pad(pad(var_i()[i]), j, 1, slicer)
 
                     d_val += (
-                        (torch.roll(m_val, -1, j) - torch.roll(m_val, 1, j))
-                        / (2 * dx[j])
-                    )[slicer]
+                        var_j()[j]
+                        * (
+                            (
+                                torch.roll(m_val, -1, j)
+                                - torch.roll(m_val, 1, j)
+                            )
+                            / (2 * dx[j])
+                        )[slicer]
+                    )
 
                 elif limiter == "upwind":
 

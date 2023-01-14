@@ -210,10 +210,10 @@ def bicgstab(
     while not finished:
 
         beta = rho_next / rho * alpha / omega
-        rho = rho_next
+        rho = rho_next.clone()
 
         # Update p in-place
-        p_dummy = p()
+        p_dummy = p().clone()
         p_dummy *= beta
         p_dummy -= beta * omega * v - r
         p.set_var_tensor(p_dummy)
