@@ -7,9 +7,10 @@ from typing import Optional
 import torch
 from torch import Tensor
 
-from pyapes.core.geometry.basis import DIR
+from pyapes.core.geometry.basis import NUM_TO_DIR
 from pyapes.core.solver.tools import create_pad
 from pyapes.core.solver.tools import fill_pad
+from pyapes.core.solver.tools import fill_pad_bc
 from pyapes.core.solver.tools import inner_slicer
 from pyapes.core.variables import Field
 
@@ -149,6 +150,12 @@ class FDC:
             g_val = []
 
             for j in range(var.mesh.dim):
+
+                bc_l = var.get_bc(f"d-{NUM_TO_DIR[j]}l")
+                bc_r = var.get_bc(f"d-{NUM_TO_DIR[j]}r")
+                var_padded = fill_pad_bc(
+                    pad(var()[i]), 1, slicer, [bc_l, bc_r]
+                )
 
                 var_padded = fill_pad(pad(var()[i]), j, 1, slicer)
                 g_val.append(

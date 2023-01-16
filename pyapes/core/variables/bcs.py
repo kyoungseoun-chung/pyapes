@@ -15,6 +15,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Callable
 from typing import get_args
+from typing import Type
 from typing import Union
 
 import torch
@@ -75,6 +76,11 @@ class BC(ABC):
     def bc_n_dir(self) -> int:
         """Normal direction of bc side. -1 for `l` side, 1 for `r` side."""
         return self._bc_n_dir
+
+    @property
+    def type(self) -> str:
+        """BC type."""
+        return self.__class__.__name__.lower()
 
     @abstractmethod
     def apply(
@@ -230,7 +236,9 @@ class BC_HN:
 BC_type = Union[Dirichlet, Neumann, Symmetry, Periodic]
 
 
-BC_FACTORY = {
+BC_FACTORY: dict[
+    str, type[Dirichlet] | type[Neumann] | type[Symmetry] | type[Periodic]
+] = {
     "dirichlet": Dirichlet,
     "neumann": Neumann,
     "symmetry": Symmetry,

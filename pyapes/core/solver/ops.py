@@ -9,7 +9,6 @@ on the other hand, `fdm` returns operation matrix, `Aop` of each discretization 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
 
 import torch
 from torch import Tensor

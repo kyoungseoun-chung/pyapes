@@ -312,6 +312,20 @@ class Field:
 
         return self.copy()
 
+    def get_bc(self, bc_id: str) -> BC_type:
+        """Get bc object by bc_id. bc_id should have convention `d-xl` for domain boundary on `xl` side."""
+
+        bc_found = [bc for bc in self.bcs if bc.bc_id == bc_id]
+
+        if len(bc_found) == 0:
+            raise KeyError(f"Field: bc_id {bc_id} not found!")
+        elif len(bc_found) > 1:
+            raise KeyError(
+                f"Field: bc_id {bc_id} returns multiple bcs. Check id once again!"
+            )
+        else:
+            return bc_found[0]
+
     def set_bcs(self) -> None:
         """Setting BCs from the given configurations.
         If there is no `Mesh.config.objs`, it will set `bcs` and `masks` to
@@ -329,7 +343,11 @@ class Field:
                 d_obj_config = self.mesh.domain.config
                 d_bc_config = self.bc_config["domain"]
 
-                for bc, obj in zip(d_bc_config, d_obj_config):
+                assert len(d_obj_config) == len(
+                    d_bc_config
+                ), f"Field: domain config ({len(d_obj_config)}) mismatch with bc config ({len(d_bc_config)})!"
+
+                for bc in d_bc_config:
 
                     # Not sure about a proper typing checking here...
                     bc_val = cast(BC_val_type, bc["bc_val"])
@@ -337,7 +355,7 @@ class Field:
 
                     self.bcs.append(
                         BC_FACTORY[str(bc["bc_type"])](
-                            bc_id=f"d-{obj}",
+                            bc_id=f"d-{bc_face}",
                             bc_val=bc_val,
                             bc_face=bc_face,
                             bc_mask=self.mesh.d_mask[bc_face],
