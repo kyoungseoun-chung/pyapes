@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 """Test mesh object and its mask."""
-import pytest
 import torch
 from torch.testing import assert_close  # type: ignore
 

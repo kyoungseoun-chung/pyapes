@@ -15,7 +15,6 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Callable
 from typing import get_args
-from typing import Type
 from typing import Union
 
 import torch
