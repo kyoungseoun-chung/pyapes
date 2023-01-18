@@ -141,6 +141,7 @@ class FDC:
 
         grad = []
         dx = var.dx
+        dg = var.mesh.dg
 
         pad = create_pad(var.mesh.dim)
         slicer = inner_slicer(var.mesh.dim)
@@ -158,15 +159,12 @@ class FDC:
                     pad(var()[i]), 1, slicer, [bc_l, bc_r], j
                 )
 
-                # var_padded = fill_pad(pad(var()[i]), j, 1, slicer)
                 g_val.append(
                     (
-                        (
                             torch.roll(var_padded, -1, j)
                             - torch.roll(var_padded, 1, j)
-                        )
-                        / (2 * dx[j])
                     )[slicer]
+                    / (2 * dg[j])
                 )
             grad.append(torch.stack(g_val))
 
