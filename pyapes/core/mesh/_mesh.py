@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from functools import cached_property
 from typing import cast
 from typing import Optional
 from typing import Union
@@ -129,7 +130,7 @@ class Mesh:
 
     @property
     def dim(self) -> int:
-        """Dimension of the mesh."""
+        """Dimension of the mesh. e.g. (x, y, z) -> 3"""
         return self.domain.dim
 
     @property
@@ -190,6 +191,28 @@ class Mesh:
         return torch.tensor(
             self._dx, dtype=self.dtype.float, device=self.device
         )
+
+    @cached_property
+    def dg(self) -> list[Tensor]:
+        """Boundary treated grid. `gd` stands for `del grid`."""
+
+        del_grid: list[Tensor] = []
+
+        for idx, g in enumerate(self.grid):
+
+            g_del = torch.zeros_like(g)
+
+            g_rp = torch.roll(g.clone(), -1, idx) - g
+            g_rm = g - torch.roll(g.clone(), 1, idx)
+
+            g_rp[g_rp.lt(0.0)] = 0.0
+            g_rm[g_rm.lt(0.0)] = 0.0
+
+            g_del += g_rp + g_rm
+
+            del_grid.append(g_del / 2)
+
+        return del_grid
 
     @property
     def nx(self) -> torch.Size:

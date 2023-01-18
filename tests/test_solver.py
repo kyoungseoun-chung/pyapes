@@ -23,7 +23,8 @@ from pyapes.testing.poisson import poisson_rhs_nd
 def test_solver_tools(dim: int) -> None:
     """Testing `create_pad`, `inner_slicer` and `fill_pad` functions."""
 
-    from pyapes.core.solver.tools import create_pad, inner_slicer, fill_pad
+    from pyapes.core.mesh.tools import create_pad, inner_slicer
+    from pyapes.core.solver.tools import fill_pad
 
     var_entry = 3
     if dim == 1:

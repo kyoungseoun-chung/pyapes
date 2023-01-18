@@ -312,16 +312,19 @@ class Field:
 
         return self.copy()
 
-    def get_bc(self, bc_id: str) -> BC_type:
-        """Get bc object by bc_id. bc_id should have convention `d-xl` for domain boundary on `xl` side."""
+    def get_bc(self, bc_id: str) -> BC_type | None:
+        """Get bc object by bc_id. bc_id should have convention `d-xl` for domain boundary on `xl` side.
+
+        If no bc is found, it will return None. If multiple bcs are found, it will raise KeyError.
+        """
 
         bc_found = [bc for bc in self.bcs if bc.bc_id == bc_id]
 
         if len(bc_found) == 0:
-            raise KeyError(f"Field: bc_id {bc_id} not found!")
+            return None
         elif len(bc_found) > 1:
             raise KeyError(
-                f"Field: bc_id {bc_id} returns multiple bcs. Check id once again!"
+                f"Field: bc_id {bc_id} returned multiple bcs. Check id once again!"
             )
         else:
             return bc_found[0]

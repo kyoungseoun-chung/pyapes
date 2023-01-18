@@ -12,6 +12,8 @@ def test_mask() -> None:
     # with out object
     mesh = Mesh(Box[0:1, 0:1], None, [0.1, 0.1])
 
+    assert_close(mesh.dg[0][0].mean(), mesh.dx[0] / 2)
+
     target = mesh.t_mask[0]
 
     assert_close(mesh.t_mask[:, 0], target)

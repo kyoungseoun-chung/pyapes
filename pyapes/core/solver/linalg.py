@@ -12,9 +12,9 @@ import torch
 from torch import Tensor
 
 from pyapes.core.mesh import Mesh
+from pyapes.core.mesh.tools import create_pad
+from pyapes.core.mesh.tools import inner_slicer
 from pyapes.core.solver.fdm import OPStype
-from pyapes.core.solver.tools import create_pad
-from pyapes.core.solver.tools import inner_slicer
 from pyapes.core.variables import Field
 
 

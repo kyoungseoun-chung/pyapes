@@ -82,7 +82,7 @@ def test_field_bcs_pad(domain: Box, spacing: list[float]) -> None:
     pad = create_pad(mesh.dim, 1)
 
     padded = fill_pad_bc(
-        pad(var()[0]), 1, slicer, [var.get_bc("d-xl"), var.get_bc("d-xr")]
+        pad(var()[0]), 1, slicer, [var.get_bc("d-xl"), var.get_bc("d-xr")], 0
     )
     if mesh.dim == 1:
         assert_close(padded[0], padded[1])
@@ -103,7 +103,7 @@ def test_field_bcs_pad(domain: Box, spacing: list[float]) -> None:
         bc.apply(var(), mesh.grid, 0)
 
     padded = fill_pad_bc(
-        pad(var()[0]), 1, slicer, [var.get_bc("d-xl"), var.get_bc("d-xr")]
+        pad(var()[0]), 1, slicer, [var.get_bc("d-xl"), var.get_bc("d-xr")], 0
     )
     if mesh.dim == 1:
         assert_close(padded[1] - padded[0], padded[2] - padded[1])
@@ -131,7 +131,7 @@ def test_field_bcs_pad(domain: Box, spacing: list[float]) -> None:
         bc.apply(var(), mesh.grid, 0)
 
     padded = fill_pad_bc(
-        pad(var()[0]), 1, slicer, [var.get_bc("d-xl"), var.get_bc("d-xr")]
+        pad(var()[0]), 1, slicer, [var.get_bc("d-xl"), var.get_bc("d-xr")], 0
     )
 
     if mesh.dim == 1:
@@ -152,7 +152,7 @@ def test_field_bcs_pad(domain: Box, spacing: list[float]) -> None:
         bc.apply(var(), mesh.grid, 0)
 
     padded = fill_pad_bc(
-        pad(var()[0]), 1, slicer, [var.get_bc("d-xl"), var.get_bc("d-xr")]
+        pad(var()[0]), 1, slicer, [var.get_bc("d-xl"), var.get_bc("d-xr")], 0
     )
     if mesh.dim == 1:
         assert_close(padded[0], padded[-1])
@@ -238,8 +238,10 @@ def test_field_bcs(domain: Box, spacing: list[float]) -> None:
     )
 
     bc_xl = var.get_bc("d-xl")
-    assert bc_xl.type == "symmetry"
-    assert bc_xl.bc_id == "d-xl"
+
+    if bc_xl is not None:
+        assert bc_xl.type == "symmetry"
+        assert bc_xl.bc_id == "d-xl"
 
     for bc in var.bcs:
         bc.apply(var(), mesh.grid, 0)

@@ -1,21 +1,17 @@
 #!/usr/bin/env python3
 """Collection of useful tools to be used in `pyABC.core.solver` module."""
-from typing import Union
-
 import torch
 from torch import Tensor
-from torch.nn import ConstantPad1d
-from torch.nn import ConstantPad2d
-from torch.nn import ConstantPad3d
 
 from pyapes.core.variables.bcs import BC_type
 
-# WIP: experimental!
+
 def fill_pad_bc(
     var_padded: Tensor,
     pad_length: int,
-    slicer: tuple[slice, ...],
-    bcs: list[BC_type],
+    slicer: list[slice],
+    bcs: list[BC_type | None],
+    dim: int,
 ) -> Tensor:
     """Interpolate boundary conditions to padded tensor.
 
@@ -33,47 +29,63 @@ def fill_pad_bc(
 
     for _ in range(pad_length):
 
-        var_padded = _bc_interpolate(var_padded, bcs, slicer)
+        var_padded = _bc_interpolate(var_padded, bcs, slicer, dim)
         var_padded[slicer] = var_inner
 
     return var_padded
 
 
 def _bc_interpolate(
-    var_padded: Tensor, bcs: list[BC_type], slicer: tuple[slice, ...]
+    var_padded: Tensor,
+    bcs: list[BC_type | None],
+    slicer: list[slice],
+    dim: int,
 ) -> Tensor:
     """Interpolate boundary conditions to padded tensor."""
 
     var_interp = torch.zeros_like(var_padded)
 
-    for bc in bcs:
+    for idx, bc in enumerate(bcs):
 
-        if bc.type == "dirichlet":
-            var_interp += torch.roll(var_padded, -bc.bc_n_dir, bc.bc_face_dim)
-        elif bc.type == "neumann":
-            var_dummy = torch.zeros_like(var_padded)
-
-            var_rolled = torch.roll(var_padded, bc.bc_n_dir, bc.bc_face_dim)
-            del_var = var_rolled - var_padded
-
-            var_dummy[slicer] = (var_padded - del_var)[slicer]
-            var_interp += torch.roll(var_dummy, bc.bc_n_dir, bc.bc_face_dim)
-        elif bc.type == "symmetry":
-
-            var_dummy = torch.zeros_like(var_padded)
-            var_dummy[slicer] = var_padded[slicer]
-
-            var_interp += torch.roll(var_dummy, bc.bc_n_dir, bc.bc_face_dim)
-        elif bc.type == "periodic":
-            var_interp += torch.roll(var_padded, bc.bc_n_dir, bc.bc_face_dim)
+        if bc is None:
+            var_interp += torch.roll(var_padded, -1 + 2 * idx, dim)
         else:
-            ValueError(f"BC: {bc.type} is not supported!")
+            if bc.type == "dirichlet":
+                var_interp += torch.roll(
+                    var_padded, -bc.bc_n_dir, bc.bc_face_dim
+                )
+            elif bc.type == "neumann":
+                var_dummy = torch.zeros_like(var_padded)
+
+                var_rolled = torch.roll(
+                    var_padded, bc.bc_n_dir, bc.bc_face_dim
+                )
+                del_var = var_rolled - var_padded
+
+                var_dummy[slicer] = (var_padded - del_var)[slicer]
+                var_interp += torch.roll(
+                    var_dummy, bc.bc_n_dir, bc.bc_face_dim
+                )
+            elif bc.type == "symmetry":
+
+                var_dummy = torch.zeros_like(var_padded)
+                var_dummy[slicer] = var_padded[slicer]
+
+                var_interp += torch.roll(
+                    var_dummy, bc.bc_n_dir, bc.bc_face_dim
+                )
+            elif bc.type == "periodic":
+                var_interp += torch.roll(
+                    var_padded, bc.bc_n_dir, bc.bc_face_dim
+                )
+            else:
+                ValueError(f"BC: {bc.type} is not supported!")
 
     return var_interp
 
 
 def fill_pad(
-    var_padded: Tensor, dim: int, pad_length: int, slicer: tuple
+    var_padded: Tensor, dim: int, pad_length: int, slicer: list
 ) -> Tensor:
     """Fill padded tensor with values from inner part.
 
@@ -99,27 +111,3 @@ def fill_pad(
         var_padded[slicer] = var_inner
 
     return var_padded
-
-
-def create_pad(
-    dim: int, pad_length: int = 1, pad_value: float = 0.0
-) -> Union[ConstantPad1d, ConstantPad2d, ConstantPad3d]:
-    """Create pad object."""
-
-    if dim == 1:
-        return ConstantPad1d(pad_length, pad_value)
-    elif dim == 2:
-        return ConstantPad2d(pad_length, pad_value)
-    else:
-        return ConstantPad3d(pad_length, pad_value)
-
-
-def inner_slicer(dim: int, pad: int = 1) -> tuple[slice, ...]:
-    """Create tensor innder slicer."""
-
-    if dim == 1:
-        return (slice(pad, -pad),)
-    elif dim == 2:
-        return (slice(pad, -pad), slice(pad, -pad))
-    else:
-        return (slice(pad, -pad), slice(pad, -pad), slice(pad, -pad))
