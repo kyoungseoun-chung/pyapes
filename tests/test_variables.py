@@ -66,7 +66,8 @@ def test_fields(domain: Box, spacing: list[float], dim: int) -> None:
 )
 def test_field_bcs_pad(domain: Box, spacing: list[float]) -> None:
 
-    from pyapes.core.solver.tools import fill_pad_bc, inner_slicer, create_pad
+    from pyapes.core.solver.tools import fill_pad_bc
+    from pyapes.core.mesh.tools import inner_slicer, create_pad
 
     mesh = Mesh(domain, None, spacing, "cpu", "double")
 
@@ -214,6 +215,7 @@ def test_field_bcs(domain: Box, spacing: list[float]) -> None:
         assert_close(var()[0][0, :, :], -1.0 * 0.1 + var()[0][1, :, :])
         assert_close(var()[0][-1, :, :], 1.0 * 0.1 + var()[0][-2, :, :])
 
+    # WIP: periodic bcs is wrong here
     f_bc_d = homogeneous_bcs(mesh.dim, None, "periodic")
     var = Field(
         "p", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random"

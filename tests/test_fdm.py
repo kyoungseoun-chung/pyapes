@@ -3,6 +3,8 @@
 
 Need to be revised. I comfused concept of fvc and fvm.
 """
+from math import pi
+
 import pytest
 import torch
 from torch.testing import assert_close  # type: ignore
@@ -12,6 +14,8 @@ from pyapes.core.mesh import Mesh
 from pyapes.core.solver.fdm import FDM
 from pyapes.core.solver.ops import Solver
 from pyapes.core.variables import Field
+from pyapes.core.variables.bcs import homogeneous_bcs
+from pyapes.testing.burgers import burger_exact_nd
 
 
 @pytest.mark.parametrize(
@@ -191,3 +195,36 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
     assert_close(solver.Aop(var_i)[0][~mesh.t_mask], target[~mesh.t_mask])
     if solver.rhs is not None:
         assert_close(solver.rhs, t_rhs)
+
+
+def test_fdm_ops_burger() -> None:
+    mesh = Mesh(Box[0 : 2 * pi], None, [101])
+    # Set dt to variable
+    f_bc = homogeneous_bcs(1, None, "periodic")
+
+    # Target variable
+    init_val = burger_exact_nd(mesh, 0.1, 0.0)
+    var = Field(
+        "U", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=[init_val]
+    )
+    # dt is 0.1
+    var.set_time(0.1, 0.0)
+
+    solver = Solver(
+        {
+            "fdm": {
+                "method": "bicgstab",
+                "tol": 1e-5,
+                "max_it": 1000,
+                "report": True,
+            }
+        }
+    )
+    fdm = FDM({"div": {"limiter": "none"}})
+    solver.set_eq(
+        fdm.ddt(var) + fdm.div(var, var) - fdm.laplacian(0.1, var) == 0.0
+    )
+    div = solver.eqs[1]["Aop"](var, fdm.div.config, var)
+    laplacian = solver.eqs[2]["Aop"](0.1, var)
+
+    solver.solve()
