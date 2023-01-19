@@ -261,9 +261,7 @@ def bicgstab(
         # Update residual
         r = s() - omega * t
 
-        # Update solution in-place-ish. Note that 'z *= omega' alters s if
-        # precon = None. That's ok since s is no longer needed in this iter.
-        # 'q *= alpha' would alter p.
+        # Update solution in-place-ish.
         s.set_var_tensor(s() * omega)
         var_new.set_var_tensor(var_new() + s() + alpha * p())
 

@@ -227,4 +227,21 @@ def test_fdm_ops_burger() -> None:
     div = solver.eqs[1]["Aop"](var, fdm.div.config, var)
     laplacian = solver.eqs[2]["Aop"](0.1, var)
 
-    solver.solve()
+    div_target = (
+        (torch.roll(var()[0], -1, 0) - torch.roll(var()[0], 1, 0))
+        / (2 * mesh.dx[0])
+        * var()[0]
+    )
+
+    laplacian_target = (
+        0.1
+        * (
+            torch.roll(var()[0], -1, 0)
+            - 2 * var()[0]
+            + torch.roll(var()[0], 1, 0)
+        )
+        / (mesh.dx[0] ** 2)
+    )
+
+    assert_close(div[0], div_target)
+    assert_close(laplacian[0], laplacian_target)

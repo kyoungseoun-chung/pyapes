@@ -76,13 +76,8 @@ def _bc_interpolate(
                 )
             elif bc.type == "periodic":
                 var_dummy = torch.zeros_like(var_padded)
-                var_dummy[slicer] = var_padded[slicer]
-                var_rolled = torch.roll(
-                    var_dummy, bc.bc_n_dir * 2, bc.bc_face_dim
-                )
-
                 var_interp += torch.roll(
-                    var_padded, bc.bc_n_dir * 2, bc.bc_face_dim
+                    var_padded, bc.bc_n_dir, bc.bc_face_dim
                 )
             else:
                 ValueError(f"BC: {bc.type} is not supported!")
