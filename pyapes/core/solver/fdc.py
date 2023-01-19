@@ -83,7 +83,13 @@ class FDC:
                     pad = create_pad(var_i.mesh.dim)
                     slicer = inner_slicer(var_i.mesh.dim)
 
-                    m_val = fill_pad(pad(var_i()[i]), j, 1, slicer)
+                    bc_il = var_i.get_bc(f"d-{NUM_TO_DIR[j]}l")
+                    bc_ir = var_i.get_bc(f"d-{NUM_TO_DIR[j]}r")
+
+                    # m_val = fill_pad(pad(var_i()[i]), j, 1, slicer)
+                    m_val = fill_pad_bc(
+                        pad(var_i()[i]), 1, slicer, [bc_il, bc_ir], j
+                    )
 
                     d_val += (
                         var_j()[j]
@@ -141,7 +147,6 @@ class FDC:
 
         grad = []
         dx = var.dx
-        dg = var.mesh.dg
 
         pad = create_pad(var.mesh.dim)
         slicer = inner_slicer(var.mesh.dim)
@@ -161,10 +166,10 @@ class FDC:
 
                 g_val.append(
                     (
-                            torch.roll(var_padded, -1, j)
-                            - torch.roll(var_padded, 1, j)
+                        torch.roll(var_padded, -1, j)
+                        - torch.roll(var_padded, 1, j)
                     )[slicer]
-                    / (2 * dg[j])
+                    / (2 * dx[j])
                 )
             grad.append(torch.stack(g_val))
 
@@ -193,8 +198,14 @@ class FDC:
 
             for j in range(var.mesh.dim):
                 ddx = dx[j] ** 2
-                var_padded = fill_pad(pad(var()[i]), j, 1, slicer)
+                # var_padded = fill_pad(pad(var()[i]), j, 1, slicer)
 
+                bc_l = var.get_bc(f"d-{NUM_TO_DIR[j]}l")
+                bc_r = var.get_bc(f"d-{NUM_TO_DIR[j]}r")
+
+                var_padded = fill_pad_bc(
+                    pad(var()[i]), 1, slicer, [bc_l, bc_r], j
+                )
                 l_val += (
                     (
                         torch.roll(var_padded, -1, j)

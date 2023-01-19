@@ -114,7 +114,6 @@ rhs = torch.Tensor(...)
 solver = Solver({"fdm": {"method": "cg", "tol": 1e-6, "max_it": 1000, "report" True}})
 fdm = FDM()
 
-# ∇^2 p = r
 solver.set_eq(fdm.laplacian(1.0, var) == fdm.rhs(rhs))
 # Solve for var
 solver.solve() # solver convergence can be checked by accessing member, `solver.report`
@@ -162,7 +161,6 @@ var = Field("u", 1, mesh, {"domain": f_bc, "obstacle": None})
 solver = Solver({"fdm": {"method": "bicgstab", "tol": 1e-6, "max_it": 1000, "report" True}})
 fdm = FDM()
 
-# ∇u - 𝞮∇^2 u = 1
 solver.set_eq(fdm.grad(var) - fdm.laplacian(epsilon, var) == 1.0)
 # Solve for var
 solver.solve() # solver convergence can be checked by accessing member, `solver.report`
