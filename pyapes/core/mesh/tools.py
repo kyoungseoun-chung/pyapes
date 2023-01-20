@@ -19,7 +19,9 @@ def create_pad(
         return ConstantPad3d(pad_length, pad_value)
 
 
-def inner_slicer(dim: int, pad: int = 1) -> list[slice]:
+def inner_slicer(dim: int, pad: int | None = 1) -> list[slice]:
     """Create tensor innder slicer."""
 
-    return [slice(pad, -pad) for _ in range(dim)]
+    return [
+        slice(pad, -pad if isinstance(pad, int) else None) for _ in range(dim)
+    ]
