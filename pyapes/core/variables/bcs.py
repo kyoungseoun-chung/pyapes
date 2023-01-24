@@ -9,6 +9,10 @@ Supporting conditions:
 
 WIP:
     * Inflow/Outflow
+
+Note:
+    * The boundary conditions are applied in `["xl", "xr", "yl", "yr", "zl", "zr"]` order.
+
 """
 from abc import ABC
 from abc import abstractmethod
@@ -187,6 +191,30 @@ def _bc_val_type_check(bc_val: BC_val_type):
             raise TypeError(
                 f"BC: wrong bc variable -> {type(bc_val)} is not one of {get_args(BC_val_type)}!"
             )
+
+
+def mixed_bcs(
+    bc_val: list[float | Callable[[tuple[Tensor, ...], Tensor], Tensor]],
+    bc_type: list[str],
+):
+    """Simple pre-defined boundary condition.
+
+    Warning:
+        - Only works for `Box` type object.
+
+    Args:
+        dim (int): dimension of mesh
+        bc_val (list[float|Callable]): values at boundaries.
+        bc_type (list[str]): Types of bcs
+
+    Returns:
+        list[BC_config_type]: list of dictionary used to declare the boundary conditions.
+    """
+
+    bc_config = []
+    for i, (v, t) in enumerate(zip(bc_val, bc_type)):
+        bc_config.append({"bc_face": FDIR[i], "bc_type": t, "bc_val": v})
+    return bc_config
 
 
 def homogeneous_bcs(

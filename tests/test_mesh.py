@@ -29,3 +29,4 @@ def test_mask() -> None:
     t1[:7] = True
     t1[-1] = True
     assert_close(mesh_ob.t_mask[3, :], t1)
+    pass

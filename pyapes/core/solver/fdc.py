@@ -67,6 +67,10 @@ class FDC:
             )
             limiter = "none"
 
+        if var_j.name == var_i.name:
+            # If var_i and var_j are the same field, use the same tensor.
+            var_j.set_var_tensor(var_i().clone())
+
         div = []
 
         dx = var_j.dx

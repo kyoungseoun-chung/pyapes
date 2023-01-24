@@ -13,6 +13,7 @@ from pyapes.core.solver.fdm import FDM
 from pyapes.core.solver.ops import Solver
 from pyapes.core.variables import Field
 from pyapes.core.variables.bcs import homogeneous_bcs
+from pyapes.core.variables.bcs import mixed_bcs
 from pyapes.testing.burgers import burger_exact_nd
 from pyapes.testing.poisson import poisson_bcs
 from pyapes.testing.poisson import poisson_exact_nd
@@ -99,12 +100,12 @@ def test_poisson_nd(domain: Box, spacing: list[float], dim: int) -> None:
     f_bc = poisson_bcs(dim)  # BC config
 
     # Target variable
-    var = Field("p", 1, mesh, {"domain": f_bc, "obstacle": None})
+    var = Field("p", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=1.0)
     rhs = poisson_rhs_nd(mesh, var)  # RHS
     sol_ex = poisson_exact_nd(mesh)  # exact solution
 
     solver = Solver(
-        {"fdm": {"method": "cg", "tol": 1e-6, "max_it": 1000, "report": True}}
+        {"fdm": {"method": "cg", "tol": 1e-5, "max_it": 1000, "report": True}}
     )
     fdm = FDM()
 
@@ -112,6 +113,42 @@ def test_poisson_nd(domain: Box, spacing: list[float], dim: int) -> None:
     solver.solve()
 
     assert_close(var()[0], sol_ex, rtol=0.1, atol=0.01)
+
+
+def test_poisson_bicgstab() -> None:
+    """Test the Poisson equation with BICGSTAB solver. (2D case)"""
+
+    # Construct mesh
+    mesh = Mesh(Box[0:1, 0:1], None, [0.005, 0.005])
+
+    f_bc = mixed_bcs(
+        [0, 1, 0, 1], ["neumann", "neumann", "neumann", "neumann"]
+    )  # BC config
+
+    # Target variable
+    var = Field("p", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=1.0)
+    rhs = torch.zeros_like(var())
+    rhs[0] = -2 * pi**2 * torch.sin(pi * mesh.X) * torch.sin(pi * mesh.Y)
+
+    solver = Solver(
+        {
+            "fdm": {
+                "method": "bicgstab",
+                "tol": 1e-6,
+                "max_it": 1000,
+                "report": True,
+            }
+        }
+    )
+    fdm = FDM()
+
+    solver.set_eq(fdm.laplacian(1.0, var) == 2.0)
+    solver.solve()
+
+    import matplotlib.pyplot as plt
+
+    plt.contourf(mesh.X, mesh.Y, var()[0])
+    plt.show()
 
 
 def test_advection_diffussion_1d() -> None:

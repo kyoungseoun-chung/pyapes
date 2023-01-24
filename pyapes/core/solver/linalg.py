@@ -182,7 +182,7 @@ def bicgstab(
 
     var_new = _apply_bc_otf(var, mesh).copy(name="var_new")
 
-    slicer = inner_slicer(mesh.dim, None)
+    slicer = inner_slicer(mesh.dim)
 
     # Initial residue
     r = torch.zeros_like(var())
