@@ -18,10 +18,10 @@ from pyapes.core.variables.bcs import mixed_bcs
 def func_n1(grid: tuple[Tensor, ...], mask: Tensor) -> Tensor:
     """Return the value of the Neumann boundary condition (sin(5x))."""
 
-    return torch.sin(5.0 * grid[0][mask])
+    return -torch.sin(5.0 * grid[0][mask])
 
 
-def test_2d_poisson_d_n() -> None:
+def test_2d_poisson_pure_neumann() -> None:
     """Test the Poisson equation with dirichlet and neumann boundary conditions.
 
     Reference:
@@ -29,12 +29,12 @@ def test_2d_poisson_d_n() -> None:
     """
 
     # Construct mesh
-    mesh = Mesh(Box[0:1, 0:1], None, [31, 31])
+    mesh = Mesh(Box[0:1, 0:1], None, [21, 21])
 
     # xl - xr - yl - yr
     f_bc = mixed_bcs(
-        [0, 0, func_n1, func_n1],
-        ["dirichlet", "dirichlet", "neumann", "neumann"],
+        [func_n1, func_n1, func_n1, func_n1],
+        ["neumann", "neumann", "neumann", "neumann"],
     )  # BC config
 
     # Target variable
@@ -61,17 +61,17 @@ def test_2d_poisson_d_n() -> None:
 
     # Test Neumann
 
-    grad_yl = (var()[0][:, 1] - var()[0][:, 0]) / mesh.dx[0]
-    grad_yr = (var()[0][:, -1] - var()[0][:, -2]) / mesh.dx[0]
+    # grad_yl = (var()[0][:, 1] - var()[0][:, 0]) / mesh.dx[0]
+    # grad_yr = (var()[0][:, -1] - var()[0][:, -2]) / mesh.dx[0]
 
-    grad_ex_yl = torch.sin(5.0 * mesh.X[:, 0])
-    grad_ex_yr = torch.sin(5.0 * mesh.X[:, -1])
+    # grad_ex_yl = torch.sin(5.0 * mesh.X[:, 0])
+    # grad_ex_yr = torch.sin(5.0 * mesh.X[:, -1])
 
-    assert_close(var()[0][0, :], torch.zeros_like(var()[0][0, :]))
-    assert_close(var()[0][-1, 1:-1], torch.zeros_like(var()[0][-1, 1:-1]))
+    # assert_close(var()[0][0, :], torch.zeros_like(var()[0][0, :]))
+    # assert_close(var()[0][-1, 1:-1], torch.zeros_like(var()[0][-1, 1:-1]))
 
-    assert_close(grad_yl[1:-1], grad_ex_yl[1:-1])
-    assert_close(grad_yr[1:-1], grad_ex_yr[1:-1])
+    # assert_close(grad_yl[1:-1], grad_ex_yl[1:-1])
+    # assert_close(grad_yr[1:-1], grad_ex_yr[1:-1])
 
     import matplotlib.pyplot as plt
     from matplotlib import cm

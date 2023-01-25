@@ -51,10 +51,12 @@ def _bc_interpolate(
             var_interp += torch.roll(var_padded, -1 + 2 * idx, dim)
         else:
             if bc.type == "dirichlet":
+
                 var_interp += torch.roll(
                     var_padded, -bc.bc_n_dir, bc.bc_face_dim
                 )
             elif bc.type == "neumann":
+
                 var_dummy = torch.zeros_like(var_padded)
 
                 var_rolled = torch.roll(
@@ -66,6 +68,7 @@ def _bc_interpolate(
                 var_interp += torch.roll(
                     var_dummy, bc.bc_n_dir, bc.bc_face_dim
                 )
+
             elif bc.type == "symmetry":
 
                 var_dummy = torch.zeros_like(var_padded)
@@ -74,7 +77,10 @@ def _bc_interpolate(
                 var_interp += torch.roll(
                     var_dummy, bc.bc_n_dir, bc.bc_face_dim
                 )
+
             elif bc.type == "periodic":
+                # NOTE: Not sure yet!
+
                 var_dummy = torch.zeros_like(var_padded)
                 var_interp += torch.roll(
                     var_padded, bc.bc_n_dir, bc.bc_face_dim

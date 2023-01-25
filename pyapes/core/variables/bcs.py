@@ -142,15 +142,15 @@ class Neumann(BC):
         if callable(self.bc_val):
             c_bc_val = self.bc_val(grid, self.bc_mask)
             var[var_dim, self.bc_mask] = (
-                sign * dx * c_bc_val + var[var_dim, mask_prev]
+                dx * c_bc_val + var[var_dim, mask_prev]
             )
         elif isinstance(self.bc_val, list):
             var[var_dim, self.bc_mask] = (
-                sign * dx * self.bc_val[var_dim] + var[var_dim, mask_prev]
+                dx * self.bc_val[var_dim] + var[var_dim, mask_prev]
             )
         else:
             var[var_dim, self.bc_mask] = (
-                sign * dx * self.bc_val + var[var_dim, mask_prev]
+                dx * self.bc_val + var[var_dim, mask_prev]
             )
 
 

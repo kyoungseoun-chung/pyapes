@@ -59,9 +59,6 @@ def cg(
 ) -> dict[str, int | float | bool]:
     """Conjugate gradient descent method."""
 
-    # Padding for different dimensions
-    pad = create_pad(mesh.dim)
-
     tolerance = config["tol"]
     max_it = config["max_it"]
     report = config["report"]
@@ -74,41 +71,36 @@ def cg(
 
     # Initial values
     Ad = torch.zeros_like(rhs)
-    var_new = _apply_bc_otf(var, mesh).copy(name="var_new")
+    _apply_bc_otf(var, mesh)
 
     slicer = inner_slicer(mesh.dim)
 
     # Initial residue
     # Ax - b = r
-    r = torch.zeros_like(var())
+    r = var.zeros_like_tensor()
     for i in range(var.dim):
-        # Pad data for later BC application
-        r[i] = pad(-rhs[i][slicer] + Aop(var_new, eqs)[i][slicer])
+        r[i][slicer] = rhs[i][slicer] - Aop(var, eqs)[i][slicer]
 
-    d = var_new.copy(name="d")
+    d = var.copy(name="d")
     d.set_var_tensor(r.clone())
 
     while tol > tolerance:
 
-        var_old = var_new.copy(name="var_old")
+        var.save_old()
 
         # CG steps
         # Act of operational matrix in the search direction
-
         for i in range(var.dim):
-            Ad[i] = -pad(Aop(d, eqs)[i][slicer])
+            Ad[i][slicer] = Aop(d, eqs)[i][slicer]
 
         # Magnitude of the jump
-        alpha = torch.nan_to_num(
+        alpha = _nan_to_num(
             torch.sum(r * r, dim=var.mesh_axis)
-            / torch.sum(d() * Ad, dim=var.mesh_axis),
-            nan=0.0,
-            posinf=0.0,
-            neginf=0.0,
+            / torch.sum(d() * Ad, dim=var.mesh_axis)
         )
 
         # Iterated solution
-        var_new.set_var_tensor(var_old() + alpha * d())
+        var.set_var_tensor(var() + alpha * d())
 
         # Intermediate computation
         beta_denom = torch.sum(r * r, dim=var.mesh_axis)
@@ -124,11 +116,10 @@ def cg(
         d.set_var_tensor(r + beta * d())
 
         # Apply BCs
-        # var_new = _apply_bc_otf(var_new, mesh).copy()
-        var_new.set_var_tensor(_apply_bc_otf(var_new, mesh)())
+        _apply_bc_otf(var, mesh)
 
         # Check validity of tolerance
-        tol = _tolerance_check(var_new(), var_old())
+        tol = _tolerance_check(var(), var.VARo)
 
         # Add iteration counts
         itr += 1
@@ -146,9 +137,6 @@ def cg(
             _solution_report(itr, tol, "CG")
 
     res_report = _write_report(itr, tol, itr < max_it)
-
-    # Update variable
-    var.VAR = var_new()  # type: ignore
 
     return res_report
 
@@ -169,9 +157,6 @@ def bicgstab(
         - And modified to use utilize `torch` rather than `numpy`.
     """
 
-    # Padding for different dimensions
-    pad = create_pad(mesh.dim)
-
     tolerance = config["tol"]
     max_it = config["max_it"]
     report = config["report"]
@@ -180,28 +165,25 @@ def bicgstab(
     # Initial residue
     itr = 0
 
-    var_new = _apply_bc_otf(var, mesh).copy(name="var_new")
-
     slicer = inner_slicer(mesh.dim)
 
+    _apply_bc_otf(var, mesh)
+
     # Initial residue
-    r = torch.zeros_like(var())
+    r0 = var.zeros_like_tensor()
     for i in range(var.dim):
-        # Pad data for later BC application
-        r[i] = pad(-rhs[i][slicer] + Aop(var_new, eqs)[i][slicer])
+        r0[i][slicer] = rhs[i][slicer] - Aop(var, eqs)[i][slicer]
 
-    r0 = r.clone()
-    v = torch.zeros_like(var())
-    t = torch.zeros_like(var())
-
-    p = var.copy(name="p")
-    s = var.copy(name="s")
+    r = r0.clone()
+    t = var.zeros_like_tensor()
+    v = var.zeros_like_tensor()
+    p = var.zeros_like(name="p")
+    s = var.zeros_like(name="s")
 
     rho = 1.0
     alpha = 1.0
     omega = 1.0
-
-    rho_next = torch.sum(r * r, dim=var.mesh_axis)
+    rho_next = torch.sum(r0 * r0, dim=var.mesh_axis)
 
     tol = torch.sqrt(rho_next.max()).item()
 
@@ -209,84 +191,70 @@ def bicgstab(
 
     while not finished:
 
+        var.save_old()
         beta = rho_next / rho * alpha / omega
-        rho = rho_next.clone()
+        rho = rho_next
 
         # Update p in-place
-        p_dummy = p().clone()
-        p_dummy *= beta
-        p_dummy -= beta * omega * v - r
-        p.set_var_tensor(p_dummy)
+        p.set_var_tensor(r + beta * (p() - omega * v))
 
         for i in range(var.dim):
-            v[i] = -pad(Aop(p, eqs)[i][slicer])
+            v[i][slicer] = Aop(p, eqs)[i][slicer]
 
         itr += 1
 
-        alpha = torch.nan_to_num(
-            rho / torch.sum(r0 * v, dim=var.mesh_axis),
-            nan=0.0,
-            posinf=0.0,
-            neginf=0.0,
-        )
+        # alpha = rho / dot(r0, v)
+        alpha = _nan_to_num(rho / torch.sum(r0 * v, dim=var.mesh_axis))
+
         s.set_var_tensor(r - alpha * v)
 
+        # Check tolerance
         tol = _tolerance_check(r, alpha * v)
 
         if tol <= tolerance:
-            var_new.set_var_tensor(var_new() + alpha * p())
+            var.set_var_tensor(var() + alpha * p())
             # Apply BCs
-            var_new.set_var_tensor(_apply_bc_otf(var_new, mesh)())
+            _apply_bc_otf(var, mesh)
             finished = True
             continue
 
-        if itr >= max_it:
-            # Convergence is not achieved
-            msg = f"Maximum iteration reached! max_it: {max_it}"
-            warnings.warn(msg, RuntimeWarning)
-            break
-
         for i in range(var.dim):
-            t[i] = -pad(Aop(s, eqs)[i][slicer])
+            t[i][slicer] = Aop(s, eqs)[i][slicer]
 
-        omega = torch.nan_to_num(
+        # omega dot(t, s) / dot(t, t)
+        omega = _nan_to_num(
             torch.sum(t * s(), dim=var.mesh_axis)
-            / torch.sum(t * t, dim=var.mesh_axis),
-            nan=0.0,
-            posinf=0.0,
-            neginf=0.0,
+            / torch.sum(t * t, dim=var.mesh_axis)
         )
+
         rho_next = -omega * torch.sum(r0 * t, dim=var.mesh_axis)
+
+        # Update solution in-place-ish.
+        var.set_var_tensor(var() + alpha * p() + s() * omega)
+
+        # Apply BCs
+        _apply_bc_otf(var, mesh)
 
         # Update residual
         r = s() - omega * t
 
-        # Update solution in-place-ish.
-        s.set_var_tensor(s() * omega)
-        var_new.set_var_tensor(var_new() + s() + alpha * p())
-
-        # Apply BCs
-        var_new.set_var_tensor(_apply_bc_otf(var_new, mesh)())
-
-        tol = torch.linalg.norm(r)
+        # Check tolerance
+        tol = _tolerance_check(s(), omega * t)
 
         if tol <= tolerance:
             finished = True
 
+        # Check maximum number of iterations
         if itr >= max_it:
-            # Convergence is not achieved
             msg = f"Maximum iteration reached! max_it: {max_it}"
             warnings.warn(msg, RuntimeWarning)
             break
 
     # Add report of the results
     if report:
-        _solution_report(itr, tol, "CG")
+        _solution_report(itr, tol, "BICGSTAB")
 
     res_report = _write_report(itr, tol, itr < max_it)
-
-    # Update variable
-    var.VAR = var_new()  # type: ignore
 
     return res_report
 
@@ -312,13 +280,21 @@ def _apply_bc_otf(var: Field, mesh: Mesh) -> Field:
     return var
 
 
+def _nan_to_num(t_in: Tensor) -> Tensor:
+    """Convert any Nan values in `input` Tensor to zero."""
+
+    return torch.nan_to_num(t_in, nan=0.0, posinf=0.0, neginf=0.0)
+
+
 def _solution_report(itr: int, tol: float, method: str) -> None:
+    """Report result of the solver with total number of iterations, solution tolerance."""
 
     print(f"\n{method}: The solution  converged after {itr} iteration.")
     print(f"\ttolerance: {tol}")
 
 
 def _write_report(itr: int, tol: float, converge: bool):
+    """Write report of the solver contains total number of iterations, solution tolerance, and convergence."""
 
     return {"itr": itr, "tol": tol, "converge": converge}
 

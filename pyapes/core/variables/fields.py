@@ -188,7 +188,7 @@ class Field:
         return copied
 
     def zeros_like(self, name: str | None = None) -> Field:
-        """Deep copy buy init all values to zero."""
+        """Deep copy but init all values to zero."""
 
         copied = copy.deepcopy(self)
         copied._VAR = torch.zeros_like(self.VAR)
@@ -197,6 +197,10 @@ class Field:
             copied.name = name
 
         return copied
+
+    def zeros_like_tensor(self) -> Tensor:
+        """Just return `torch.zeros_like(self.VAR)`."""
+        return torch.zeros_like(self.VAR)
 
     @property
     def size(self) -> torch.Size:
