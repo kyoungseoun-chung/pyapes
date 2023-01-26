@@ -18,6 +18,20 @@ from pyapes.core.variables.bcs import homogeneous_bcs
 from pyapes.testing.burgers import burger_exact_nd
 
 
+def test_disc_w_bc() -> None:
+
+    t_field = torch.rand(11)
+    dx = 0.1
+
+    # Normal Laplacian
+    l_val = (
+        torch.roll(t_field, -1, 0) - 2 * t_field + torch.roll(t_field, 1, 0)
+    ) / (dx**2)
+
+    # Neumann BC l-r
+    bc_val = 2.0
+
+
 @pytest.mark.parametrize(
     ["domain", "spacing"],
     [

@@ -207,6 +207,8 @@ class FDC:
                 bc_l = var.get_bc(f"d-{NUM_TO_DIR[j]}l")
                 bc_r = var.get_bc(f"d-{NUM_TO_DIR[j]}r")
 
+                # Treat BC here
+
                 var_padded = fill_pad_bc(
                     pad(var()[i]), 1, slicer, [bc_l, bc_r], j
                 )

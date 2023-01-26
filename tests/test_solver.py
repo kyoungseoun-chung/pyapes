@@ -20,6 +20,12 @@ from pyapes.testing.poisson import poisson_exact_nd
 from pyapes.testing.poisson import poisson_rhs_nd
 
 
+def func_n1(grid: tuple[Tensor, ...], mask: Tensor) -> Tensor:
+    """Return the value of the Neumann boundary condition (sin(5x))."""
+
+    return -torch.sin(5.0 * grid[0][mask])
+
+
 @pytest.mark.parametrize(["dim"], [[1], [2], [3]])
 def test_solver_tools(dim: int) -> None:
     """Testing `create_pad`, `inner_slicer` and `fill_pad` functions."""
@@ -83,12 +89,14 @@ def test_solver_tools(dim: int) -> None:
 @pytest.mark.parametrize(
     ["domain", "spacing", "dim"],
     [
-        [Box[0:1], [11], 1],
+        [Box[0:1], [21], 1],
         [Box[0:1, 0:1], [0.01, 0.01], 2],
         [Box[0:1, 0:1, 0:1], [0.1, 0.1, 0.1], 3],
     ],
 )
-def test_poisson_nd(domain: Box, spacing: list[float], dim: int) -> None:
+def test_poisson_nd_pure_dirichlet(
+    domain: Box, spacing: list[float], dim: int
+) -> None:
     """Test poisson in N-D cases.
     Note:
         - See `pyapes.testing.poisson` for more details.
@@ -139,6 +147,101 @@ def test_poisson_nd(domain: Box, spacing: list[float], dim: int) -> None:
 
     assert solver.report["converge"] == True
     assert_close(var()[0], sol_ex, rtol=0.1, atol=0.01)
+
+
+def test_poisson_2d_pure_neumann() -> None:
+    """
+    Reference:
+        - https://fenicsproject.org/olddocs/dolfin/1.5.0/python/demo/documented/auto-adaptive-poisson/python/documentation.html
+    """
+    # Construct mesh
+    mesh = Mesh(Box[0:1, 0:1], None, [21, 21])
+
+    # xl - xr - yl - yr
+    f_bc = mixed_bcs(
+        [func_n1, func_n1, func_n1, func_n1],
+        ["neumann", "neumann", "neumann", "neumann"],
+    )  # BC config
+
+    # Target variable
+    var = Field("p", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=0.0)
+    rhs = torch.zeros_like(var())
+    rhs[0] = -10 * torch.exp(
+        -((mesh.X - 0.5) ** 2 + (mesh.Y - 0.5) ** 2) / 0.02
+    )
+
+    solver = Solver(
+        {
+            "fdm": {
+                "method": "bicgstab",
+                "tol": 1e-8,
+                "max_it": 1000,
+                "report": True,
+            }
+        }
+    )
+    fdm = FDM()
+
+    solver.set_eq(fdm.laplacian(1.0, var) == fdm.rhs(rhs))
+    solver.solve()
+
+    import matplotlib.pyplot as plt
+    from matplotlib import cm
+
+    fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+    ax.plot_surface(mesh.X, mesh.Y, var()[0], cmap=cm.coolwarm)
+    plt.show()
+    pass
+
+    # WIP: !!
+
+
+def test_poisson_2d_periodic() -> None:
+    pass
+
+
+def test_poisson_2d_mixed() -> None:
+    """Test the Poisson equation with BICGSTAB solver. (2D case)"""
+
+    # Construct mesh
+    mesh = Mesh(Box[0:0.5, 0:0.5], None, [7, 7])
+
+    f_bc = mixed_bcs(
+        [0, 0, 0, 0], ["dirichlet", "neumann", "dirichlet", "neumann"]
+    )  # BC config
+
+    # Target variable
+    var = Field("p", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=0.0)
+    rhs = torch.zeros_like(var())
+    rhs[0] = -2 * pi**2 * torch.sin(pi * mesh.X) * torch.sin(pi * mesh.Y)
+
+    solver = Solver(
+        {
+            "fdm": {
+                "method": "cg",
+                "tol": 1e-6,
+                "max_it": 1000,
+                "report": True,
+            }
+        }
+    )
+    fdm = FDM()
+
+    solver.set_eq(fdm.laplacian(1.0, var) == fdm.rhs(rhs))
+    solver.solve()
+    lhs = solver.eqs[0]["Aop"](1.0, var)
+
+    import matplotlib.pyplot as plt
+    from matplotlib import cm
+
+    fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+    ax.plot_surface(mesh.X, mesh.Y, var()[0], cmap=cm.coolwarm)
+    plt.show()
+
+    import matplotlib.pyplot as plt
+
+    plt.contourf(mesh.X, mesh.Y, var()[0])
+    plt.show()
 
 
 def test_advection_diffussion_1d() -> None:

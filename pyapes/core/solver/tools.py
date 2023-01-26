@@ -6,6 +6,26 @@ from torch import Tensor
 from pyapes.core.variables.bcs import BC_type
 
 
+# NOTE: Later need object bc treatment?
+def treat_d_bc(var: Tensor, bcs: list[BC_type | None], order: int) -> Tensor:
+    """Treat domain boundary conditions."""
+
+    # Make sure bcs are always for both sides l and r
+    assert len(bcs) == 2
+    assert order in [1, 2]
+
+    for bc in bcs:
+
+        if bc is None:
+            # do nothing
+            continue
+
+        if bc.type == "dirichlet":
+            pass
+
+    return var
+
+
 def fill_pad_bc(
     var_padded: Tensor,
     pad_length: int,
@@ -64,6 +84,7 @@ def _bc_interpolate(
                 )
                 del_var = var_rolled - var_padded
 
+                # NOTE: NEED BC VAL?
                 var_dummy[slicer] = (var_padded - del_var)[slicer]
                 var_interp += torch.roll(
                     var_dummy, bc.bc_n_dir, bc.bc_face_dim

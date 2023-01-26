@@ -12,7 +12,6 @@ import torch
 from torch import Tensor
 
 from pyapes.core.mesh import Mesh
-from pyapes.core.mesh.tools import create_pad
 from pyapes.core.mesh.tools import inner_slicer
 from pyapes.core.solver.fdm import OPStype
 from pyapes.core.variables import Field
@@ -70,8 +69,8 @@ def cg(
     itr = 0
 
     # Initial values
-    Ad = torch.zeros_like(rhs)
     _apply_bc_otf(var, mesh)
+    Ad = torch.zeros_like(rhs)
 
     slicer = inner_slicer(mesh.dim)
 
@@ -98,9 +97,11 @@ def cg(
             torch.sum(r * r, dim=var.mesh_axis)
             / torch.sum(d() * Ad, dim=var.mesh_axis)
         )
-
         # Iterated solution
         var.set_var_tensor(var() + alpha * d())
+
+        # Apply BCs
+        _apply_bc_otf(var, mesh)
 
         # Intermediate computation
         beta_denom = torch.sum(r * r, dim=var.mesh_axis)
@@ -108,18 +109,15 @@ def cg(
         # Update residual
         r -= alpha * Ad
 
+        # Check validity of tolerance
+        tol = _tolerance_check(var(), var.VARo)
+
         # Compute beta
         beta = torch.sum(r * r, dim=var.mesh_axis) / beta_denom
 
         # Update search direction
         # d = r + beta * d
         d.set_var_tensor(r + beta * d())
-
-        # Apply BCs
-        _apply_bc_otf(var, mesh)
-
-        # Check validity of tolerance
-        tol = _tolerance_check(var(), var.VARo)
 
         # Add iteration counts
         itr += 1
