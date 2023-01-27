@@ -89,7 +89,7 @@ def test_solver_tools(dim: int) -> None:
 @pytest.mark.parametrize(
     ["domain", "spacing", "dim"],
     [
-        [Box[0:1], [21], 1],
+        [Box[0:1], [11], 1],
         [Box[0:1, 0:1], [0.01, 0.01], 2],
         [Box[0:1, 0:1, 0:1], [0.1, 0.1, 0.1], 3],
     ],
@@ -155,7 +155,7 @@ def test_poisson_2d_pure_neumann() -> None:
         - https://fenicsproject.org/olddocs/dolfin/1.5.0/python/demo/documented/auto-adaptive-poisson/python/documentation.html
     """
     # Construct mesh
-    mesh = Mesh(Box[0:1, 0:1], None, [21, 21])
+    mesh = Mesh(Box[0:1, 0:1], None, [101, 101])
 
     # xl - xr - yl - yr
     f_bc = mixed_bcs(
@@ -173,7 +173,7 @@ def test_poisson_2d_pure_neumann() -> None:
     solver = Solver(
         {
             "fdm": {
-                "method": "bicgstab",
+                "method": "cg",
                 "tol": 1e-8,
                 "max_it": 1000,
                 "report": True,
@@ -204,7 +204,7 @@ def test_poisson_2d_mixed() -> None:
     """Test the Poisson equation with BICGSTAB solver. (2D case)"""
 
     # Construct mesh
-    mesh = Mesh(Box[0:0.5, 0:0.5], None, [7, 7])
+    mesh = Mesh(Box[0:0.5, 0:0.5], None, [101, 101])
 
     f_bc = mixed_bcs(
         [0, 0, 0, 0], ["dirichlet", "neumann", "dirichlet", "neumann"]

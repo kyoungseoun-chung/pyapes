@@ -6,26 +6,7 @@ from torch import Tensor
 from pyapes.core.variables.bcs import BC_type
 
 
-# NOTE: Later need object bc treatment?
-def treat_d_bc(var: Tensor, bcs: list[BC_type | None], order: int) -> Tensor:
-    """Treat domain boundary conditions."""
-
-    # Make sure bcs are always for both sides l and r
-    assert len(bcs) == 2
-    assert order in [1, 2]
-
-    for bc in bcs:
-
-        if bc is None:
-            # do nothing
-            continue
-
-        if bc.type == "dirichlet":
-            pass
-
-    return var
-
-
+# NOTE: ALSO NEED TO ASSIGN BC VAL
 def fill_pad_bc(
     var_padded: Tensor,
     pad_length: int,
@@ -45,6 +26,7 @@ def fill_pad_bc(
     # Make sure bcs are always for both sides l and r
     assert len(bcs) == 2
 
+    # NOTE: BC should be added here
     var_inner = var_padded[slicer].clone()
 
     for _ in range(pad_length):

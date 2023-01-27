@@ -16,8 +16,10 @@ from typing import TypedDict
 import torch
 from torch import Tensor
 
+from pyapes.core.mesh import Mesh
 from pyapes.core.solver.fdc import FDC
 from pyapes.core.variables import Field
+from pyapes.core.variables.bcs import BC_type
 
 
 class OPStype(TypedDict):
@@ -35,6 +37,7 @@ class OPStype(TypedDict):
     """Sign to be applied."""
     other: dict[str, float] | None
     """Additional information. e.g. `dt` in `Ddt`."""
+    update_rhs: Callable[[Tensor, list[BC_type], Mesh], None]
 
 
 @dataclass(eq=False)
@@ -145,8 +148,13 @@ class Grad(Discretizer):
             "param": (None,),
             "sign": 1.0,
             "other": None,
+            "update_rhs": self.update_rhs,
         }
         return self
+
+    @staticmethod
+    def update_rhs(rhs: Tensor, bcs: list[BC_type], mesh: Mesh) -> None:
+        pass
 
     @property
     def var(self) -> Field:
@@ -182,9 +190,14 @@ class Ddt(Discretizer):
             "param": (dt,),
             "sign": 1.0,
             "other": None,
+            "update_rhs": self.update_rhs,
         }
 
         return self
+
+    @staticmethod
+    def update_rhs(rhs: Tensor, bcs: list[BC_type], mesh: Mesh) -> None:
+        pass
 
     @property
     def var(self) -> Field:
@@ -226,9 +239,14 @@ class Div(Discretizer):
             "param": (var_j, self.config),
             "sign": 1.0,
             "other": None,
+            "update_rhs": self.update_rhs,
         }
 
         return self
+
+    @staticmethod
+    def update_rhs(rhs: Tensor, bcs: list[BC_type], mesh: Mesh) -> None:
+        pass
 
     @property
     def var(self) -> Field:
@@ -273,9 +291,16 @@ class Laplacian(Discretizer):
             "param": (coeff,),
             "sign": 1.0,
             "other": None,
+            "update_rhs": self.update_rhs,
         }
 
         return self
+
+    @staticmethod
+    def update_rhs(rhs: Tensor, bcs: list[BC_type], mesh: Mesh) -> None:
+        for bc in bcs:
+            if bc.bc_type == "neumann":
+                bc.laplacian_rhs(rhs, mesh.grid)
 
     @property
     def var(self) -> Field:

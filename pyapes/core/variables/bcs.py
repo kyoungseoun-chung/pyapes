@@ -70,6 +70,21 @@ class BC(ABC):
         else:
             self._bc_n_dir: int = 1
 
+        self._bc_type = self.__class__.__name__.lower()
+
+    @property
+    def bc_treat(self) -> bool:
+        """Whether the special treatment is needed for discretization or rhs."""
+        if self.bc_type == "neumann" or self.bc_type == "symmetry":
+            return True
+        else:
+            return False
+
+    @property
+    def bc_type(self) -> str:
+        """BC type."""
+        return self._bc_type
+
     @property
     def bc_face_dim(self) -> int:
         """Dimension (e.g. `x`: `0`) that the bc is applied to. Used to roll the variable `Tensor`."""
@@ -102,6 +117,10 @@ class BC(ABC):
 class Dirichlet(BC):
     r"""Apply Dirichlet boundary conditions."""
 
+    def laplacian_rhs(self, *_) -> None:
+        # Do nothing since rhs is redefined anyway
+        pass
+
     def apply(
         self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int
     ) -> None:
@@ -122,6 +141,25 @@ class Neumann(BC):
     Note:
         - Gradient is calculated using the 1st order forward difference.
     """
+
+    def laplacian_rhs(self, rhs: Tensor, grid):
+        """Adjust RHS for Neumann BCs."""
+
+        assert self.bc_val is not None, "BC: bc_val is not specified!"
+
+        for i in range(rhs.shape[0]):
+            mask = torch.roll(self.bc_mask, -self.bc_n_dir, i)
+            if callable(self.bc_val):
+                rhs[i][mask] += (
+                    2
+                    / 3
+                    * self.bc_val(grid, self.bc_mask)
+                    * float(-self.bc_n_dir)
+                )
+            elif isinstance(self.bc_val, list):
+                rhs[i][mask] += 2 / 3 * self.bc_val[i] * float(-self.bc_n_dir)
+            else:
+                rhs[i][mask] += 2 / 3 * self.bc_val * float(-self.bc_n_dir)
 
     def apply(
         self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int
@@ -157,6 +195,10 @@ class Neumann(BC):
 class Symmetry(BC):
     r"""Apply Neumann boundary conditions."""
 
+    def laplacian_rhs(self, *_) -> None:
+        # Do nothing since gradient is zero
+        pass
+
     def apply(
         self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int
     ) -> None:
@@ -169,6 +211,9 @@ class Symmetry(BC):
 
 class Periodic(BC):
     r"""Apply Periodic boundary conditions."""
+
+    def laplacian_rhs(self, *_) -> None:
+        raise NotImplementedError
 
     def apply(
         self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int

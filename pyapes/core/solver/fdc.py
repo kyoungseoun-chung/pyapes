@@ -193,8 +193,6 @@ class FDC:
         laplacian = []
 
         dx = var.dx
-        pad = create_pad(var.mesh.dim)
-        slicer = inner_slicer(var.mesh.dim)
 
         for i in range(var.dim):
 
@@ -202,25 +200,36 @@ class FDC:
 
             for j in range(var.mesh.dim):
                 ddx = dx[j] ** 2
-                # var_padded = fill_pad(pad(var()[i]), j, 1, slicer)
 
+                l_val_1d = (
+                    torch.roll(var()[i], -1, j)
+                    - 2 * var()[i]
+                    + torch.roll(var()[i], 1, j)
+                ) / ddx
+
+                # Treat BC
                 bc_l = var.get_bc(f"d-{NUM_TO_DIR[j]}l")
                 bc_r = var.get_bc(f"d-{NUM_TO_DIR[j]}r")
 
-                # Treat BC here
+                if bc_l is not None and bc_l.bc_treat:
+                    # Mask forwards
+                    mask_f = torch.roll(bc_l.bc_mask, 1, j)
+                    mask_ff = torch.roll(bc_l.bc_mask, 2, j)
 
-                var_padded = fill_pad_bc(
-                    pad(var()[i]), 1, slicer, [bc_l, bc_r], j
-                )
-                l_val += (
-                    (
-                        torch.roll(var_padded, -1, j)
-                        - 2 * var_padded
-                        + torch.roll(var_padded, 1, j)
-                    )
-                    / ddx
-                    * gamma
-                )[slicer]
+                    l_val_1d[mask_f] = (
+                        -2 / 3 * var()[i][mask_f] + 2 / 3 * var()[i][mask_ff]
+                    ) / ddx
+
+                if bc_r is not None and bc_r.bc_treat:
+                    # Mask backward
+                    mask_b = torch.roll(bc_r.bc_mask, -1, j)
+                    mask_bb = torch.roll(bc_r.bc_mask, -2, j)
+
+                    l_val_1d[mask_b] = (
+                        -2 / 3 * var()[i][mask_b] + 2 / 3 * var()[i][mask_bb]
+                    ) / ddx
+
+                l_val += l_val_1d * gamma
 
             laplacian.append(l_val)
 

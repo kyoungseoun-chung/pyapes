@@ -218,7 +218,11 @@ class Field:
 
         return torch.sum(self.VAR, dim=dim)
 
-    def set_var_tensor(self, val: Tensor, insert: int | None = None) -> None:
+    def set_var_tensor(
+        self,
+        val: Tensor,
+        insert: int | None = None,
+    ) -> None:
         """Set variable with a given Tensor.
 
         Examples:

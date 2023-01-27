@@ -150,3 +150,5 @@ pyABC/legacy
 tests/test_data/
 tests/legacy/
 legacy/
+
+tests/test_playground.py

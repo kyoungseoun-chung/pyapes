@@ -58,6 +58,12 @@ class Solver:
         # RHS of the equation
         self.rhs = eq.rhs
 
+        if self.rhs is not None:
+            for e in self.eqs:
+                self.eqs[e]["update_rhs"](
+                    self.rhs, self.var.bcs, self.var.mesh
+                )
+
         # Restting ops and rhs to avoid unnecessary copy when fdm is used multiple times in separate solvers
         eq.ops = {}
         eq.rhs = None
