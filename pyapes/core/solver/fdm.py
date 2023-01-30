@@ -296,6 +296,20 @@ class Laplacian(Discretizer):
 
         return self
 
+    # NOTE: I need to separate the build_coeffs() method from the Aop() method
+    # so that we can avoid multiple computation of the coefficients due to different boundary conditions.
+    def build_coeffs(self, var: Field) -> tuple[Tensor, Tensor, Tensor]:
+        """Build coefficients for Laplacian operator."""
+
+        Aop_p = torch.ones_like(var()[0])
+        Aop_c = -2 * torch.ones_like(Aop_p)
+        Aop_m = torch.ones_like(Aop_p)
+
+        for bc in var.bcs:
+            pass
+
+        return Aop_p, Aop_c, Aop_m
+
     @staticmethod
     def update_rhs(rhs: Tensor, bcs: list[BC_type], mesh: Mesh) -> None:
         for bc in bcs:
