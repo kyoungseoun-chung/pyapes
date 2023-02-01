@@ -7,6 +7,7 @@ from math import pi
 
 import pytest
 import torch
+from torch import Tensor
 from torch.testing import assert_close  # type: ignore
 
 from pyapes.core.geometry import Box
@@ -259,3 +260,80 @@ def test_fdm_ops_burger() -> None:
 
     assert_close(div[0], div_target)
     assert_close(laplacian[0], laplacian_target)
+
+
+class TestCoeffs:
+
+    f_test = torch.rand(10)
+    Am = torch.ones_like(f_test)
+    Ap = torch.ones_like(Am)
+    Ac = -2.0 * torch.ones_like(Am)
+
+    def test_dirichlet(self):
+
+        Am = torch.ones_like(self.f_test)
+        Ap = torch.ones_like(Am)
+        Ac = -2.0 * torch.ones_like(Am)
+
+        lap_manuel = self.lap_op(self.f_test)
+        lap_A_ops = self.lap_op(self.f_test, [Ap, Ac, Am])
+
+        assert_close(lap_manuel, lap_A_ops)
+
+    def test_neumann(self):
+        """Symmetric is same as Neumann but only the zero gradient is applied."""
+
+        # construct Neumann BC applied field
+        lap_manuel = self.lap_op(self.f_test)
+        lap_manuel[1] = -2 / 3 * self.f_test[1] + 2 / 3 * self.f_test[2]
+        lap_manuel[-2] = -2 / 3 * self.f_test[-2] + 2 / 3 * self.f_test[-3]
+
+        Am = torch.ones_like(self.f_test)
+        Ap = torch.ones_like(Am)
+        Ac = -2.0 * torch.ones_like(Am)
+
+        # mask_forward
+        Ac[1] = -2 / 3
+        Ap[1] = 2 / 3
+        Am[1] = 0
+
+        # mask_backward
+        Am[-2] = 2 / 3
+        Ac[-2] = -2 / 3
+        Ap[-2] = 0
+
+        lap_A_ops = self.lap_op(self.f_test, [Ap, Ac, Am])
+
+        assert_close(lap_manuel[1:-1], lap_A_ops[1:-1])
+
+    def test_periodic(self):
+
+        lap_manuel = self.lap_op(self.f_test)
+        lap_manuel[1] = -2 * self.f_test[1] + self.f_test[2]
+        lap_manuel[-2] = -2 * self.f_test[-2] + self.f_test[-3]
+
+        Am = torch.ones_like(self.f_test)
+        Ap = torch.ones_like(Am)
+        Ac = -2.0 * torch.ones_like(Am)
+
+        # mask_forward
+        Am[1] = 0
+
+        # mask_backward
+        Ap[-2] = 0
+
+        lap_A_ops = self.lap_op(self.f_test, [Ap, Ac, Am])
+
+        assert_close(lap_manuel[1:-1], lap_A_ops[1:-1])
+
+    def lap_op(self, field: Tensor, A_ops: list[Tensor] | None = None):
+        """If A_ops is given, the list of Aop should be in order of `[Ap, Ac, Am]`."""
+
+        if A_ops is None:
+            return torch.roll(field, -1) - 2 * field + torch.roll(field, 1)
+        else:
+            return (
+                A_ops[0] * torch.roll(field, -1)
+                + A_ops[1] * field
+                + A_ops[2] * torch.roll(field, 1)
+            )
