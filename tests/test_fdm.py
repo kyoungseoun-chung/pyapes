@@ -262,12 +262,9 @@ def test_fdm_ops_burger() -> None:
     assert_close(laplacian[0], laplacian_target)
 
 
-class TestCoeffs:
+class TestLaplacianCoeffs:
 
     f_test = torch.rand(10)
-    Am = torch.ones_like(f_test)
-    Ap = torch.ones_like(Am)
-    Ac = -2.0 * torch.ones_like(Am)
 
     def test_dirichlet(self):
 

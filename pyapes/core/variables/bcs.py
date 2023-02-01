@@ -72,6 +72,35 @@ class BC(ABC):
 
         self._bc_type = self.__class__.__name__.lower()
 
+        self._bc_mask_prev = torch.roll(
+            self.bc_mask, -self.bc_n_dir, self.bc_face_dim
+        )
+        self._bc_mask_forward = torch.roll(
+            self.bc_mask, self.bc_n_dir, self.bc_face_dim
+        )
+
+    @property
+    def bc_mask_prev(self) -> Tensor:
+        """Previous (one index before in `-self.bc_n_dir` direction) mask of the mesh where to apply BCs.
+
+        Examples:
+            >>> bc_mask = torch.Tensor([True, False, False, False])
+            >>> bc_mask_prev = torch.Tensor([False, True, False, False])
+
+        """
+        return self._bc_mask_prev
+
+    @property
+    def bc_mask_forward(self) -> Tensor:
+        """Forward (one index after in `self.bc_n_dir` direction) mask of the mesh where to apply BCs.
+
+        Examples:
+            >>> bc_mask = torch.Tensor([True, False, False, False])
+            >>> bc_mask_prev = torch.Tensor([False, False, False, True])
+
+        """
+        return self._bc_mask_forward
+
     @property
     def bc_treat(self) -> bool:
         """Whether the special treatment is needed for discretization or rhs."""
@@ -168,27 +197,25 @@ class Neumann(BC):
 
         assert self.bc_val is not None, "BC: bc_val is not specified!"
 
-        mask_prev = torch.roll(self.bc_mask, -self.bc_n_dir, self.bc_face_dim)
-
         sign = float(self.bc_n_dir)
 
         dx = sign * (
             grid[self.bc_face_dim][self.bc_mask]
-            - grid[self.bc_face_dim][mask_prev]
+            - grid[self.bc_face_dim][self.bc_mask_prev]
         )
 
         if callable(self.bc_val):
             c_bc_val = self.bc_val(grid, self.bc_mask)
             var[var_dim, self.bc_mask] = (
-                dx * c_bc_val + var[var_dim, mask_prev]
+                dx * c_bc_val + var[var_dim, self.bc_mask_prev]
             )
         elif isinstance(self.bc_val, list):
             var[var_dim, self.bc_mask] = (
-                dx * self.bc_val[var_dim] + var[var_dim, mask_prev]
+                dx * self.bc_val[var_dim] + var[var_dim, self.bc_mask_prev]
             )
         else:
             var[var_dim, self.bc_mask] = (
-                dx * self.bc_val + var[var_dim, mask_prev]
+                dx * self.bc_val + var[var_dim, self.bc_mask_prev]
             )
 
 
@@ -205,8 +232,7 @@ class Symmetry(BC):
 
         assert grid
 
-        mask_prev = torch.roll(self.bc_mask, -self.bc_n_dir, self.bc_face_dim)
-        var[var_dim, self.bc_mask] = var[var_dim, mask_prev]
+        var[var_dim, self.bc_mask] = var[var_dim, self.bc_mask_prev]
 
 
 class Periodic(BC):
@@ -221,10 +247,7 @@ class Periodic(BC):
 
         assert grid
 
-        mask_forward = torch.roll(
-            self.bc_mask, self.bc_n_dir, self.bc_face_dim
-        )
-        var[var_dim, self.bc_mask] = var[var_dim, mask_forward]
+        var[var_dim, self.bc_mask] = var[var_dim, self.bc_mask_forward]
 
 
 def _bc_val_type_check(bc_val: BC_val_type):
