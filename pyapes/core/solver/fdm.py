@@ -41,8 +41,8 @@ class OPStype(TypedDict):
 
 
 @dataclass(eq=False)
-class Discretizer:
-    """Base class of FDM discretization.
+class Operators:
+    """Base class of FDM operators.
 
     * `__eq__` method assign RHS of the equation.
     * `__add__` and `__sub__` method add discretization of the equation.
@@ -89,7 +89,7 @@ class Discretizer:
     def config(self) -> dict[str, dict[str, str]]:
         return self._config
 
-    def __eq__(self, other: Field | Tensor | float) -> Discretizer:
+    def __eq__(self, other: Field | Tensor | float) -> Operators:
 
         if isinstance(other, Tensor):
             self._rhs = other
@@ -100,18 +100,18 @@ class Discretizer:
 
         assert (
             self._rhs.shape == self.var().shape
-        ), f"Discretizer: RHS shape {self._rhs.shape} does not match {self.var().shape}!"
+        ), f"Operators: RHS shape {self._rhs.shape} does not match {self.var().shape}!"
 
         return self
 
-    def __add__(self, other: Discretizer) -> Discretizer:
+    def __add__(self, other: Operators) -> Operators:
 
         idx = list(self._ops.keys())
         self._ops.update({idx[-1] + 1: other.ops[0]})
 
         return self
 
-    def __sub__(self, other: Discretizer) -> Discretizer:
+    def __sub__(self, other: Operators) -> Operators:
 
         idx = list(self._ops.keys())
         other.ops[0]["sign"] = -1
@@ -119,14 +119,14 @@ class Discretizer:
 
         return self
 
-    def __neg__(self) -> Discretizer:
+    def __neg__(self) -> Operators:
 
         self._ops[0]["sign"] = -1
 
         return self
 
 
-class Grad(Discretizer):
+class Grad(Operators):
     r"""Variable discretization: Gradient
 
     .. math::
@@ -168,7 +168,7 @@ class Grad(Discretizer):
         return fdc.grad(var)
 
 
-class Ddt(Discretizer):
+class Ddt(Operators):
     r"""Variable discretization: Time derivative.
 
     Note:
@@ -209,7 +209,7 @@ class Ddt(Discretizer):
         return FDC().ddt(dt, var)
 
 
-class Div(Discretizer):
+class Div(Operators):
     r"""Variable discretization: Divergence
 
     Note:
@@ -264,7 +264,7 @@ class Div(Discretizer):
         return fdc.div(var_j, var_i)
 
 
-class Laplacian(Discretizer):
+class Laplacian(Operators):
     r"""Variable discretization: Laplacian
 
     .. math::
@@ -281,6 +281,8 @@ class Laplacian(Discretizer):
     """
 
     def __call__(self, coeff: float, var: Field) -> Laplacian:
+
+        # NOTE: Create A_ops and added to param? FDC should be standalone class Therefore, `fdc` should contains A_ops. But why should we do this? We can just use `fdm` for both implicit and explicit parts. Only different thing is capability of adding discretization schemes as a whole and used in `linalg.solve`
 
         self._coeff = coeff
         self._var = var
@@ -325,7 +327,7 @@ class Laplacian(Discretizer):
         return FDC().laplacian(gamma, var)
 
 
-class RHS(Discretizer):
+class RHS(Operators):
     r"""Simple interface to return RHS of PDE."""
 
     def __call__(self, var: Field | Tensor | float) -> Field | Tensor | float:

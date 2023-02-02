@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Finite Difference for the current field `FDC`. Similar to Openfoam's `FVC` class."""
 import warnings
+from abc import ABC
+from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Optional
 
@@ -13,10 +15,194 @@ from pyapes.core.mesh.tools import inner_slicer
 from pyapes.core.solver.tools import fill_pad
 from pyapes.core.solver.tools import fill_pad_bc
 from pyapes.core.variables import Field
+from pyapes.core.variables.bcs import BC
 
 
 @dataclass
+class Discretizer(ABC):
+    """Collection of the operators for explicit finite difference discretizations."""
+
+    A_coeffs: tuple[Tensor, Tensor, Tensor] | None = None
+    """Tuple of A operation matrix coefficients."""
+    rhs_adj: Tensor | None = None
+    """RHS adjustment tensor."""
+
+    @staticmethod
+    @abstractmethod
+    def build_A_coeffs(var: Field) -> tuple[Tensor, Tensor, Tensor]:
+        """Build the operation matrix coefficients to be used for the discretization.
+        `var: Field` is required due to the boundary conditions. Should always return three tensors in `Ap`, `Ac`, and `Am` order.
+        """
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def adjust_rhs(var: Field) -> Tensor:
+        """Return a tensor that is used to adjust `rhs` of the PDE."""
+        ...
+
+    @abstractmethod
+    def __call__(self, *_) -> Tensor:
+        """Apply discretization and return the resulting tensor."""
+        ...
+
+
+class Laplacian(Discretizer):
+    """Laplacian discretizer."""
+
+    @staticmethod
+    def build_A_coeffs(var: Field) -> tuple[Tensor, Tensor, Tensor]:
+
+        Ap = torch.ones_like(var())
+        Ac = -2.0 * torch.ones_like(var())
+        Am = torch.ones_like(var())
+
+        dx = var.dx
+
+        # Treat boundaries
+        for i in range(var.dim):
+
+            for bc in var.bcs:
+                if bc.bc_type == "neumann" or bc.bc_type == "symmetry":
+                    if bc.bc_n_dir < 0:
+                        # At lower side
+                        Ap[i][bc.bc_mask_prev] = 2 / 3
+                        Ac[i][bc.bc_mask_prev] = -2 / 3
+                        Am[i][bc.bc_mask_prev] = 0.0
+                    else:
+                        # At upper side
+                        Ap[i][bc.bc_mask_prev] = 0.0
+                        Ac[i][bc.bc_mask_prev] = -2 / 3
+                        Am[i][bc.bc_mask_prev] = 2 / 3
+                elif bc.bc_type == "periodic":
+                    if bc.bc_n_dir < 0:
+                        # At lower side
+                        Am[i][bc.bc_mask_prev] = 0.0
+                    else:
+                        # At upper side
+                        Ap[i][bc.bc_mask_prev] = 0.0
+                else:
+                    # Dirichlet BC: Do nothing
+
+                    pass
+
+        Ap /= dx**2
+        Ac /= dx**2
+        Am /= dx**2
+
+        return Ap, Ac, Am
+
+    @staticmethod
+    def adjust_rhs(var: Field) -> Tensor:
+
+        rhs_adj = torch.zeros_like(var())
+        dx = var.dx
+
+        # Treat boundaries
+        for i in range(var.dim):
+
+            for bc in var.bcs:
+
+                if bc.bc_type == "neumann":
+                    at_bc = _return_bc_val(bc, var, i)
+                    rhs_adj -= 2 / 3 * at_bc / dx * float(bc.bc_n_dir)
+                elif bc.bc_type == "periodic":
+                    # NOTE: Not sure yet
+                    rhs_adj += (
+                        var()[i][bc.bc_mask_forward]
+                        / dx**2
+                        * float(bc.bc_n_dir)
+                    )
+                else:
+                    # Dirichlet and Symmetry BC: Do nothing
+                    pass
+
+        return rhs_adj
+
+    def __call__(self, var) -> Tensor:
+
+        if self.A_coeffs is None:
+            self.A_coeffs = self.build_A_coeffs(var)
+
+        if self.rhs_adj is None:
+            self.rhs_adj = self.adjust_rhs(var)
+
+
+class Grad(Discretizer):
+    def build_A_coeffs(self, var: Field) -> tuple[Tensor, Tensor, Tensor]:
+        ...
+
+    def adjust_rhs(self, var: Field) -> Tensor:
+        ...
+
+    def __call__(self, var) -> Tensor:
+        ...
+
+
+class Div(Discretizer):
+    def build_A_coeffs(self, var: Field) -> tuple[Tensor, Tensor, Tensor]:
+        ...
+
+    def adjust_rhs(self, var: Field) -> Tensor:
+        ...
+
+    def __call__(self, var_j: Field, var_i: Field) -> Tensor:
+        ...
+
+
+class Ddt(Discretizer):
+    def build_A_coeffs(self, var: Field) -> tuple[Tensor, Tensor, Tensor]:
+        ...
+
+    def adjust_rhs(self, var: Field) -> Tensor:
+        ...
+
+    def __call__(self, var) -> Tensor:
+        ...
+
+
+def _return_bc_val(bc: BC, var: Field, dim: int) -> Tensor | float:
+    """Return boundary values."""
+
+    if callable(bc.bc_val):
+        at_bc = bc.bc_val(var.mesh.grid, bc.bc_mask)
+    elif isinstance(bc.bc_val, list):
+        at_bc = bc.bc_val[dim]
+    elif isinstance(bc.bc_val, float | int):
+        at_bc = bc.bc_val
+    elif bc.bc_val is None:
+        at_bc = 0.0
+    else:
+        raise ValueError(f"Unknown boundary condition value: {bc.bc_val}")
+
+    return at_bc
+
+
 class FDC:
+    """Collection of Finite Difference discretizations. The operation is explicit, therefore, all methods return a tensor."""
+
+    config: Optional[dict[str, dict[str, str]]] = None
+    """Configuration for the discretization."""
+    div: Div = Div()
+    """Divergence operator: `div(var_j, var_i)`."""
+    laplacian: Laplacian = Laplacian()
+    """Laplacian operator: `laplacian(coeff, var)`."""
+    grad: Grad = Grad()
+    """Gradient operator: `grad(var)`."""
+    ddt: Ddt = Ddt()
+    """Time discretization: `ddt(var)`. It will only adjust RHS of the PDE."""
+
+    def update_config(self, scheme: str, target: str, val: str):
+        """Update config values."""
+
+        if self.config is not None:
+            self.config[scheme][target] = val
+        else:
+            self.config = {scheme: {target: val}}
+
+
+@dataclass
+class FDC_old:
     """Collection of the operators for explicit finite difference discretizations."""
 
     config: Optional[dict[str, dict[str, str]]] = None
