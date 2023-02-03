@@ -42,8 +42,13 @@ class Discretizer(ABC):
         ...
 
     @abstractmethod
+    def apply(self) -> Tensor:
+        """Apply discretization."""
+        ...
+
+    @abstractmethod
     def __call__(self, *_) -> Tensor:
-        """Apply discretization and return the resulting tensor."""
+        """Conduct whole process of discretization of input Field."""
         ...
 
 
@@ -119,6 +124,20 @@ class Laplacian(Discretizer):
 
         return rhs_adj
 
+    def apply(self, var: Field) -> Tensor:
+        assert self.A_coeffs is not None, "FDC: A_coeffs is not defined!"
+
+        discretized = torch.zeros_like(var())
+
+        for idx in range(var.dim):
+            discretized += (
+                self.A_coeffs[0] * torch.roll(var()[idx], -1)
+                + self.A_coeffs[1] * var()[idx]
+                + self.A_coeffs[2] * torch.roll(var()[idx], 1)
+            )
+
+        return discretized
+
     def __call__(self, var) -> Tensor:
 
         if self.A_coeffs is None:
@@ -126,6 +145,8 @@ class Laplacian(Discretizer):
 
         if self.rhs_adj is None:
             self.rhs_adj = self.adjust_rhs(var)
+
+        return self.apply(var)
 
 
 class Grad(Discretizer):
