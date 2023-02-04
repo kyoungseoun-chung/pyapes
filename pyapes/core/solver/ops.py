@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import torch
 from torch import Tensor
 
-from pyapes.core.solver.fdm import Discretizer
+from pyapes.core.solver.fdm import Operators
 from pyapes.core.solver.fdm import OPStype
 from pyapes.core.solver.linalg import solve
 from pyapes.core.variables import Field
@@ -42,7 +42,7 @@ class Solver:
     config: None | (dict[str, dict[str, str | float | int | bool]]) = None
     """Solver configuration."""
 
-    def set_eq(self, eq: Discretizer) -> None:
+    def set_eq(self, eq: Operators) -> None:
         """Construct PDE to solve.
         (Actually construct Aop and RHS of the equation)
 

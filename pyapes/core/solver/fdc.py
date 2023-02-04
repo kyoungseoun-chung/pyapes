@@ -41,10 +41,21 @@ class Discretizer(ABC):
         """Return a tensor that is used to adjust `rhs` of the PDE."""
         ...
 
-    @abstractmethod
-    def apply(self) -> Tensor:
-        """Apply discretization."""
-        ...
+    def apply(self, var: Field) -> Tensor:
+        """Apply the discretization to the input `Field` variable."""
+        assert self.A_coeffs is not None, "FDC: A_coeffs is not defined!"
+
+        discretized = torch.zeros_like(var())
+
+        for idx in range(var.dim):
+            for dim in range(var.mesh.dim):
+                discretized[idx] += (
+                    self.A_coeffs[0][idx] * torch.roll(var()[idx], -1, dim)
+                    + self.A_coeffs[1][idx] * var()[idx]
+                    + self.A_coeffs[2][idx] * torch.roll(var()[idx], 1, dim)
+                )
+
+        return discretized
 
     @abstractmethod
     def __call__(self, *_) -> Tensor:
@@ -124,20 +135,6 @@ class Laplacian(Discretizer):
 
         return rhs_adj
 
-    def apply(self, var: Field) -> Tensor:
-        assert self.A_coeffs is not None, "FDC: A_coeffs is not defined!"
-
-        discretized = torch.zeros_like(var())
-
-        for idx in range(var.dim):
-            discretized += (
-                self.A_coeffs[0] * torch.roll(var()[idx], -1)
-                + self.A_coeffs[1] * var()[idx]
-                + self.A_coeffs[2] * torch.roll(var()[idx], 1)
-            )
-
-        return discretized
-
     def __call__(self, var) -> Tensor:
 
         if self.A_coeffs is None:
@@ -150,10 +147,12 @@ class Laplacian(Discretizer):
 
 
 class Grad(Discretizer):
-    def build_A_coeffs(self, var: Field) -> tuple[Tensor, Tensor, Tensor]:
+    @staticmethod
+    def build_A_coeffs(var: Field) -> tuple[Tensor, Tensor, Tensor]:
         ...
 
-    def adjust_rhs(self, var: Field) -> Tensor:
+    @staticmethod
+    def adjust_rhs(var: Field) -> Tensor:
         ...
 
     def __call__(self, var) -> Tensor:
@@ -161,10 +160,12 @@ class Grad(Discretizer):
 
 
 class Div(Discretizer):
-    def build_A_coeffs(self, var: Field) -> tuple[Tensor, Tensor, Tensor]:
+    @staticmethod
+    def build_A_coeffs(var: Field) -> tuple[Tensor, Tensor, Tensor]:
         ...
 
-    def adjust_rhs(self, var: Field) -> Tensor:
+    @staticmethod
+    def adjust_rhs(var: Field) -> Tensor:
         ...
 
     def __call__(self, var_j: Field, var_i: Field) -> Tensor:
@@ -172,10 +173,12 @@ class Div(Discretizer):
 
 
 class Ddt(Discretizer):
-    def build_A_coeffs(self, var: Field) -> tuple[Tensor, Tensor, Tensor]:
+    @staticmethod
+    def build_A_coeffs(var: Field) -> tuple[Tensor, Tensor, Tensor]:
         ...
 
-    def adjust_rhs(self, var: Field) -> Tensor:
+    @staticmethod
+    def adjust_rhs(var: Field) -> Tensor:
         ...
 
     def __call__(self, var) -> Tensor:

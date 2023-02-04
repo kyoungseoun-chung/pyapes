@@ -49,10 +49,20 @@ def test_fdc_ops(domain: Box, spacing: list[float]) -> None:
 
     mesh = Mesh(domain, None, spacing)
 
+    f_bc = homogeneous_bcs(mesh.dim, 2.0, "neumann")
+
     # Field boundaries are all set to zero
-    var = Field("test", 1, mesh, None)
+    var = Field("test", 1, mesh, {"domain": f_bc, "obstacle": None})
 
     var.set_var_tensor(mesh.X**2)
+
+    # Set discretizer
+
+    fdc = FDC()
+
+    # Laplacian operator
+    lap = fdc.laplacian(var)
+    pass
 
 
 @pytest.mark.parametrize(
@@ -223,7 +233,7 @@ def test_fdm_ops_burger() -> None:
     assert_close(laplacian[0], laplacian_target)
 
 
-class TestLaplacianCoeffs:
+class TestPrototype_LaplacianCoeffs:
 
     f_test = torch.rand(10)
 
