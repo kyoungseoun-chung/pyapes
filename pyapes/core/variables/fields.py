@@ -258,6 +258,7 @@ class Field:
         return self.VAR
 
     def __add__(self, other: Any) -> Field:
+        """Use `+` operator to add values to the field."""
 
         if isinstance(other, Field):
             self.VAR += other()
@@ -285,18 +286,20 @@ class Field:
                 "Field: you can only add Field, float, Tensor, list[int], or list[float]!"
             )
 
-        return self.copy()
+        return self
 
     def __sub__(self, other: Any) -> Field:
+        """Use `-` operator to subtract `other` from `Field.VAR`."""
 
         if isinstance(other, Field):
             self.VAR -= other()
         else:
             raise TypeError("Field: you can only subtract Field!")
 
-        return self.copy()
+        return self
 
     def __mul__(self, other: Any) -> Field:
+        """Use `*` operator to multiply `Field.VAR` by `other`."""
 
         if isinstance(other, Field):
             self.VAR *= other()
@@ -307,9 +310,10 @@ class Field:
                 "Field: you can only multiply Field, int, or float!"
             )
 
-        return self.copy()
+        return self
 
     def __truediv__(self, other: Any) -> Field:
+        """Use `/=` operator to divide `Field.VAR` by `other`."""
 
         if isinstance(other, Field):
             mask = other().gt(0.0)
@@ -318,7 +322,28 @@ class Field:
         else:
             raise TypeError("Field: you can only divide by Field!")
 
-        return self.copy()
+        return self
+
+    def __ilshift__(self, other: Any) -> Field:
+        """use `<<=` operator to assign `other` to `Field.VAR`."""
+
+        if isinstance(other, Field):
+            self.VAR = other()
+        elif isinstance(other, Tensor):
+            self.set_var_tensor(other)
+        elif isinstance(other, float | int):
+            self.VAR = torch.zeros_like(self.VAR) + other
+        elif isinstance(other, list):
+            assert self.dim == len(other), "Field: dimension mismatch!"
+            self.VAR = torch.zeros_like(self.VAR)
+            for i in range(self.dim):
+                self.VAR[i] += other[i]
+        else:
+            raise TypeError(
+                "Field: you can only assign Field, Tensor, float, int, or list!"
+            )
+
+        return self
 
     def get_bc(self, bc_id: str) -> BC_type | None:
         """Get bc object by bc_id. bc_id should have convention `d-xl` for domain boundary on `xl` side.
