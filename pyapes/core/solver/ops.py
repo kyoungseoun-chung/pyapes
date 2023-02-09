@@ -58,11 +58,10 @@ class Solver:
         # RHS of the equation
         self.rhs = eq.rhs
 
+        # Adjusting RHS based on the boundary conditions
         if self.rhs is not None:
             for e in self.eqs:
-                self.eqs[e]["update_rhs"](
-                    self.rhs, self.var.bcs, self.var.mesh
-                )
+                self.rhs += self.eqs[e]["adjust_rhs"]
 
         # Restting ops and rhs to avoid unnecessary copy when fdm is used multiple times in separate solvers
         eq.ops = {}
@@ -126,7 +125,11 @@ def _Aop(target: Field, eqs: dict[int, OPStype]) -> Tensor:
                 "FDM: ddt is not allowed in the middle of the equation!"
             )
 
-        Ax = eqs[op]["Aop"](*eqs[op]["param"], target) * eqs[op]["sign"]
+        # Compute A @ x
+        Ax = (
+            eqs[op]["Aop"](*eqs[op]["param"], target, eqs[op]["A_coeffs"])
+            * eqs[op]["sign"]
+        )
 
         if eqs[op]["name"].lower() == "grad":
             # If operator is grad, re-shape to match the size of the target variable

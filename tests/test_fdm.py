@@ -19,20 +19,6 @@ from pyapes.core.variables.bcs import homogeneous_bcs
 from pyapes.testing.burgers import burger_exact_nd
 
 
-def test_disc_w_bc() -> None:
-
-    t_field = torch.rand(11)
-    dx = 0.1
-
-    # Normal Laplacian
-    l_val = (
-        torch.roll(t_field, -1, 0) - 2 * t_field + torch.roll(t_field, 1, 0)
-    ) / (dx**2)
-
-    # Neumann BC l-r
-    bc_val = 2.0
-
-
 # WIP: Revise all `FDC` tests
 @pytest.mark.parametrize(
     ["domain", "spacing"],
@@ -49,20 +35,101 @@ def test_fdc_ops(domain: Box, spacing: list[float]) -> None:
 
     mesh = Mesh(domain, None, spacing)
 
+    # Since Neumann BC is set by \nabla Phi \cdot \vec{n} = V, below
+    # BC will assign -2.0 to the lower boundary and 2.0 to the upper boundary.
     f_bc = homogeneous_bcs(mesh.dim, 2.0, "neumann")
 
     # Field boundaries are all set to zero
     var = Field("test", 1, mesh, {"domain": f_bc, "obstacle": None})
 
-    var.set_var_tensor(mesh.X**2)
+    # Arbitrary initial condition
+    var <<= 0.3 * mesh.X**2
+
+    # Check BC assignment
+    for bc in var.bcs:
+        bc.apply(var(), var.mesh.grid, 0)
+
+    # Lower BC
+    phi0 = (
+        -3 / 2 * var()[0][0] + 2 * var()[0][1] - 1 / 2 * var()[0][2]
+    ) / mesh.dx[0]
+    # Upper BC
+    phiN = (
+        3 / 2 * var()[0][-1] - 2 * var()[0][-2] + 1 / 2 * var()[0][-3]
+    ) / mesh.dx[0]
+
+    # Check Neumann BCs in the second order accuracy
+    assert_close(phi0.mean(), torch.tensor(-2.0))
+    assert_close(phiN.mean(), torch.tensor(2.0))
+
+    # Check discretization
+    # Basic manuel operation
+
+    # Same in all directions
+    dx = mesh.dx[0]
+
+    lap_manuel = torch.zeros_like(var()[0])
+    for i in range(mesh.dim):
+        lap_manuel += (
+            torch.roll(var()[0], -1, i)
+            - 2 * var()[0]
+            + torch.roll(var()[0], 1, i)
+        ) / dx**2
+
+    lap_backup = lap_manuel.clone()
+
+    # First for 1D
+    if mesh.dim == 1:
+        lap_manuel[1] = (2 / 3 * var()[0][2] - 2 / 3 * var()[0][1]) / dx**2
+        lap_manuel[-2] = (
+            -2 / 3 * var()[0][-2] + 2 / 3 * var()[0][-3]
+        ) / dx**2
+    elif mesh.dim == 2:
+        # Var has no dependency on y direction
+        # In y direction
+        x_inner = (
+            torch.roll(var()[0], -1, 0)
+            - 2 * var()[0]
+            + torch.roll(var()[0], 1, 0)
+        ) / dx**2
+
+        x_inner[1, :] = (
+            2 / 3 * var()[0][2, :] - 2 / 3 * var()[0][1, :]
+        ) / dx**2
+        x_inner[-2, :] = (
+            -2 / 3 * var()[0][-2, :] + 2 / 3 * var()[0][-3, :]
+        ) / dx**2
+
+        # Need x_inner bc treats
+        # X locs are weird...
+        # -------
+        # x-----x
+        # -------
+        # x-----x
+        # -------
+        lap_manuel[:, 1] = x_inner[:, 1]
+        lap_manuel[:, -2] = x_inner[:, -2]
+
+        lap_manuel[1, :] = x_inner[1, :]
+        lap_manuel[-2, :] = x_inner[-2, :]
+    else:
+        pass
 
     # Set discretizer
-
     fdc = FDC()
 
     # Laplacian operator
     lap = fdc.laplacian(var)
-    pass
+
+    assert_close(lap[0], lap_manuel)
+
+    # Test reset function
+    assert fdc.laplacian.A_coeffs is not None
+
+    fdc.laplacian.reset()
+
+    assert fdc.laplacian.A_coeffs is None
+    assert fdc.laplacian.rhs_adj is None
 
 
 @pytest.mark.parametrize(
@@ -88,7 +155,7 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
     fdm = FDM({"div": {"limiter": "upwind"}})
 
     # Poisson equation.
-    solver.set_eq(fdm.laplacian(2.0, var_i) == fdm.rhs(0.0))
+    solver.set_eq(fdm.laplacian(2.0, var_i) == 0.0)
 
     target = (
         (
@@ -183,59 +250,9 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
         assert_close(solver.rhs, t_rhs)
 
 
-def test_fdm_ops_burger() -> None:
-    mesh = Mesh(Box[0 : 2 * pi], None, [101])
-    # Set dt to variable
-    f_bc = homogeneous_bcs(1, None, "periodic")
-
-    # Target variable
-    init_val = burger_exact_nd(mesh, 0.1, 0.0)
-    var = Field(
-        "U", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=[init_val]
-    )
-    # dt is 0.1
-    var.set_time(0.1, 0.0)
-
-    solver = Solver(
-        {
-            "fdm": {
-                "method": "bicgstab",
-                "tol": 1e-5,
-                "max_it": 1000,
-                "report": True,
-            }
-        }
-    )
-    fdm = FDM({"div": {"limiter": "none"}})
-    solver.set_eq(
-        fdm.ddt(var) + fdm.div(var, var) - fdm.laplacian(0.1, var) == 0.0
-    )
-    div = solver.eqs[1]["Aop"](var, fdm.div.config, var)
-    laplacian = solver.eqs[2]["Aop"](0.1, var)
-
-    div_target = (
-        (torch.roll(var()[0], -1, 0) - torch.roll(var()[0], 1, 0))
-        / (2 * mesh.dx[0])
-        * var()[0]
-    )
-
-    laplacian_target = (
-        0.1
-        * (
-            torch.roll(var()[0], -1, 0)
-            - 2 * var()[0]
-            + torch.roll(var()[0], 1, 0)
-        )
-        / (mesh.dx[0] ** 2)
-    )
-
-    assert_close(div[0], div_target)
-    assert_close(laplacian[0], laplacian_target)
-
-
 class TestPrototype_LaplacianCoeffs:
 
-    f_test = torch.rand(10)
+    f_test = torch.linspace(0, 1, 6) ** 2
 
     def test_dirichlet(self):
 

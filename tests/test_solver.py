@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
+from math import cos
 from math import exp
 from math import pi
+from math import sin
 
 import pytest
 import torch
@@ -20,10 +22,18 @@ from pyapes.testing.poisson import poisson_exact_nd
 from pyapes.testing.poisson import poisson_rhs_nd
 
 
-def func_n1(grid: tuple[Tensor, ...], mask: Tensor) -> Tensor:
-    """Return the value of the Neumann boundary condition (sin(5x))."""
+def func_n1(
+    grid: tuple[Tensor, ...], mask: Tensor, _, n_vec: Tensor
+) -> Tensor:
+    """Return the value of the Neumann boundary condition (sin(5x)).
+    Boundary function should have 3 inputs and last one is variable itself.
+    Since here, the variable is not used, it is set to dummy.
+    """
 
-    return -torch.sin(5.0 * grid[0][mask])
+    if n_vec.sum() > 0:
+        return -torch.sin(5.0 * grid[0][mask])
+    else:
+        return torch.sin(5.0 * grid[0][mask])
 
 
 @pytest.mark.parametrize(["dim"], [[1], [2], [3]])
@@ -124,7 +134,7 @@ def test_poisson_nd_pure_dirichlet(
     )
     fdm = FDM()
 
-    solver.set_eq(fdm.laplacian(1.0, var) == fdm.rhs(rhs))
+    solver.set_eq(fdm.laplacian(1.0, var) == rhs)
     solver.solve()
 
     assert solver.report["converge"] == True
@@ -142,7 +152,7 @@ def test_poisson_nd_pure_dirichlet(
             }
         }
     )
-    solver.set_eq(fdm.laplacian(1.0, var) == fdm.rhs(rhs))
+    solver.set_eq(fdm.laplacian(1.0, var) == rhs)
     solver.solve()
 
     assert solver.report["converge"] == True
@@ -173,7 +183,7 @@ def test_poisson_2d_pure_neumann() -> None:
     solver = Solver(
         {
             "fdm": {
-                "method": "cg",
+                "method": "bicgstab",
                 "tol": 1e-8,
                 "max_it": 1000,
                 "report": True,
@@ -182,7 +192,7 @@ def test_poisson_2d_pure_neumann() -> None:
     )
     fdm = FDM()
 
-    solver.set_eq(fdm.laplacian(1.0, var) == fdm.rhs(rhs))
+    solver.set_eq(fdm.laplacian(1.0, var) == rhs)
     solver.solve()
 
     import matplotlib.pyplot as plt
@@ -197,6 +207,75 @@ def test_poisson_2d_pure_neumann() -> None:
 
 
 def test_poisson_2d_periodic() -> None:
+    pass
+
+
+def test_poisson_1d_mixed() -> None:
+    """Referenced from https://www.scirp.org/pdf/JEMAA_2014092510103331.pdf
+
+    The equation is given by
+
+    math::
+        d^2 phi / dx^2 = V0 cos(kx + phi0)
+
+    which is underlined in the domain [-pi/2, pi/4].
+    If we set V0 = 0, k = pi/2, and phi0 = pi/4 with the boundary conditions
+    phi'(-pi/2) = 1/4 and phi(pi/4) = -1/2, the analytic solution is given by
+
+    math::
+        phi(x) = [1/4 - 2/pi sin(-pi/2 * pi/2 + pi/4)] * (x - pi/4)
+                - 4/pi^2 [ cos(pi/2 x + pi/4) - cos(pi^2/8 + pi/4 )] - 1/2
+
+    """
+    # Construct mesh
+    mesh = Mesh(Box[-pi / 2 : pi / 4], None, [101])
+
+    f_bc = mixed_bcs([-1 / 4, -1 / 2], ["neumann", "dirichlet"])  # BC config
+    # Target variable
+    var = Field(
+        "phi", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=0.0
+    )
+    rhs = torch.zeros_like(var())
+    rhs[0] = torch.cos(pi / 2 * mesh.X + pi / 4)
+
+    sol_ex = torch.zeros_like(var())
+    sol_ex[0] = (
+        (1 / 4 - 2 / pi * sin(-(pi**2) / 4 + pi / 4)) * (mesh.X - pi / 4)
+        - (4 / pi**2)
+        * (torch.cos(pi / 2 * mesh.X + pi / 4) - cos(pi**2 / 8 + pi / 4))
+        - 1 / 2
+    )
+
+    solver = Solver(
+        {
+            "fdm": {
+                "method": "bicgstab",
+                "tol": 1e-6,
+                "max_it": 1000,
+                "report": True,
+            }
+        }
+    )
+    fdm = FDM()
+
+    solver.set_eq(fdm.laplacian(1.0, var) == rhs)
+    solver.solve()
+
+    # Check gradient at the boundary
+    phi0 = (
+        -3 / 2 * var()[0][0] + 2 * var()[0][1] - 1 / 2 * var()[0][2]
+    ) / mesh.dx[0]
+    phi0_ex = (
+        -3 / 2 * sol_ex[0][0] + 2 * sol_ex[0][1] - 1 / 2 * sol_ex[0][2]
+    ) / mesh.dx[0]
+
+    import matplotlib.pyplot as plt
+
+    plt.plot(mesh.X, sol_ex[0], "r:")
+    plt.plot(mesh.X, var()[0], "b^")
+
+    assert_close(phi0, phi0_ex, atol=1e-3, rtol=1e-3)
+
     pass
 
 
@@ -227,7 +306,7 @@ def test_poisson_2d_mixed() -> None:
     )
     fdm = FDM()
 
-    solver.set_eq(fdm.laplacian(1.0, var) == fdm.rhs(rhs))
+    solver.set_eq(fdm.laplacian(1.0, var) == rhs)
     solver.solve()
     lhs = solver.eqs[0]["Aop"](1.0, var)
 

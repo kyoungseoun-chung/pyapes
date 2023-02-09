@@ -33,7 +33,7 @@ BC_val_type = Union[
     float,
     list[int],
     list[float],
-    Callable[[tuple[Tensor, ...], Tensor], Tensor],
+    Callable[[tuple[Tensor, ...], Tensor, Tensor, Tensor], Tensor],
     None,
 ]
 """BC value type."""
@@ -75,9 +75,32 @@ class BC(ABC):
         self._bc_mask_prev = torch.roll(
             self.bc_mask, -self.bc_n_dir, self.bc_face_dim
         )
+        self._bc_mask_prev2 = torch.roll(
+            self.bc_mask, -self.bc_n_dir * 2, self.bc_face_dim
+        )
         self._bc_mask_forward = torch.roll(
             self.bc_mask, self.bc_n_dir, self.bc_face_dim
         )
+        self._bc_n_vec = torch.zeros(
+            3, dtype=self.dtype.float, device=self.device
+        )
+        self._bc_n_vec[self.bc_face_dim] = self.bc_n_dir
+
+    @property
+    def bc_n_vec(self) -> Tensor:
+        """Return normal vector of the bc surface."""
+        return self._bc_n_vec
+
+    @property
+    def bc_mask_prev2(self) -> Tensor:
+        """Previous (two indices before in `-self.bc_n_dir` direction) mask of the mesh where to apply BCs.
+
+        Examples:
+            >>> bc_mask = torch.Tensor([True, False, False, False])
+            >>> bc_mask_prev = torch.Tensor([False, False, True, False])
+
+        """
+        return self._bc_mask_prev2
 
     @property
     def bc_mask_prev(self) -> Tensor:
@@ -146,10 +169,6 @@ class BC(ABC):
 class Dirichlet(BC):
     r"""Apply Dirichlet boundary conditions."""
 
-    def laplacian_rhs(self, *_) -> None:
-        # Do nothing since rhs is redefined anyway
-        pass
-
     def apply(
         self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int
     ) -> None:
@@ -157,7 +176,12 @@ class Dirichlet(BC):
         assert self.bc_val is not None, "BC: bc_val is not specified!"
 
         if callable(self.bc_val):
-            var[var_dim, self.bc_mask] = self.bc_val(grid, self.bc_mask)
+            at_bc = self.bc_val(grid, self.bc_mask, var, self.bc_n_vec)
+
+            assert isinstance(
+                at_bc, Tensor | float
+            ), "BC: bc_val must return Tensor or float!"
+            var[var_dim, self.bc_mask] = at_bc
         elif isinstance(self.bc_val, list):
             var[var_dim, self.bc_mask] = self.bc_val[var_dim]
         else:
@@ -171,60 +195,43 @@ class Neumann(BC):
         - Gradient is calculated using the 1st order forward difference.
     """
 
-    def laplacian_rhs(self, rhs: Tensor, grid):
-        """Adjust RHS for Neumann BCs."""
-
-        assert self.bc_val is not None, "BC: bc_val is not specified!"
-
-        for i in range(rhs.shape[0]):
-            mask = torch.roll(self.bc_mask, -self.bc_n_dir, i)
-            if callable(self.bc_val):
-                rhs[i][mask] += (
-                    2
-                    / 3
-                    * self.bc_val(grid, self.bc_mask)
-                    * float(-self.bc_n_dir)
-                )
-            elif isinstance(self.bc_val, list):
-                rhs[i][mask] += 2 / 3 * self.bc_val[i] * float(-self.bc_n_dir)
-            else:
-                rhs[i][mask] += 2 / 3 * self.bc_val * float(-self.bc_n_dir)
-
     def apply(
         self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int
     ) -> None:
-        """Apply BC"""
+        """Apply Neumann BC in the second-order accuracy."""
 
         assert self.bc_val is not None, "BC: bc_val is not specified!"
 
         sign = float(self.bc_n_dir)
-
         dx = sign * (
             grid[self.bc_face_dim][self.bc_mask]
             - grid[self.bc_face_dim][self.bc_mask_prev]
         )
 
+        var_p = var[var_dim][self.bc_mask_prev]
+        var_pp = var[var_dim][self.bc_mask_prev2]
+
+        # BUG: NEED TO REVISE THIS!!!
+        # Neumann BC:
+        # Second order forward-backward difference gives
+        # p0 = 4/3 p1 - 1/3 p2 - 2/3 V dx
+        # pN = 4/3 pN-1 - 1/3 pN-2 + 2/3 V dx
         if callable(self.bc_val):
-            c_bc_val = self.bc_val(grid, self.bc_mask)
-            var[var_dim, self.bc_mask] = (
-                dx * c_bc_val + var[var_dim, self.bc_mask_prev]
-            )
+            c_bc_val = self.bc_val(grid, self.bc_mask, var, self.bc_n_vec)
         elif isinstance(self.bc_val, list):
-            var[var_dim, self.bc_mask] = (
-                dx * self.bc_val[var_dim] + var[var_dim, self.bc_mask_prev]
-            )
+            c_bc_val = self.bc_val[var_dim]
+        elif isinstance(self.bc_val, float | int):
+            c_bc_val = float(self.bc_val)
         else:
-            var[var_dim, self.bc_mask] = (
-                dx * self.bc_val + var[var_dim, self.bc_mask_prev]
-            )
+            raise TypeError("Neumann: bc_val must be callable or list!")
+
+        var[var_dim][self.bc_mask] = (
+            4 / 3 * var_p - 1 / 3 * var_pp + 2 / 3 * c_bc_val * dx
+        )
 
 
 class Symmetry(BC):
     r"""Apply Neumann boundary conditions."""
-
-    def laplacian_rhs(self, *_) -> None:
-        # Do nothing since gradient is zero
-        pass
 
     def apply(
         self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int
@@ -237,9 +244,6 @@ class Symmetry(BC):
 
 class Periodic(BC):
     r"""Apply Periodic boundary conditions."""
-
-    def laplacian_rhs(self, *_) -> None:
-        raise NotImplementedError
 
     def apply(
         self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int
@@ -262,7 +266,13 @@ def _bc_val_type_check(bc_val: BC_val_type):
 
 
 def mixed_bcs(
-    bc_val: list[float | Callable[[tuple[Tensor, ...], Tensor], Tensor]],
+    bc_val: list[
+        float
+        | Callable[
+            [tuple[Tensor, ...], Tensor, Tensor, Tensor],
+            Tensor | list[Tensor] | float | list[float],
+        ]
+    ],
     bc_type: list[str],
 ):
     """Simple pre-defined boundary condition.
@@ -286,7 +296,9 @@ def mixed_bcs(
 
 
 def homogeneous_bcs(
-    dim: int, bc_val: float | list[float] | None, bc_type: str
+    dim: int,
+    bc_val: float | list[float] | list[list[float]] | None,
+    bc_type: str,
 ) -> list[BC_config_type]:
     """Simple pre-defined boundary condition.
 

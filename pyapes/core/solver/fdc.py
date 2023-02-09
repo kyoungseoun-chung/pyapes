@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Finite Difference for the current field `FDC`. Similar to Openfoam's `FVC` class."""
+"""Finite Difference for the current field `FDC`. Similar to Openfoam's `FVC` class.
+Each discretization method should create `A_coeffs` and `rhs_adj` attributes.
+The `A_coeffs` contains `Ap`, `Ac`, and `Am` and each coefficient has a dimension of `mesh.dim x var.dim x mesh.nx`. Be careful! leading dimension is `mesh.dim` and not `var.dim`.
+"""
 import warnings
 from abc import ABC
 from abc import abstractmethod
@@ -22,7 +25,7 @@ from pyapes.core.variables.bcs import BC
 class Discretizer(ABC):
     """Collection of the operators for explicit finite difference discretizations."""
 
-    A_coeffs: tuple[Tensor, Tensor, Tensor] | None = None
+    A_coeffs: tuple[list[Tensor], list[Tensor], list[Tensor]] | None = None
     """Tuple of A operation matrix coefficients."""
     rhs_adj: Tensor | None = None
     """RHS adjustment tensor."""
@@ -41,21 +44,28 @@ class Discretizer(ABC):
         """Return a tensor that is used to adjust `rhs` of the PDE."""
         ...
 
-    def apply(self, var: Field) -> Tensor:
+    def apply(self, coeffs: tuple[list[Tensor], ...], var: Field) -> Tensor:
         """Apply the discretization to the input `Field` variable."""
-        assert self.A_coeffs is not None, "FDC: A_coeffs is not defined!"
+
+        assert coeffs is not None, "FDC: A_coeffs is not defined!"
 
         discretized = torch.zeros_like(var())
 
         for idx in range(var.dim):
             for dim in range(var.mesh.dim):
                 discretized[idx] += (
-                    self.A_coeffs[0][idx] * torch.roll(var()[idx], -1, dim)
-                    + self.A_coeffs[1][idx] * var()[idx]
-                    + self.A_coeffs[2][idx] * torch.roll(var()[idx], 1, dim)
+                    coeffs[0][dim][idx] * torch.roll(var()[idx], -1, dim)
+                    + coeffs[1][dim][idx] * var()[idx]
+                    + coeffs[2][dim][idx] * torch.roll(var()[idx], 1, dim)
                 )
 
         return discretized
+
+    def reset(self) -> None:
+        """Restting all the attributes to `None`."""
+
+        self.A_coeffs = None
+        self.rhs_adj = None
 
     @abstractmethod
     def __call__(self, *_) -> Tensor:
@@ -67,44 +77,63 @@ class Laplacian(Discretizer):
     """Laplacian discretizer."""
 
     @staticmethod
-    def build_A_coeffs(var: Field) -> tuple[Tensor, Tensor, Tensor]:
+    def build_A_coeffs(
+        var: Field,
+    ) -> tuple[list[Tensor], list[Tensor], list[Tensor]]:
 
-        Ap = torch.ones_like(var())
-        Ac = -2.0 * torch.ones_like(var())
-        Am = torch.ones_like(var())
+        Ap = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
+        Ac = [-2.0 * torch.ones_like(var()) for _ in range(var.mesh.dim)]
+        Am = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
 
         dx = var.dx
-
         # Treat boundaries
         for i in range(var.dim):
 
-            for bc in var.bcs:
-                if bc.bc_type == "neumann" or bc.bc_type == "symmetry":
-                    if bc.bc_n_dir < 0:
-                        # At lower side
-                        Ap[i][bc.bc_mask_prev] = 2 / 3
-                        Ac[i][bc.bc_mask_prev] = -2 / 3
-                        Am[i][bc.bc_mask_prev] = 0.0
-                    else:
-                        # At upper side
-                        Ap[i][bc.bc_mask_prev] = 0.0
-                        Ac[i][bc.bc_mask_prev] = -2 / 3
-                        Am[i][bc.bc_mask_prev] = 2 / 3
-                elif bc.bc_type == "periodic":
-                    if bc.bc_n_dir < 0:
-                        # At lower side
-                        Am[i][bc.bc_mask_prev] = 0.0
-                    else:
-                        # At upper side
-                        Ap[i][bc.bc_mask_prev] = 0.0
-                else:
-                    # Dirichlet BC: Do nothing
+            for j in range(var.mesh.dim):
 
-                    pass
+                if var.bcs is None:
+                    # Do nothing
+                    continue
 
-        Ap /= dx**2
-        Ac /= dx**2
-        Am /= dx**2
+                # Treat BC
+                for bc in var.bcs:
+
+                    # NOTE: I should check whether this is for x directional discretization or y or z
+                    # Since depends on the discretization direction, boundary treatment cannot be necessary.
+                    if bc.bc_type == "neumann" or bc.bc_type == "symmetry":
+
+                        # If discretization direction is not the same as the BC surface normal direction, do nothing
+                        if bc.bc_n_vec[j] == 0:
+                            continue
+
+                        if bc.bc_n_dir < 0:
+                            # At lower side
+                            Ap[j][i][bc.bc_mask_prev] = 2 / 3
+                            Ac[j][i][bc.bc_mask_prev] = -2 / 3
+                            Am[j][i][bc.bc_mask_prev] = 0.0
+                        else:
+                            # At upper side
+                            Ap[j][i][bc.bc_mask_prev] = 0.0
+                            Ac[j][i][bc.bc_mask_prev] = -2 / 3
+                            Am[j][i][bc.bc_mask_prev] = 2 / 3
+                    elif bc.bc_type == "periodic":
+
+                        if bc.bc_n_vec[j] == 0:
+                            continue
+
+                        if bc.bc_n_dir < 0:
+                            # At lower side
+                            Am[j][i][bc.bc_mask_prev] = 0.0
+                        else:
+                            # At upper side
+                            Ap[j][i][bc.bc_mask_prev] = 0.0
+                    else:
+                        # Dirichlet BC: Do nothing
+                        pass
+
+                Ap[j][i] /= dx[j] ** 2
+                Ac[j][i] /= dx[j] ** 2
+                Am[j][i] /= dx[j] ** 2
 
         return Ap, Ac, Am
 
@@ -117,25 +146,32 @@ class Laplacian(Discretizer):
         # Treat boundaries
         for i in range(var.dim):
 
-            for bc in var.bcs:
+            if var.bcs is None:
+                # Do nothing
+                continue
 
-                if bc.bc_type == "neumann":
-                    at_bc = _return_bc_val(bc, var, i)
-                    rhs_adj -= 2 / 3 * at_bc / dx * float(bc.bc_n_dir)
-                elif bc.bc_type == "periodic":
-                    # NOTE: Not sure yet
-                    rhs_adj += (
-                        var()[i][bc.bc_mask_forward]
-                        / dx**2
-                        * float(bc.bc_n_dir)
-                    )
-                else:
-                    # Dirichlet and Symmetry BC: Do nothing
-                    pass
+            for j in range(var.mesh.dim):
+
+                for bc in var.bcs:
+                    if bc.bc_type == "neumann":
+                        at_bc = _return_bc_val(bc, var, i)
+                        rhs_adj[i][bc.bc_mask] += (
+                            (2 / 3) * (at_bc * bc.bc_n_vec[j]) / dx[j]
+                        )
+                    elif bc.bc_type == "periodic":
+                        # NOTE: Not sure yet
+                        rhs_adj[i][bc.bc_mask] += (
+                            var()[i][bc.bc_mask_forward]
+                            / dx[j] ** 2
+                            * float(bc.bc_n_dir)
+                        )
+                    else:
+                        # Dirichlet and Symmetry BC: Do nothing
+                        pass
 
         return rhs_adj
 
-    def __call__(self, var) -> Tensor:
+    def __call__(self, var: Field) -> Tensor:
 
         if self.A_coeffs is None:
             self.A_coeffs = self.build_A_coeffs(var)
@@ -143,7 +179,7 @@ class Laplacian(Discretizer):
         if self.rhs_adj is None:
             self.rhs_adj = self.adjust_rhs(var)
 
-        return self.apply(var)
+        return self.apply(self.A_coeffs, var)
 
 
 class Grad(Discretizer):
@@ -189,7 +225,7 @@ def _return_bc_val(bc: BC, var: Field, dim: int) -> Tensor | float:
     """Return boundary values."""
 
     if callable(bc.bc_val):
-        at_bc = bc.bc_val(var.mesh.grid, bc.bc_mask)
+        at_bc = bc.bc_val(var.mesh.grid, bc.bc_mask, var(), bc.bc_n_vec)
     elif isinstance(bc.bc_val, list):
         at_bc = bc.bc_val[dim]
     elif isinstance(bc.bc_val, float | int):

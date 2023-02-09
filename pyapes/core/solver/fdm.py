@@ -37,7 +37,10 @@ class OPStype(TypedDict):
     """Sign to be applied."""
     other: dict[str, float] | None
     """Additional information. e.g. `dt` in `Ddt`."""
-    update_rhs: Callable[[Tensor, list[BC_type], Mesh], None]
+    A_coeffs: tuple[list[Tensor], ...]
+    """Coefficients of the discretization."""
+    adjust_rhs: Tensor
+    """Tensor used to adjust rhs."""
 
 
 @dataclass(eq=False)
@@ -141,15 +144,15 @@ class Grad(Operators):
     def __call__(self, var: Field) -> Grad:
 
         self._var = var
-        self._ops[0] = {
-            "name": self.__class__.__name__,
-            "Aop": self.Aop,
-            "target": var,
-            "param": (None,),
-            "sign": 1.0,
-            "other": None,
-            "update_rhs": self.update_rhs,
-        }
+        # self._ops[0] = {
+        #     "name": self.__class__.__name__,
+        #     "Aop": self.Aop,
+        #     "target": var,
+        #     "param": (None,),
+        #     "sign": 1.0,
+        #     "other": None,
+        #     "update_rhs": self.update_rhs,
+        # }
         return self
 
     @staticmethod
@@ -183,15 +186,15 @@ class Ddt(Operators):
             raise AttributeError("FDM: No time step is specified.")
 
         self._var = var
-        self._ops[0] = {
-            "name": self.__class__.__name__,
-            "Aop": self.Aop,
-            "target": var,
-            "param": (dt,),
-            "sign": 1.0,
-            "other": None,
-            "update_rhs": self.update_rhs,
-        }
+        # self._ops[0] = {
+        #     "name": self.__class__.__name__,
+        #     "Aop": self.Aop,
+        #     "target": var,
+        #     "param": (dt,),
+        #     "sign": 1.0,
+        #     "other": None,
+        #     "adjust_rhs": self.update_rhs,
+        # }
 
         return self
 
@@ -205,8 +208,9 @@ class Ddt(Operators):
 
     @staticmethod
     def Aop(dt: float, var: Field) -> Tensor:
+        ...
 
-        return FDC().ddt(dt, var)
+        # return FDC().ddt(dt, var)
 
 
 class Div(Operators):
@@ -232,15 +236,15 @@ class Div(Operators):
 
         self._var_i = var_i
         self._var_j = var_j
-        self._ops[0] = {
-            "name": self.__class__.__name__,
-            "Aop": self.Aop,
-            "target": var_i,
-            "param": (var_j, self.config),
-            "sign": 1.0,
-            "other": None,
-            "update_rhs": self.update_rhs,
-        }
+        # self._ops[0] = {
+        #     "name": self.__class__.__name__,
+        #     "Aop": self.Aop,
+        #     "target": var_i,
+        #     "param": (var_j, self.config),
+        #     "sign": 1.0,
+        #     "other": None,
+        #     "update_rhs": self.update_rhs,
+        # }
 
         return self
 
@@ -282,7 +286,8 @@ class Laplacian(Operators):
 
     def __call__(self, coeff: float, var: Field) -> Laplacian:
 
-        # NOTE: Create A_ops and added to param? FDC should be standalone class Therefore, `fdc` should contains A_ops. But why should we do this? We can just use `fdm` for both implicit and explicit parts. Only different thing is capability of adding discretization schemes as a whole and used in `linalg.solve`
+        A_coeffs = FDC.laplacian.build_A_coeffs(var)
+        rhs_adj = FDC.laplacian.adjust_rhs(var)
 
         self._coeff = coeff
         self._var = var
@@ -293,45 +298,19 @@ class Laplacian(Operators):
             "param": (coeff,),
             "sign": 1.0,
             "other": None,
-            "update_rhs": self.update_rhs,
+            "A_coeffs": A_coeffs,
+            "adjust_rhs": rhs_adj,
         }
 
         return self
-
-    # NOTE: I need to separate the build_coeffs() method from the Aop() method
-    # so that we can avoid multiple computation of the coefficients due to different boundary conditions.
-    def build_coeffs(self, var: Field) -> tuple[Tensor, Tensor, Tensor]:
-        """Build coefficients for Laplacian operator."""
-
-        Aop_p = torch.ones_like(var()[0])
-        Aop_c = -2 * torch.ones_like(Aop_p)
-        Aop_m = torch.ones_like(Aop_p)
-
-        for bc in var.bcs:
-            pass
-
-        return Aop_p, Aop_c, Aop_m
-
-    @staticmethod
-    def update_rhs(rhs: Tensor, bcs: list[BC_type], mesh: Mesh) -> None:
-        for bc in bcs:
-            if bc.bc_type == "neumann":
-                bc.laplacian_rhs(rhs, mesh.grid)
 
     @property
     def var(self) -> Field:
         return self._var
 
     @staticmethod
-    def Aop(gamma: float, var: Field) -> Tensor:
-        return FDC().laplacian(gamma, var)
-
-
-class RHS(Operators):
-    r"""Simple interface to return RHS of PDE."""
-
-    def __call__(self, var: Field | Tensor | float) -> Field | Tensor | float:
-        return FDC().rhs(var)
+    def Aop(gamma: float, var: Field, A_coeffs: tuple[Tensor, ...]) -> Tensor:
+        return FDC().laplacian.apply(A_coeffs, var) * gamma
 
 
 class FDM:
@@ -345,17 +324,19 @@ class FDM:
         * `rhs` simply return `torch.Tensor`.
         * And temporal discretization using Euler Implicit can be accessed via `ddt`.
 
+    Updates:
+        * 08.02.2023:
+            - Removed `rhs` since you can directly assign by using `==` operator.
+
     """
 
-    div: Div = Div()
+    # div: Div = Div()
     """Divergence operator: `div(var_j, var_i)`."""
     laplacian: Laplacian = Laplacian()
     """Laplacian operator: `laplacian(coeff, var)`."""
-    grad: Grad = Grad()
+    # grad: Grad = Grad()
     """Gradient operator: `grad(var)`."""
-    rhs: RHS = RHS()
-    """Assign RHS of PDE: `rhs(var)`."""
-    ddt: Ddt = Ddt()
+    # ddt: Ddt = Ddt()
     """Time discretization: `ddt(var)`."""
 
     def __init__(
@@ -383,4 +364,4 @@ class FDM:
         self.config = config
 
         # Currently only `Div`` operator requires config
-        self.div.update_config(config)
+        # self.div.update_config(config)
