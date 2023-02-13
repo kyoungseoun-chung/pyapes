@@ -29,6 +29,11 @@ class Discretizer(ABC):
     """Tuple of A operation matrix coefficients."""
     rhs_adj: Tensor | None = None
     """RHS adjustment tensor."""
+    _op_type: str = "Discretizer"
+
+    @property
+    def op_type(self) -> str:
+        return self._op_type
 
     @staticmethod
     @abstractmethod
@@ -44,20 +49,36 @@ class Discretizer(ABC):
         """Return a tensor that is used to adjust `rhs` of the PDE."""
         ...
 
-    def apply(self, coeffs: tuple[list[Tensor], ...], var: Field) -> Tensor:
+    def apply(
+        self, coeffs: tuple[list[Tensor], ...], var: Field
+    ) -> Tensor | list[Tensor]:
         """Apply the discretization to the input `Field` variable."""
 
         assert coeffs is not None, "FDC: A_coeffs is not defined!"
 
-        discretized = torch.zeros_like(var())
+        # Grad operator returns Jacobian but Laplacian, Div, and Ddt return scalar (sum over j-index)
+        if self.op_type == "Grad":
+            discretized = []
+            for idx in range(var.dim):
+                grad_d = []
+                for dim in range(var.mesh.dim):
+                    grad_d.append(
+                        coeffs[0][dim][idx] * torch.roll(var()[idx], -1, dim)
+                        + coeffs[1][dim][idx] * var()[idx]
+                        + coeffs[2][dim][idx] * torch.roll(var()[idx], 1, dim)
+                    )
+                test = torch.stack(grad_d)
+                discretized.append(torch.stack(grad_d))
+        else:
+            discretized = torch.zeros_like(var())
 
-        for idx in range(var.dim):
-            for dim in range(var.mesh.dim):
-                discretized[idx] += (
-                    coeffs[0][dim][idx] * torch.roll(var()[idx], -1, dim)
-                    + coeffs[1][dim][idx] * var()[idx]
-                    + coeffs[2][dim][idx] * torch.roll(var()[idx], 1, dim)
-                )
+            for idx in range(var.dim):
+                for dim in range(var.mesh.dim):
+                    discretized[idx] += (
+                        coeffs[0][dim][idx] * torch.roll(var()[idx], -1, dim)
+                        + coeffs[1][dim][idx] * var()[idx]
+                        + coeffs[2][dim][idx] * torch.roll(var()[idx], 1, dim)
+                    )
 
         return discretized
 
@@ -67,14 +88,23 @@ class Discretizer(ABC):
         self.A_coeffs = None
         self.rhs_adj = None
 
-    @abstractmethod
-    def __call__(self, *_) -> Tensor:
-        """Conduct whole process of discretization of input Field."""
-        ...
+    def __call__(self, var: Field) -> Tensor | list[Tensor]:
+        """By calling the class with the input `Field` variable, the discretization is conducted."""
+
+        if self.A_coeffs is None:
+            self.A_coeffs = self.build_A_coeffs(var)
+
+        if self.rhs_adj is None:
+            self.rhs_adj = self.adjust_rhs(var)
+
+        return self.apply(self.A_coeffs, var)
 
 
 class Laplacian(Discretizer):
     """Laplacian discretizer."""
+
+    def __init__(self):
+        self._op_type = __class__.__name__
 
     @staticmethod
     def build_A_coeffs(
@@ -97,12 +127,11 @@ class Laplacian(Discretizer):
 
                 # Treat BC
                 for bc in var.bcs:
+                    # If discretization direction is not the same as the BC surface normal direction, do nothing
+                    if bc.bc_n_vec[j] == 0:
+                        continue
 
                     if bc.bc_type == "neumann" or bc.bc_type == "symmetry":
-                        # If discretization direction is not the same as the BC surface normal direction, do nothing
-                        if bc.bc_n_vec[j] == 0:
-                            continue
-
                         if bc.bc_n_dir < 0:
                             # At lower side
                             Ap[j][i][bc.bc_mask_prev] = 2 / 3
@@ -114,10 +143,6 @@ class Laplacian(Discretizer):
                             Ac[j][i][bc.bc_mask_prev] = -2 / 3
                             Am[j][i][bc.bc_mask_prev] = 2 / 3
                     elif bc.bc_type == "periodic":
-
-                        if bc.bc_n_vec[j] == 0:
-                            continue
-
                         if bc.bc_n_dir < 0:
                             # At lower side
                             Am[j][i][bc.bc_mask_prev] = 0.0
@@ -167,19 +192,11 @@ class Laplacian(Discretizer):
 
         return rhs_adj
 
-    def __call__(self, var: Field) -> Tensor:
-        """By calling the class with the input `Field` variable, the discretization is conducted."""
-
-        if self.A_coeffs is None:
-            self.A_coeffs = self.build_A_coeffs(var)
-
-        if self.rhs_adj is None:
-            self.rhs_adj = self.adjust_rhs(var)
-
-        return self.apply(self.A_coeffs, var)
-
 
 class Grad(Discretizer):
+    def __init__(self):
+        self._op_type = __class__.__name__
+
     @staticmethod
     def build_A_coeffs(
         var: Field,
@@ -191,7 +208,7 @@ class Grad(Discretizer):
         """
         Ap = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
         Ac = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
-        Am = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
+        Am = [-1.0 * torch.ones_like(var()) for _ in range(var.mesh.dim)]
 
         dx = var.dx
         # Treat boundaries
@@ -205,27 +222,22 @@ class Grad(Discretizer):
 
                 # Treat BC
                 for bc in var.bcs:
+                    # If discretization direction is not the same as the BC surface normal direction, do nothing
+                    if bc.bc_n_vec[j] == 0:
+                        continue
 
                     if bc.bc_type == "neumann" or bc.bc_type == "symmetry":
-                        # If discretization direction is not the same as the BC surface normal direction, do nothing
-                        if bc.bc_n_vec[j] == 0:
-                            continue
-
                         if bc.bc_n_dir < 0:
                             # At lower side
-                            Ap[j][i][bc.bc_mask_prev] = 2 / 3
-                            Ac[j][i][bc.bc_mask_prev] = -2 / 3
+                            Ap[j][i][bc.bc_mask_prev] = 4 / 3
+                            Ac[j][i][bc.bc_mask_prev] = -4 / 3
                             Am[j][i][bc.bc_mask_prev] = 0.0
                         else:
                             # At upper side
                             Ap[j][i][bc.bc_mask_prev] = 0.0
-                            Ac[j][i][bc.bc_mask_prev] = -2 / 3
-                            Am[j][i][bc.bc_mask_prev] = 2 / 3
+                            Ac[j][i][bc.bc_mask_prev] = -4 / 3
+                            Am[j][i][bc.bc_mask_prev] = 4 / 3
                     elif bc.bc_type == "periodic":
-
-                        if bc.bc_n_vec[j] == 0:
-                            continue
-
                         if bc.bc_n_dir < 0:
                             # At lower side
                             Am[j][i][bc.bc_mask_prev] = 0.0
@@ -244,35 +256,61 @@ class Grad(Discretizer):
 
     @staticmethod
     def adjust_rhs(var: Field) -> Tensor:
-        ...
 
-    def __call__(self, var) -> Tensor:
-        ...
+        rhs_adj = torch.zeros_like(var())
+        dx = var.dx
+
+        # Treat boundaries
+        for i in range(var.dim):
+
+            if var.bcs is None:
+                # Do nothing
+                continue
+
+            for j in range(var.mesh.dim):
+
+                for bc in var.bcs:
+                    if bc.bc_type == "neumann":
+                        at_bc = _return_bc_val(bc, var, i)
+                        rhs_adj[i][bc.bc_mask_prev] += (1 / 3) * (
+                            at_bc * bc.bc_n_vec[j]
+                        )
+                    elif bc.bc_type == "periodic":
+                        rhs_adj[i][bc.bc_mask_prev] += (
+                            var()[i][bc.bc_mask_forward]
+                            / (2.0 * dx[j])
+                            * float(bc.bc_n_dir)
+                        )
+                    else:
+                        # Dirichlet and Symmetry BC: Do nothing
+                        pass
+
+        return rhs_adj
 
 
 class Div(Discretizer):
+    def __init__(self):
+        self._op_type = __class__.__name__
+
     @staticmethod
     def build_A_coeffs(var: Field) -> tuple[Tensor, Tensor, Tensor]:
         ...
 
     @staticmethod
     def adjust_rhs(var: Field) -> Tensor:
-        ...
-
-    def __call__(self, var_j: Field, var_i: Field) -> Tensor:
         ...
 
 
 class Ddt(Discretizer):
+    def __init__(self):
+        self._op_type = __class__.__name__
+
     @staticmethod
     def build_A_coeffs(var: Field) -> tuple[Tensor, Tensor, Tensor]:
         ...
 
     @staticmethod
     def adjust_rhs(var: Field) -> Tensor:
-        ...
-
-    def __call__(self, var) -> Tensor:
         ...
 
 

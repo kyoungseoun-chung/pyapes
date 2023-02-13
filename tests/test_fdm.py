@@ -3,8 +3,6 @@
 
 Need to be revised. I comfused concept of fvc and fvm.
 """
-from math import pi
-
 import pytest
 import torch
 from torch import Tensor
@@ -12,6 +10,7 @@ from torch.testing import assert_close  # type: ignore
 
 from pyapes.core.geometry import Box
 from pyapes.core.mesh import Mesh
+from pyapes.core.mesh.tools import inner_slicer
 from pyapes.core.solver.fdm import FDM
 from pyapes.core.solver.ops import Solver
 from pyapes.core.variables import Field
@@ -29,11 +28,14 @@ from pyapes.testing.burgers import burger_exact_nd
     ],
 )
 def test_fdc_ops(domain: Box, spacing: list[float]) -> None:
-    """Test FDC module that discretizes current field values."""
+    """Test FDC module that discretizes current field values.
+    Since the Neumann BC is a special case, we test with that. The dirichlet BC is straightforward and self explanatory, so we skip it.
+    """
 
     from pyapes.core.solver.fdc import FDC
 
     mesh = Mesh(domain, None, spacing)
+    slicer = inner_slicer(mesh.dim)
 
     # Since Neumann BC is set by \nabla Phi \cdot \vec{n} = V, below
     # BC will assign -2.0 to the lower boundary and 2.0 to the upper boundary.
@@ -49,6 +51,7 @@ def test_fdc_ops(domain: Box, spacing: list[float]) -> None:
     for bc in var.bcs:
         bc.apply(var(), var.mesh.grid, 0)
 
+    # Check Neumann BC
     # Lower BC
     phi0 = (
         -3 / 2 * var()[0][0] + 2 * var()[0][1] - 1 / 2 * var()[0][2]
@@ -62,60 +65,14 @@ def test_fdc_ops(domain: Box, spacing: list[float]) -> None:
     assert_close(phi0.mean(), torch.tensor(-2.0))
     assert_close(phiN.mean(), torch.tensor(2.0))
 
-    # Check discretization
-    # Basic manuel operation
-
-    # Same in all directions
-    dx = mesh.dx[0]
-
-    lap_manuel = torch.zeros_like(var()[0])
-    for i in range(mesh.dim):
-        lap_manuel += (
-            torch.roll(var()[0], -1, i)
-            - 2 * var()[0]
-            + torch.roll(var()[0], 1, i)
-        ) / dx**2
-
-    lap_backup = lap_manuel.clone()
-
-    # First for 1D
-    if mesh.dim == 1:
-        lap_manuel[1] = (2 / 3 * var()[0][2] - 2 / 3 * var()[0][1]) / dx**2
-        lap_manuel[-2] = (
-            -2 / 3 * var()[0][-2] + 2 / 3 * var()[0][-3]
-        ) / dx**2
-    elif mesh.dim == 2:
-        # Var has no dependency on y direction
-        # In y direction
-        x_inner = (
-            torch.roll(var()[0], -1, 0)
-            - 2 * var()[0]
-            + torch.roll(var()[0], 1, 0)
-        ) / dx**2
-
-        x_inner[1, :] = (
-            2 / 3 * var()[0][2, :] - 2 / 3 * var()[0][1, :]
-        ) / dx**2
-        x_inner[-2, :] = (
-            -2 / 3 * var()[0][-2, :] + 2 / 3 * var()[0][-3, :]
-        ) / dx**2
-
-        # Need x_inner bc treats
-        lap_manuel[:, 1] = x_inner[:, 1]
-        lap_manuel[:, -2] = x_inner[:, -2]
-
-        lap_manuel[1, :] = x_inner[1, :]
-        lap_manuel[-2, :] = x_inner[-2, :]
-    else:
-        pass
-
     # Set discretizer
     fdc = FDC()
 
     # Laplacian operator
     lap = fdc.laplacian(var)
+    lap_manuel = _lap_manuel_op(var()[0], mesh.dx, mesh.dim)
 
-    assert_close(lap[0], lap_manuel)
+    assert_close(lap[0][slicer], lap_manuel[slicer])
 
     # Test reset function
     assert fdc.laplacian.A_coeffs is not None
@@ -124,6 +81,93 @@ def test_fdc_ops(domain: Box, spacing: list[float]) -> None:
 
     assert fdc.laplacian.A_coeffs is None
     assert fdc.laplacian.rhs_adj is None
+
+    # Grad operator
+    grad = fdc.grad(var)
+    grad_manuel = _grad_manuel_op(var()[0], mesh.dx, mesh.dim)
+
+    assert_close(grad[0][0][slicer], grad_manuel[0][slicer])
+
+
+def _grad_manuel_op(var: Tensor, dx: Tensor, dim: int) -> list[Tensor]:
+    """Only test grad-x"""
+
+    dx = dx[0]
+
+    grad_manuel = []
+
+    grad_manuel.append(
+        (torch.roll(var, -1, 0) - torch.roll(var, 1, 0)) / (2 * dx)
+    )
+
+    x_inner = (torch.roll(var, -1, 0) - torch.roll(var, 1, 0)) / (2 * dx)
+    # Var has no dependency on y direction
+    # In y direction
+    x_inner[1] = (4 / 3 * var[2] - 4 / 3 * var[1]) / (2 * dx)
+    x_inner[-2] = (-4 / 3 * var[-2] + 4 / 3 * var[-3]) / (2 * dx)
+
+    if dim == 1:
+        grad_manuel[0] = x_inner
+    elif dim == 2:
+        # Need x_inner bc treats
+        grad_manuel[0][:, 1] = x_inner[:, 1]
+        grad_manuel[0][:, -2] = x_inner[:, -2]
+
+        grad_manuel[0][1, :] = x_inner[1, :]
+        grad_manuel[0][-2, :] = x_inner[-2, :]
+    else:
+        # Need x_in[0]ner bc treats
+        grad_manuel[0][:, :, 1] = x_inner[:, :, 1]
+        grad_manuel[0][:, :, -2] = x_inner[:, :, -2]
+
+        grad_manuel[0][:, 1, :] = x_inner[:, 1, :]
+        grad_manuel[0][:, -2, :] = x_inner[:, -2, :]
+
+        grad_manuel[0][1, :, :] = x_inner[1, :, :]
+        grad_manuel[0][-2, :, :] = x_inner[-2, :, :]
+
+    return grad_manuel
+
+
+def _lap_manuel_op(var: Tensor, dx: Tensor, dim: int) -> Tensor:
+
+    dx = dx[0]
+
+    lap_manuel = torch.zeros_like(var)
+    for i in range(dim):
+        lap_manuel += (
+            torch.roll(var, -1, i) - 2 * var + torch.roll(var, 1, i)
+        ) / dx**2
+
+    x_inner = (
+        torch.roll(var, -1, 0) - 2 * var + torch.roll(var, 1, 0)
+    ) / dx**2
+    # Var has no dependency on y direction
+    # In y direction
+    x_inner[1] = (2 / 3 * var[2] - 2 / 3 * var[1]) / dx**2
+    x_inner[-2] = (-2 / 3 * var[-2] + 2 / 3 * var[-3]) / dx**2
+
+    if dim == 1:
+        lap_manuel = x_inner
+    elif dim == 2:
+        # Need x_inner bc treats
+        lap_manuel[:, 1] = x_inner[:, 1]
+        lap_manuel[:, -2] = x_inner[:, -2]
+
+        lap_manuel[1, :] = x_inner[1, :]
+        lap_manuel[-2, :] = x_inner[-2, :]
+    else:
+        # Need x_inner bc treats
+        lap_manuel[:, :, 1] = x_inner[:, :, 1]
+        lap_manuel[:, :, -2] = x_inner[:, :, -2]
+
+        lap_manuel[:, 1, :] = x_inner[:, 1, :]
+        lap_manuel[:, -2, :] = x_inner[:, -2, :]
+
+        lap_manuel[1, :, :] = x_inner[1, :, :]
+        lap_manuel[-2, :, :] = x_inner[-2, :, :]
+
+    return lap_manuel
 
 
 @pytest.mark.parametrize(
