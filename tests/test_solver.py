@@ -21,6 +21,8 @@ from pyapes.testing.poisson import poisson_bcs
 from pyapes.testing.poisson import poisson_exact_nd
 from pyapes.testing.poisson import poisson_rhs_nd
 
+DISPLAY_PLOT: bool = False
+
 
 def func_n1(
     grid: tuple[Tensor, ...], mask: Tensor, _, n_vec: Tensor
@@ -195,19 +197,58 @@ def test_poisson_2d_pure_neumann() -> None:
     solver.set_eq(fdm.laplacian(1.0, var) == rhs)
     solver.solve()
 
-    import matplotlib.pyplot as plt
-    from matplotlib import cm
+    if DISPLAY_PLOT:
+        import matplotlib.pyplot as plt
+        from matplotlib import cm
 
-    fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-    ax.plot_surface(mesh.X, mesh.Y, var()[0], cmap=cm.coolwarm)
-    plt.show()
-    pass
-
-    # WIP: !!
+        _, ax = plt.subplots(subplot_kw={"projection": "3d"})
+        ax.plot_surface(mesh.X, mesh.Y, var()[0], cmap=cm.coolwarm)
+        plt.show()
 
 
 def test_poisson_2d_periodic() -> None:
-    pass
+    """
+    Reference: https://fenicsproject.org/olddocs/dolfin/1.5.0/python/demo/documented/periodic/python/documentation.html
+    """
+
+    # Construct mesh
+    mesh = Mesh(Box[0:1, 0:1], None, [101, 101])
+
+    # xl - xr - yl - yr
+    f_bc = mixed_bcs(
+        [None, None, 0, 0],
+        ["periodic", "periodic", "dirichlet", "dirichlet"],
+    )  # BC config
+
+    # Target variable
+    var = Field("p", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=0.0)
+    rhs = torch.zeros_like(var())
+    rhs[0] = -mesh.X * torch.sin(5.0 * pi * mesh.Y) - torch.exp(
+        -((mesh.X - 0.5) ** 2 + (mesh.Y - 0.5) ** 2) / 0.02
+    )
+
+    solver = Solver(
+        {
+            "fdm": {
+                "method": "bicgstab",
+                "tol": 1e-8,
+                "max_it": 1000,
+                "report": True,
+            }
+        }
+    )
+    fdm = FDM()
+
+    solver.set_eq(fdm.laplacian(1.0, var) == rhs)
+    solver.solve()
+
+    if DISPLAY_PLOT:
+        import matplotlib.pyplot as plt
+        from matplotlib import cm
+
+        _, ax = plt.subplots(subplot_kw={"projection": "3d"})
+        ax.plot_surface(mesh.X, mesh.Y, var()[0], cmap=cm.coolwarm)
+        plt.show()
 
 
 def test_poisson_1d_mixed() -> None:
@@ -269,14 +310,8 @@ def test_poisson_1d_mixed() -> None:
         -3 / 2 * sol_ex[0][0] + 2 * sol_ex[0][1] - 1 / 2 * sol_ex[0][2]
     ) / mesh.dx[0]
 
-    import matplotlib.pyplot as plt
-
-    plt.plot(mesh.X, sol_ex[0], "r:")
-    plt.plot(mesh.X, var()[0], "b^")
-
     assert_close(phi0, phi0_ex, atol=1e-3, rtol=1e-3)
-
-    pass
+    assert_close(var()[0], sol_ex[0], atol=1e-3, rtol=1e-3)
 
 
 def test_poisson_2d_mixed() -> None:
@@ -308,19 +343,14 @@ def test_poisson_2d_mixed() -> None:
 
     solver.set_eq(fdm.laplacian(1.0, var) == rhs)
     solver.solve()
-    lhs = solver.eqs[0]["Aop"](1.0, var)
 
-    import matplotlib.pyplot as plt
-    from matplotlib import cm
+    if DISPLAY_PLOT:
+        import matplotlib.pyplot as plt
+        from matplotlib import cm
 
-    fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-    ax.plot_surface(mesh.X, mesh.Y, var()[0], cmap=cm.coolwarm)
-    plt.show()
-
-    import matplotlib.pyplot as plt
-
-    plt.contourf(mesh.X, mesh.Y, var()[0])
-    plt.show()
+        fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+        ax.plot_surface(mesh.X, mesh.Y, var()[0], cmap=cm.coolwarm)
+        plt.show()
 
 
 def test_advection_diffussion_1d() -> None:

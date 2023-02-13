@@ -268,6 +268,7 @@ def _bc_val_type_check(bc_val: BC_val_type):
 def mixed_bcs(
     bc_val: list[
         float
+        | None
         | Callable[
             [tuple[Tensor, ...], Tensor, Tensor, Tensor],
             Tensor | list[Tensor] | float | list[float],
