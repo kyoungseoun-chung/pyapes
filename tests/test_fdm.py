@@ -101,12 +101,6 @@ def test_fdc_ops(domain: Box, spacing: list[float]) -> None:
         ) / dx**2
 
         # Need x_inner bc treats
-        # X locs are weird...
-        # -------
-        # x-----x
-        # -------
-        # x-----x
-        # -------
         lap_manuel[:, 1] = x_inner[:, 1]
         lap_manuel[:, -2] = x_inner[:, -2]
 

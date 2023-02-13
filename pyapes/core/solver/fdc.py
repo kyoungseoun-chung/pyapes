@@ -155,12 +155,12 @@ class Laplacian(Discretizer):
                 for bc in var.bcs:
                     if bc.bc_type == "neumann":
                         at_bc = _return_bc_val(bc, var, i)
-                        rhs_adj[i][bc.bc_mask] += (
+                        rhs_adj[i][bc.bc_mask_prev] += (
                             (2 / 3) * (at_bc * bc.bc_n_vec[j]) / dx[j]
                         )
                     elif bc.bc_type == "periodic":
                         # NOTE: Not sure yet
-                        rhs_adj[i][bc.bc_mask] += (
+                        rhs_adj[i][bc.bc_mask_prev] += (
                             var()[i][bc.bc_mask_forward]
                             / dx[j] ** 2
                             * float(bc.bc_n_dir)
@@ -172,6 +172,7 @@ class Laplacian(Discretizer):
         return rhs_adj
 
     def __call__(self, var: Field) -> Tensor:
+        """By calling the class with the input `Field` variable, the discretization is conducted."""
 
         if self.A_coeffs is None:
             self.A_coeffs = self.build_A_coeffs(var)
