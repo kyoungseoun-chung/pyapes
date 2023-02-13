@@ -32,7 +32,7 @@ class Discretizer(ABC):
 
     @staticmethod
     @abstractmethod
-    def build_A_coeffs(var: Field) -> tuple[Tensor, Tensor, Tensor]:
+    def build_A_coeffs(var: Field) -> tuple[list[Tensor], ...]:
         """Build the operation matrix coefficients to be used for the discretization.
         `var: Field` is required due to the boundary conditions. Should always return three tensors in `Ap`, `Ac`, and `Am` order.
         """
@@ -98,10 +98,7 @@ class Laplacian(Discretizer):
                 # Treat BC
                 for bc in var.bcs:
 
-                    # NOTE: I should check whether this is for x directional discretization or y or z
-                    # Since depends on the discretization direction, boundary treatment cannot be necessary.
                     if bc.bc_type == "neumann" or bc.bc_type == "symmetry":
-
                         # If discretization direction is not the same as the BC surface normal direction, do nothing
                         if bc.bc_n_vec[j] == 0:
                             continue
@@ -159,7 +156,6 @@ class Laplacian(Discretizer):
                             (2 / 3) * (at_bc * bc.bc_n_vec[j]) / dx[j]
                         )
                     elif bc.bc_type == "periodic":
-                        # NOTE: Not sure yet
                         rhs_adj[i][bc.bc_mask_prev] += (
                             var()[i][bc.bc_mask_forward]
                             / dx[j] ** 2
@@ -185,8 +181,66 @@ class Laplacian(Discretizer):
 
 class Grad(Discretizer):
     @staticmethod
-    def build_A_coeffs(var: Field) -> tuple[Tensor, Tensor, Tensor]:
-        ...
+    def build_A_coeffs(
+        var: Field,
+    ) -> tuple[list[Tensor], list[Tensor], list[Tensor]]:
+        r"""Build the coefficients for the discretization of the gradient operator using the second-order central finite difference method.
+
+        ..math::
+            \nabla \Phi = \frac{\Phi^{i+1} - \Phi^{i-1}}{2 \Delta x}
+        """
+        Ap = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
+        Ac = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
+        Am = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
+
+        dx = var.dx
+        # Treat boundaries
+        for i in range(var.dim):
+
+            for j in range(var.mesh.dim):
+
+                if var.bcs is None:
+                    # Do nothing
+                    continue
+
+                # Treat BC
+                for bc in var.bcs:
+
+                    if bc.bc_type == "neumann" or bc.bc_type == "symmetry":
+                        # If discretization direction is not the same as the BC surface normal direction, do nothing
+                        if bc.bc_n_vec[j] == 0:
+                            continue
+
+                        if bc.bc_n_dir < 0:
+                            # At lower side
+                            Ap[j][i][bc.bc_mask_prev] = 2 / 3
+                            Ac[j][i][bc.bc_mask_prev] = -2 / 3
+                            Am[j][i][bc.bc_mask_prev] = 0.0
+                        else:
+                            # At upper side
+                            Ap[j][i][bc.bc_mask_prev] = 0.0
+                            Ac[j][i][bc.bc_mask_prev] = -2 / 3
+                            Am[j][i][bc.bc_mask_prev] = 2 / 3
+                    elif bc.bc_type == "periodic":
+
+                        if bc.bc_n_vec[j] == 0:
+                            continue
+
+                        if bc.bc_n_dir < 0:
+                            # At lower side
+                            Am[j][i][bc.bc_mask_prev] = 0.0
+                        else:
+                            # At upper side
+                            Ap[j][i][bc.bc_mask_prev] = 0.0
+                    else:
+                        # Dirichlet BC: Do nothing
+                        pass
+
+                Ap[j][i] /= 2.0 * dx[j]
+                Ac[j][i] /= 2.0 * dx[j]
+                Am[j][i] /= 2.0 * dx[j]
+
+        return Ap, Ac, Am
 
     @staticmethod
     def adjust_rhs(var: Field) -> Tensor:
