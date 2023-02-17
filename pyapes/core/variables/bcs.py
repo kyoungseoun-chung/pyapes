@@ -81,10 +81,24 @@ class BC(ABC):
         self._bc_mask_forward = torch.roll(
             self.bc_mask, self.bc_n_dir, self.bc_face_dim
         )
+        self._bc_mask_forward2 = torch.roll(
+            self.bc_mask, self.bc_n_dir * 2, self.bc_face_dim
+        )
         self._bc_n_vec = torch.zeros(
             3, dtype=self.dtype.float, device=self.device
         )
         self._bc_n_vec[self.bc_face_dim] = self.bc_n_dir
+
+    def bc_mask_shift(self, shift: int) -> Tensor:
+        """Shift `bc_mask` by `shift` indices in the direction of `self.bc_face_dim`.
+        Negative `shift` will return previous location, while positive `shift` will return forward location.
+
+        Example:
+            >>> self.bc_mask = torch.tensor([True, False, False, False])
+            >>> self.bc_mask_shift(-1)
+            torch.tensor([False, True, False, False])
+        """
+        return torch.roll(self.bc_mask, shift, self.bc_face_dim)
 
     @property
     def bc_n_vec(self) -> Tensor:
@@ -119,10 +133,21 @@ class BC(ABC):
 
         Examples:
             >>> bc_mask = torch.Tensor([True, False, False, False])
-            >>> bc_mask_prev = torch.Tensor([False, False, False, True])
+            >>> bc_mask_forward = torch.Tensor([False, False, False, True])
 
         """
         return self._bc_mask_forward
+
+    @property
+    def bc_mask_forward2(self) -> Tensor:
+        """Forward (one index after in `self.bc_n_dir` direction) mask of the mesh where to apply BCs.
+
+        Examples:
+            >>> bc_mask = torch.Tensor([True, False, False, False])
+            >>> bc_mask_forward2 = torch.Tensor([False, False, True, False])
+
+        """
+        return self._bc_mask_forward2
 
     @property
     def bc_treat(self) -> bool:

@@ -11,11 +11,47 @@ from torch.testing import assert_close  # type: ignore
 from pyapes.core.geometry import Box
 from pyapes.core.mesh import Mesh
 from pyapes.core.mesh.tools import inner_slicer
+from pyapes.core.solver.fdc import FDC
 from pyapes.core.solver.fdm import FDM
 from pyapes.core.solver.ops import Solver
 from pyapes.core.variables import Field
 from pyapes.core.variables.bcs import homogeneous_bcs
 from pyapes.testing.burgers import burger_exact_nd
+
+
+def test_fdc_edge() -> None:
+    """Test in 2D."""
+
+    mesh = Mesh(Box[0:1, 0:1], None, [5, 5])
+
+    # Field boundaries are all set to zero
+    var = Field("test", 1, mesh, {"domain": None, "obstacle": None})
+
+    # Arbitrary but useful initial condition
+    var <<= 0.3 * mesh.X**2
+
+    fdc = FDC()
+
+    grad_torch = torch.gradient(
+        var()[0], spacing=mesh.dx[0].item(), edge_order=2
+    )
+    grad_fdc = fdc.grad(var, edge=True)
+
+    assert_close(grad_torch[0], grad_fdc[0][0])
+
+    lap_torch_1 = torch.gradient(
+        grad_torch[0], spacing=mesh.dx[0].item(), edge_order=2
+    )
+    lap_torch_2 = torch.gradient(
+        grad_torch[1], spacing=mesh.dx[0].item(), edge_order=2
+    )
+
+    lap_torch = lap_torch_1[0] + lap_torch_2[0]
+
+    lap_fdc = fdc.laplacian(var, edge=True)
+
+    assert_close(lap_torch, lap_fdc[0])
+    pass
 
 
 # WIP: Revise all `FDC` tests
@@ -31,8 +67,6 @@ def test_fdc_ops(domain: Box, spacing: list[float]) -> None:
     """Test FDC module that discretizes current field values.
     Since the Neumann BC is a special case, we test with that. The dirichlet BC is straightforward and self explanatory, so we skip it.
     """
-
-    from pyapes.core.solver.fdc import FDC
 
     mesh = Mesh(domain, None, spacing)
     slicer = inner_slicer(mesh.dim)

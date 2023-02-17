@@ -23,7 +23,13 @@ from pyapes.core.variables.bcs import BC
 
 @dataclass
 class Discretizer(ABC):
-    """Collection of the operators for explicit finite difference discretizations."""
+    """Collection of the operators for explicit finite difference discretizations.
+    Currently, all operators are meaning in `var[:][inner_slicer(mesh.dim)]` region.
+    Therefore, to use in the `FDM` solver, the boundary conditions `var` should be applied before/during the `linalg` process.
+
+    WIP:
+        - Maybe later, we can manipulate the `A_coeffs` and `rhs_adj` to have consistent discretization at the boundary.
+    """
 
     A_coeffs: tuple[list[Tensor], list[Tensor], list[Tensor]] | None = None
     """Tuple of A operation matrix coefficients."""
@@ -49,16 +55,14 @@ class Discretizer(ABC):
         """Return a tensor that is used to adjust `rhs` of the PDE."""
         ...
 
-    def apply(
-        self, coeffs: tuple[list[Tensor], ...], var: Field
-    ) -> Tensor | list[Tensor]:
+    def apply(self, coeffs: tuple[list[Tensor], ...], var: Field) -> Tensor:
         """Apply the discretization to the input `Field` variable."""
 
         assert coeffs is not None, "FDC: A_coeffs is not defined!"
 
         # Grad operator returns Jacobian but Laplacian, Div, and Ddt return scalar (sum over j-index)
         if self.op_type == "Grad":
-            discretized = []
+            dis_var_dim = []
             for idx in range(var.dim):
                 grad_d = []
                 for dim in range(var.mesh.dim):
@@ -67,8 +71,8 @@ class Discretizer(ABC):
                         + coeffs[1][dim][idx] * var()[idx]
                         + coeffs[2][dim][idx] * torch.roll(var()[idx], 1, dim)
                     )
-                test = torch.stack(grad_d)
-                discretized.append(torch.stack(grad_d))
+                dis_var_dim.append(torch.stack(grad_d))
+            discretized = torch.stack(dis_var_dim)
         else:
             discretized = torch.zeros_like(var())
 
@@ -88,7 +92,9 @@ class Discretizer(ABC):
         self.A_coeffs = None
         self.rhs_adj = None
 
-    def __call__(self, var: Field) -> Tensor | list[Tensor]:
+    def __call__(
+        self, var: Field, edge: bool = False
+    ) -> Tensor | list[Tensor]:
         """By calling the class with the input `Field` variable, the discretization is conducted."""
 
         if self.A_coeffs is None:
@@ -97,7 +103,94 @@ class Discretizer(ABC):
         if self.rhs_adj is None:
             self.rhs_adj = self.adjust_rhs(var)
 
-        return self.apply(self.A_coeffs, var)
+        if edge:
+            discretized = self.apply(self.A_coeffs, var)
+            for dim in range(var.dim):
+                _treat_edge(discretized, var, self.op_type, dim)
+            return discretized
+        else:
+            return self.apply(self.A_coeffs, var)
+
+
+def _treat_edge(
+    discretized: Tensor | list[Tensor], var: Field, ops: str, dim: int
+):
+    """Treat edge of discretized variable using the forward/backward difference.
+    Here the edge means the domain (mesh) boundary.
+    """
+
+    # Slicers
+    slicer_1: list[slice | int] = [slice(None) for _ in range(var.mesh.dim)]
+    slicer_2: list[slice | int] = [slice(None) for _ in range(var.mesh.dim)]
+    slicer_3: list[slice | int] = [slice(None) for _ in range(var.mesh.dim)]
+    slicer_4: list[slice | int] = [slice(None) for _ in range(var.mesh.dim)]
+
+    if ops == "Laplacian":
+        # Treat edge with the second order forward/backward difference
+
+        for idx in range(var.mesh.dim):
+
+            slicer_1[idx] = 0
+            slicer_2[idx] = 1
+            slicer_3[idx] = 2
+            slicer_4[idx] = 3
+
+            bc_val = var()[dim][slicer_1]
+            bc_val_p = var()[dim][slicer_2]
+            bc_val_pp = var()[dim][slicer_3]
+            bc_val_ppp = var()[dim][slicer_4]
+
+            discretized[dim][slicer_1] = (
+                2.0 * bc_val - 5.0 * bc_val_p + 4.0 * bc_val_pp - bc_val_ppp
+            ) / (var.mesh.dx[idx] ** 2)
+
+            slicer_1[idx] = -1
+            slicer_2[idx] = -2
+            slicer_3[idx] = -3
+            slicer_4[idx] = -4
+
+            bc_val = var()[dim][slicer_1]
+            bc_val_p = var()[dim][slicer_2]
+            bc_val_pp = var()[dim][slicer_3]
+            bc_val_ppp = var()[dim][slicer_4]
+
+            discretized[dim][slicer_1] = (
+                2.0 * bc_val - 5.0 * bc_val_p + 4.0 * bc_val_pp - bc_val_ppp
+            ) / (var.mesh.dx[idx] ** 2)
+
+    elif ops == "Grad":
+        for idx in range(var.mesh.dim):
+
+            slicer_1[idx] = 0
+            slicer_2[idx] = 1
+            slicer_3[idx] = 2
+
+            bc_val = var()[dim][slicer_1]
+            bc_val_p = var()[dim][slicer_2]
+            bc_val_pp = var()[dim][slicer_3]
+
+            discretized[dim][idx][slicer_1] = -(
+                3 / 2 * bc_val - 2.0 * bc_val_p + 1 / 2 * bc_val_pp
+            ) / (var.mesh.dx[idx])
+
+            slicer_1[idx] = -1
+            slicer_2[idx] = -2
+            slicer_3[idx] = -3
+
+            bc_val = var()[dim][slicer_1]
+            bc_val_p = var()[dim][slicer_2]
+            bc_val_pp = var()[dim][slicer_3]
+
+            discretized[dim][idx][slicer_1] = (
+                3 / 2 * bc_val - 2.0 * bc_val_p + 1 / 2 * bc_val_pp
+            ) / (var.mesh.dx[idx])
+
+    elif ops == "Div":
+        raise NotImplementedError(
+            f"FDC: edge treatment of {ops=} is not implemented yet!"
+        )
+    else:
+        raise RuntimeError(f"FDC: edge treatment of {ops=} is not supported!")
 
 
 class Laplacian(Discretizer):
@@ -194,6 +287,20 @@ class Laplacian(Discretizer):
 
 
 class Grad(Discretizer):
+    """Gradient operator.
+    Once the discretization is conducted, returned value is a `2 + len(mesh.nx)` dimensional tensor with the shape of `(var.dim, mesh.dim, *mesh.nx)`
+
+    Example:
+
+        >>> mesh = Mesh(Box[0:1, 0:1], None, [10, 10]) # 2D mesh with 10x10 cells
+        >>> var = Field("test_field", 1, mesh, ...) # scalar field
+        >>> fdm = FDM()
+        >>> grad = fdm.grad(var)
+        >>> grad.shape
+        torch.Size([1, 2, 10, 10])
+
+    """
+
     def __init__(self):
         self._op_type = __class__.__name__
 

@@ -21,7 +21,7 @@ from pyapes.testing.poisson import poisson_bcs
 from pyapes.testing.poisson import poisson_exact_nd
 from pyapes.testing.poisson import poisson_rhs_nd
 
-DISPLAY_PLOT: bool = False
+DISPLAY_PLOT: bool = True
 
 
 def func_n1(
@@ -202,7 +202,7 @@ def test_poisson_2d_pure_neumann() -> None:
         from matplotlib import cm
 
         _, ax = plt.subplots(subplot_kw={"projection": "3d"})
-        ax.plot_surface(mesh.X, mesh.Y, var()[0], cmap=cm.coolwarm)
+        ax.plot_surface(mesh.X, mesh.Y, var()[0], cmap="coolwarm")
         plt.show()
 
 
@@ -247,7 +247,7 @@ def test_poisson_2d_periodic() -> None:
         from matplotlib import cm
 
         _, ax = plt.subplots(subplot_kw={"projection": "3d"})
-        ax.plot_surface(mesh.X, mesh.Y, var()[0], cmap=cm.coolwarm)
+        ax.plot_surface(mesh.X, mesh.Y, var()[0], cmap="coolwarm")
         plt.show()
 
 
@@ -346,10 +346,9 @@ def test_poisson_2d_mixed() -> None:
 
     if DISPLAY_PLOT:
         import matplotlib.pyplot as plt
-        from matplotlib import cm
 
-        fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-        ax.plot_surface(mesh.X, mesh.Y, var()[0], cmap=cm.coolwarm)
+        _, ax = plt.subplots(subplot_kw={"projection": "3d"})
+        ax.plot_surface(mesh.X, mesh.Y, var()[0], cmap="coolwarm")
         plt.show()
 
 

@@ -13,6 +13,7 @@ from pyapes.core.backend import DTYPE_SINGLE
 from pyapes.core.backend import TORCH_DEVICE
 from pyapes.core.backend import TorchDevice
 from pyapes.core.geometry import GeoTypeIdentifier
+from pyapes.core.geometry.basis import DIR_TO_NUM
 from pyapes.core.geometry.basis import Geometry
 
 
@@ -115,6 +116,36 @@ class Mesh:
     def __repr__(self) -> str:
         desc = f"{self.domain} with dx={self.dx.tolist()}"
         return desc
+
+    def d_mask_dim(self, d_face: str) -> int:
+        """Return the mask face dimension."""
+
+        return DIR_TO_NUM[d_face[0]]
+
+    def d_mask_dir(self, d_face: str) -> int:
+        """Return the mask face dir."""
+
+        return 1 if d_face[1] == "r" else -1
+
+    def d_mask_shift(self, d_face: str, shift: int) -> Tensor:
+        """Shift the domain mask towrad inner side.
+        If `d_face` is "xl", the mask will be shifted to the left.
+
+        Example:
+            >>> d_mask = {
+                "xl": torch.tensor([True, False, False, False, False]),
+                "xr": torch.tensor([False, False, False, False, True])
+                }
+            >>> d_mask_shift("xl", 1)
+            torch.tensor([False, True, False, False, False])
+            >>> d_mask_shift("xr", 1)
+            torch.tensor([False, False, False, True, False])
+
+        """
+        face_dim = self.d_mask_dim(d_face)
+        face_dir = self.d_mask_dir(d_face)
+
+        return torch.roll(self.d_mask[d_face], -shift * face_dir, face_dim)
 
     @property
     def _depth(self) -> float:

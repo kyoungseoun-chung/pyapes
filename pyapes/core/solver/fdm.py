@@ -309,7 +309,9 @@ class Laplacian(Operators):
         return self._var
 
     @staticmethod
-    def Aop(gamma: float, var: Field, A_coeffs: tuple[Tensor, ...]) -> Tensor:
+    def Aop(
+        gamma: float, var: Field, A_coeffs: tuple[list[Tensor], ...]
+    ) -> Tensor:
         return FDC().laplacian.apply(A_coeffs, var) * gamma
 
 
