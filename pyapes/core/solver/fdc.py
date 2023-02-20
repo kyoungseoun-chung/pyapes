@@ -26,9 +26,6 @@ class Discretizer(ABC):
     """Collection of the operators for explicit finite difference discretizations.
     Currently, all operators are meaning in `var[:][inner_slicer(mesh.dim)]` region.
     Therefore, to use in the `FDM` solver, the boundary conditions `var` should be applied before/during the `linalg` process.
-
-    WIP:
-        - Maybe later, we can manipulate the `A_coeffs` and `rhs_adj` to have consistent discretization at the boundary.
     """
 
     A_coeffs: tuple[list[Tensor], list[Tensor], list[Tensor]] | None = None
@@ -117,6 +114,9 @@ def _treat_edge(
 ):
     """Treat edge of discretized variable using the forward/backward difference.
     Here the edge means the domain (mesh) boundary.
+
+    Note:
+        - Using slicers is inspired from `numpy.gradient` function
     """
 
     # Slicers
@@ -317,47 +317,9 @@ class Grad(Discretizer):
         Ac = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
         Am = [-1.0 * torch.ones_like(var()) for _ in range(var.mesh.dim)]
 
-        dx = var.dx
-        # Treat boundaries
         for i in range(var.dim):
 
-            for j in range(var.mesh.dim):
-
-                if var.bcs is None:
-                    # Do nothing
-                    continue
-
-                # Treat BC
-                for bc in var.bcs:
-                    # If discretization direction is not the same as the BC surface normal direction, do nothing
-                    if bc.bc_n_vec[j] == 0:
-                        continue
-
-                    if bc.bc_type == "neumann" or bc.bc_type == "symmetry":
-                        if bc.bc_n_dir < 0:
-                            # At lower side
-                            Ap[j][i][bc.bc_mask_prev] = 4 / 3
-                            Ac[j][i][bc.bc_mask_prev] = -4 / 3
-                            Am[j][i][bc.bc_mask_prev] = 0.0
-                        else:
-                            # At upper side
-                            Ap[j][i][bc.bc_mask_prev] = 0.0
-                            Ac[j][i][bc.bc_mask_prev] = -4 / 3
-                            Am[j][i][bc.bc_mask_prev] = 4 / 3
-                    elif bc.bc_type == "periodic":
-                        if bc.bc_n_dir < 0:
-                            # At lower side
-                            Am[j][i][bc.bc_mask_prev] = 0.0
-                        else:
-                            # At upper side
-                            Ap[j][i][bc.bc_mask_prev] = 0.0
-                    else:
-                        # Dirichlet BC: Do nothing
-                        pass
-
-                Ap[j][i] /= 2.0 * dx[j]
-                Ac[j][i] /= 2.0 * dx[j]
-                Am[j][i] /= 2.0 * dx[j]
+            _grad_central_adjust(var, (Ap, Ac, Am), i)
 
         return Ap, Ac, Am
 
@@ -395,17 +357,163 @@ class Grad(Discretizer):
         return rhs_adj
 
 
+def _grad_central_adjust(
+    var: Field, A_ops: tuple[list[Tensor], ...], dim: int
+) -> None:
+    """Function separated from the class to be re-used in Div central scheme.
+
+    Args:
+        var (Field): input variable to be discretized
+        A_ops (tuple[list[Tensor], ...]): tuple of lists of tensors containing the coefficients of the discretization. `len(A_ops) == 3` since we need `Ap`, `Ac`, and `Am` coefficients.
+        dim (int): variable dimension. It should be in the range of `var.dim`. Defaults to 0.
+        it is not the dimension of the mesh!
+    """
+
+    Ap, Ac, Am = A_ops
+
+    dx = var.dx
+    # Treat boundaries
+    for j in range(var.mesh.dim):
+
+        if var.bcs is None:
+            # Do nothing
+            continue
+
+        # Treat BC
+        for bc in var.bcs:
+            # If discretization direction is not the same as the BC surface normal direction, do nothing
+            if bc.bc_n_vec[j] == 0:
+                continue
+
+            if bc.bc_type == "neumann" or bc.bc_type == "symmetry":
+                if bc.bc_n_dir < 0:
+                    # At lower side
+                    Ap[j][dim][bc.bc_mask_prev] = 4 / 3
+                    Ac[j][dim][bc.bc_mask_prev] = -4 / 3
+                    Am[j][dim][bc.bc_mask_prev] = 0.0
+                else:
+                    # At upper side
+                    Ap[j][dim][bc.bc_mask_prev] = 0.0
+                    Ac[j][dim][bc.bc_mask_prev] = -4 / 3
+                    Am[j][dim][bc.bc_mask_prev] = 4 / 3
+            elif bc.bc_type == "periodic":
+                if bc.bc_n_dir < 0:
+                    # At lower side
+                    Am[j][dim][bc.bc_mask_prev] = 0.0
+                else:
+                    # At upper side
+                    Ap[j][dim][bc.bc_mask_prev] = 0.0
+            else:
+                # Dirichlet BC: Do nothing
+                pass
+
+        Ap[j][dim] /= 2.0 * dx[j]
+        Ac[j][dim] /= 2.0 * dx[j]
+        Am[j][dim] /= 2.0 * dx[j]
+
+
 class Div(Discretizer):
+    """Divergence operator.
+    It supports `central` and `upwind` discretization methods.
+
+        FUTURE: Quick scheme
+    """
+
     def __init__(self):
         self._op_type = __class__.__name__
 
     @staticmethod
-    def build_A_coeffs(var: Field) -> tuple[Tensor, Tensor, Tensor]:
-        ...
+    def build_A_coeffs(
+        var_j: Field | float | Tensor,
+        var_i: Field,
+        config: dict[str, dict[str, str]],
+    ) -> tuple[list[Tensor], list[Tensor], list[Tensor]]:
+        r"""Build the coefficients for the discretization of the gradient operator using the second-order central finite difference method.
+
+        ..math::
+            \nabla \Phi = \frac{\Phi^{i+1} - \Phi^{i-1}}{2 \Delta x}
+        """
+
+        if isinstance(var_j, float):
+            adv = torch.ones_like(var_i()) * var_j
+        elif isinstance(var_j, Tensor):
+            adv = var_j
+        else:
+            adv = var_j()
+
+        # Shape check
+        assert (
+            adv.shape == var_i().shape
+        ), "FDC Div: adv shape must match var_i shape"
+
+        if config is not None and "limiter" in config["div"]:
+            limiter = config["div"]["limiter"]
+        else:
+            warnings.warn(
+                "FDM: no limiter is specified. Use `none` as default."
+            )
+            limiter = "none"
+
+        Ap = [torch.ones_like(var_i()) for _ in range(var_i.mesh.dim)]
+        Ac = [torch.zeros_like(var_i()) for _ in range(var_i.mesh.dim)]
+        Am = [-1.0 * torch.ones_like(var_i()) for _ in range(var_i.mesh.dim)]
+
+        if limiter == "none":
+            Ap, Ac, Am = _adv_central(adv, var_i, (Ap, Ac, Am))
+        elif limiter == "upwind":
+            Ap, Ac, Am = _adv_upwind(adv, var_i)
+        elif limiter == "quick":
+            raise NotImplementedError(
+                "FDC Div: quick scheme is not implemented yet."
+            )
+        else:
+            raise RuntimeError(
+                f"FDC Div: {limiter=} is an unknown limiter type."
+            )
+
+        return Ap, Ac, Am
 
     @staticmethod
     def adjust_rhs(var: Field) -> Tensor:
         ...
+
+
+def _adv_central(
+    adv: Tensor, var: Field, A_ops: tuple[list[Tensor], ...]
+) -> tuple[list[Tensor], list[Tensor], list[Tensor]]:
+    """Discretization of the advection tern using central difference.
+
+    Args:
+        adv (Tensor): Advection term, i.e., `var_j`.
+        var (Field): variable to be discretized. i.e., `var_i`.
+        A_ops (tuple[list[Tensor], ...]): Discretization coefficients.
+    """
+
+    # Leading dimension is the dimension of the mesh
+    # The following dimension is the dimension of the variable
+    # A_[mesh.dim][var.dim]
+    Ap, Ac, Am = A_ops
+
+    for i in range(var.dim):
+        _grad_central_adjust(var, (Ap, Ac, Am), i)
+
+    Ap = [adv * ap for ap in Ap]
+    Ac = [adv * ac for ac in Ac]
+    Am = [adv * am for am in Am]
+
+    return Ap, Ac, Am
+
+
+def _adv_upwind(
+    adv: Tensor, var: Field
+) -> tuple[list[Tensor], list[Tensor], list[Tensor]]:
+    Ap = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
+    Ac = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
+    Am = [-1.0 * torch.ones_like(var()) for _ in range(var.mesh.dim)]
+
+    dx = var.dx
+
+    return Ap, Ac, Am
 
 
 class Ddt(Discretizer):

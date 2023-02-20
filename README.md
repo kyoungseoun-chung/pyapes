@@ -36,6 +36,7 @@ poetry install
 
 - Core dependency
   - `python >= 3.10`
+    - As of 19.02.2023, `torch` does not support 3.11 properly (for the official release). Therefore, stick to `python3.10`.
   - `numpy >= 1.21.0`
   - `torch >= 1.10.0`
   - `pyevtk >= 1.2.0`

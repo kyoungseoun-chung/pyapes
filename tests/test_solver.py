@@ -194,7 +194,12 @@ def test_poisson_2d_pure_neumann() -> None:
     )
     fdm = FDM()
 
-    solver.set_eq(fdm.laplacian(1.0, var) == rhs)
+    solver.set_eq(fdm.laplacian(1.0, var) == rhs.clone())
+    solver.solve()
+
+    var <<= torch.zeros_like(var())
+
+    solver.set_eq(fdm.laplacian(var) == rhs.clone())
     solver.solve()
 
     if DISPLAY_PLOT:

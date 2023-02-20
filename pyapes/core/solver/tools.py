@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Collection of useful tools to be used in `pyABC.core.solver` module."""
+"""Collection of useful tools to be used in `pyABC.core.solver` module.
+
+"""
 import torch
 from torch import Tensor
 
 from pyapes.core.variables.bcs import BC_type
 
 
-# NOTE: ALSO NEED TO ASSIGN BC VAL
 def fill_pad_bc(
     var_padded: Tensor,
     pad_length: int,
@@ -26,7 +27,6 @@ def fill_pad_bc(
     # Make sure bcs are always for both sides l and r
     assert len(bcs) == 2
 
-    # NOTE: BC should be added here
     var_inner = var_padded[slicer].clone()
 
     for _ in range(pad_length):
@@ -66,7 +66,6 @@ def _bc_interpolate(
                 )
                 del_var = var_rolled - var_padded
 
-                # NOTE: NEED BC VAL?
                 var_dummy[slicer] = (var_padded - del_var)[slicer]
                 var_interp += torch.roll(
                     var_dummy, bc.bc_n_dir, bc.bc_face_dim
@@ -82,8 +81,6 @@ def _bc_interpolate(
                 )
 
             elif bc.type == "periodic":
-                # NOTE: Not sure yet!
-
                 var_dummy = torch.zeros_like(var_padded)
                 var_interp += torch.roll(
                     var_padded, bc.bc_n_dir, bc.bc_face_dim

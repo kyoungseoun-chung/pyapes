@@ -37,13 +37,23 @@ def solve(
         config: solver configuration.
     """
 
-    if config["method"] == "cg":
+    method = config["method"]
+
+    assert (
+        isinstance(method, str) and method is not None
+    ), "Linalg: solver method is not defined!"
+
+    # Just to make it sure that the method is in lower case
+    method = method.lower()
+
+    if method == "cg":
         report = cg(var, rhs, Aop, eqs, config, mesh)
-    elif config["method"] == "bicgstab":
-        # res, report = bicgstab(var, rhs, config, mesh)
+    elif method == "bicgstab":
         report = bicgstab(var, rhs, Aop, eqs, config, mesh)
     else:
-        raise NotImplementedError
+        raise RuntimeError(
+            f"Linalg: solver only supports CG and BICGSTAB. {method=} would be a typo or is not supported."
+        )
 
     return report
 

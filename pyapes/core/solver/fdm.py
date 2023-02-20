@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from dataclasses import field
+from typing import Any
 from typing import Callable
 from typing import TypedDict
 
@@ -31,7 +32,9 @@ class OPStype(TypedDict):
     """Linear system operator. `Aop` is equivalent to `Ax` in `Ax = b`."""
     target: Field
     """Target field to be discretized."""
-    param: tuple[float] | tuple[Field, dict[str, dict[str, str]]] | tuple[None]
+    param: tuple[float | Tensor | None, ...] | tuple[
+        Field, dict[str, dict[str, str]]
+    ]
     """Additional parameters other than target. e.g. `coeff` in `laplacian(coeff, var)`."""
     sign: float | int
     """Sign to be applied."""
@@ -103,7 +106,7 @@ class Operators:
 
         assert (
             self._rhs.shape == self.var().shape
-        ), f"Operators: RHS shape {self._rhs.shape} does not match {self.var().shape}!"
+        ), f"FDM Operators: RHS shape {self._rhs.shape} does not match {self.var().shape}!"
 
         return self
 
@@ -129,6 +132,70 @@ class Operators:
         return self
 
 
+class Laplacian(Operators):
+    r"""Variable discretization: Laplacian
+
+    .. math::
+
+        \frac{\partial}{\partial x_j}
+        \left(
+            \Gamma^\Phi \frac{\partial \Phi}{\partial x_j}
+        \right)
+
+
+    Args:
+        coeff: coefficient of the Laplacian operator ($\Gamma^\Phi$)
+        var: Field object to be discretized ($\Phi$)
+    """
+
+    def __call__(self, *args: Any) -> Laplacian:
+
+        if len(args) == 2:
+            assert isinstance(
+                args[0], float | Tensor
+            ), "FDM Laplacian: if additional parameter is provided, it must be a float or Tensor!"
+
+            coeffs = args[0]
+            var = args[1]
+        elif len(args) == 1:
+            coeffs = None
+            var = args[0]
+        else:
+            raise TypeError("FDM: invalid input type!")
+
+        A_coeffs = FDC.laplacian.build_A_coeffs(var)
+        rhs_adj = FDC.laplacian.adjust_rhs(var)
+
+        self._var = var
+        self._ops[0] = {
+            "name": self.__class__.__name__,
+            "Aop": self.Aop,
+            "target": var,
+            "param": (coeffs,),
+            "sign": 1.0,
+            "other": None,
+            "A_coeffs": A_coeffs,
+            "adjust_rhs": rhs_adj,
+        }
+
+        return self
+
+    @property
+    def var(self) -> Field:
+        return self._var
+
+    @staticmethod
+    def Aop(
+        param: float | Tensor | None,
+        var: Field,
+        A_coeffs: tuple[list[Tensor], ...],
+    ) -> Tensor:
+        if param is None:
+            return FDC().laplacian.apply(A_coeffs, var)
+        else:
+            return FDC().laplacian.apply(A_coeffs, var) * param
+
+
 class Grad(Operators):
     r"""Variable discretization: Gradient
 
@@ -141,18 +208,102 @@ class Grad(Operators):
 
     """
 
-    def __call__(self, var: Field) -> Grad:
+    def __call__(self, *inputs: Any) -> Grad:
+
+        if isinstance(inputs, tuple):
+
+            assert isinstance(inputs[0], float) or isinstance(
+                inputs[0], Tensor
+            ), "FDM Grad: if additional parameter is provided, it must be a float or Tensor!"
+
+            coeffs = inputs[0]
+            var = inputs[1]
+        elif isinstance(inputs, Field):
+            coeffs = None
+            var = inputs
+        else:
+            raise TypeError("FDM: invalid input type!")
+
+        A_coeffs = FDC.grad.build_A_coeffs(var)
+        rhs_adj = FDC.grad.adjust_rhs(var)
 
         self._var = var
-        # self._ops[0] = {
-        #     "name": self.__class__.__name__,
-        #     "Aop": self.Aop,
-        #     "target": var,
-        #     "param": (None,),
-        #     "sign": 1.0,
-        #     "other": None,
-        #     "update_rhs": self.update_rhs,
-        # }
+        self._ops[0] = {
+            "name": self.__class__.__name__,
+            "Aop": self.Aop,
+            "target": var,
+            "param": (coeffs,),
+            "sign": 1.0,
+            "other": None,
+            "A_coeffs": A_coeffs,
+            "adjust_rhs": rhs_adj,
+        }
+        return self
+
+    @property
+    def var(self) -> Field:
+        return self._var
+
+    @staticmethod
+    def Aop(
+        param: float | Tensor | None,
+        var: Field,
+        A_coeffs: tuple[list[Tensor], ...],
+    ) -> Tensor:
+
+        if param is None:
+            return FDC().grad.apply(A_coeffs, var)
+        else:
+            return FDC().grad.apply(A_coeffs, var) * param
+
+
+class Div(Operators):
+    r"""Variable discretization: Divergence
+
+    Note:
+        - Currently supports `central difference`, and `upwind` schemes. Therefore, `self.config` must be defined prior to calling `Div()` and `self.config` must contain `scheme` key either `upwind` or `none`.
+        - `quick` scheme is not yet supported but work in progress.
+
+    .. math::
+
+        \frac{\partial}{\partial x_j}
+        \left(
+            u_j \phi_i
+        \right)
+
+    Args:
+        var_j: Field object to be discretized ($\Phi_i$)
+        var_i: convective variable ($\vec{u}_j$)
+    """
+
+    def __call__(self, *inputs: Any) -> Div:
+        """It is important to note that the order of inputs is important here. The first input is the convective variable (`var_j`), and the second input is the field to be discretized (`var_i`)."""
+
+        assert len(inputs) == 2, "FDM Div: input length must be 2!"
+        assert isinstance(
+            inputs[0], Field | float | Tensor
+        ), "FDM Div: inputs[0] must be Field or float or Tensor type!"
+        assert isinstance(
+            inputs[1], Field
+        ), "FDM Div: inputs[1] must be Field type!"
+
+        self._var_j = inputs[0]
+        self._var_i = inputs[1]
+
+        A_coeffs = FDC.div.build_A_coeffs(inputs[0], inputs[1])
+        rhs_adj = FDC.div.adjust_rhs(inputs[1])
+
+        self._ops[0] = {
+            "name": self.__class__.__name__,
+            "Aop": self.Aop,
+            "target": inputs[1],
+            "param": (inputs[0], self.config),
+            "sign": 1.0,
+            "other": None,
+            "A_coeffs": A_coeffs,
+            "adjust_rhs": self.update_rhs,
+        }
+
         return self
 
     @staticmethod
@@ -161,14 +312,18 @@ class Grad(Operators):
 
     @property
     def var(self) -> Field:
-        return self._var
+        return self._var_i
 
     @staticmethod
-    def Aop(_, var: Field) -> Tensor:
+    def Aop(
+        var_j: Field, config: dict[str, dict[str, str]], var_i: Field
+    ) -> Tensor:
 
+        # Div operator need config options
         fdc = FDC()
+        fdc.update_config("div", "limiter", config["div"]["limiter"])
 
-        return fdc.grad(var)
+        return fdc.div.apply(var_j, var_i)
 
 
 class Ddt(Operators):
@@ -213,108 +368,6 @@ class Ddt(Operators):
         # return FDC().ddt(dt, var)
 
 
-class Div(Operators):
-    r"""Variable discretization: Divergence
-
-    Note:
-        - Currently supports `central difference`, and `upwind` schemes. Therefore, `self.config` must be defined prior to calling `Div()` and `self.config` must contain `scheme` key either `upwind` or `none`.
-        - `quick` scheme is not yet supported but work in progress.
-
-    .. math::
-
-        \frac{\partial}{\partial x_j}
-        \left(
-            u_j \phi_i
-        \right)
-
-    Args:
-        var_j: Field object to be discretized ($\Phi_i$)
-        var_i: convective variable ($\vec{u}_j$)
-    """
-
-    def __call__(self, var_j: Field, var_i: Field) -> Div:
-
-        self._var_i = var_i
-        self._var_j = var_j
-        # self._ops[0] = {
-        #     "name": self.__class__.__name__,
-        #     "Aop": self.Aop,
-        #     "target": var_i,
-        #     "param": (var_j, self.config),
-        #     "sign": 1.0,
-        #     "other": None,
-        #     "update_rhs": self.update_rhs,
-        # }
-
-        return self
-
-    @staticmethod
-    def update_rhs(rhs: Tensor, bcs: list[BC_type], mesh: Mesh) -> None:
-        pass
-
-    @property
-    def var(self) -> Field:
-        return self._var_i
-
-    @staticmethod
-    def Aop(
-        var_j: Field, config: dict[str, dict[str, str]], var_i: Field
-    ) -> Tensor:
-
-        # Div operator need config options
-        fdc = FDC()
-        fdc.update_config("div", "limiter", config["div"]["limiter"])
-
-        return fdc.div(var_j, var_i)
-
-
-class Laplacian(Operators):
-    r"""Variable discretization: Laplacian
-
-    .. math::
-
-        \frac{\partial}{\partial x_j}
-        \left(
-            \Gamma^\Phi \frac{\partial \Phi}{\partial x_j}
-        \right)
-
-
-    Args:
-        coeff: coefficient of the Laplacian operator ($\Gamma^\Phi$)
-        var: Field object to be discretized ($\Phi$)
-    """
-
-    def __call__(self, coeff: float, var: Field) -> Laplacian:
-
-        A_coeffs = FDC.laplacian.build_A_coeffs(var)
-        rhs_adj = FDC.laplacian.adjust_rhs(var)
-
-        self._coeff = coeff
-        self._var = var
-        self._ops[0] = {
-            "name": self.__class__.__name__,
-            "Aop": self.Aop,
-            "target": var,
-            "param": (coeff,),
-            "sign": 1.0,
-            "other": None,
-            "A_coeffs": A_coeffs,
-            "adjust_rhs": rhs_adj,
-        }
-
-        return self
-
-    @property
-    def var(self) -> Field:
-        return self._var
-
-    @staticmethod
-    def Aop(
-        gamma: float, var: Field, A_coeffs: tuple[list[Tensor], ...]
-    ) -> Tensor:
-        return FDC().laplacian.apply(A_coeffs, var) * gamma
-
-
 class FDM:
     """Collection of the operators for finite difference discretizations.
 
@@ -332,12 +385,20 @@ class FDM:
 
     """
 
+    laplacian: Laplacian = Laplacian()
+    """Laplacian operator. Returns `Tensor`:
+        >>> FDM().laplacian(coeff: float | Tensor, var: Field)
+        # or
+        >>> FDM().laplacian(var: Field)
+    """
+    grad: Grad = Grad()
+    """Gradient operator. Returns `Tensor`.:
+        >>> FDM().grad(coeff: float | Tensor, var: Field)
+        # or
+        >>> FDM().grad(var: Field)
+    """
     # div: Div = Div()
     """Divergence operator: `div(var_j, var_i)`."""
-    laplacian: Laplacian = Laplacian()
-    """Laplacian operator: `laplacian(coeff, var)`."""
-    # grad: Grad = Grad()
-    """Gradient operator: `grad(var)`."""
     # ddt: Ddt = Ddt()
     """Time discretization: `ddt(var)`."""
 
