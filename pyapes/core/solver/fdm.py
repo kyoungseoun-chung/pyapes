@@ -42,7 +42,7 @@ class OPStype(TypedDict):
     """Additional information. e.g. `dt` in `Ddt`."""
     A_coeffs: tuple[list[Tensor], ...]
     """Coefficients of the discretization."""
-    adjust_rhs: Tensor
+    adjust_rhs: Callable
     """Tensor used to adjust rhs."""
 
 
@@ -164,7 +164,6 @@ class Laplacian(Operators):
             raise TypeError("FDM: invalid input type!")
 
         A_coeffs = FDC.laplacian.build_A_coeffs(var)
-        rhs_adj = FDC.laplacian.adjust_rhs(var)
 
         self._var = var
         self._ops[0] = {
@@ -175,7 +174,7 @@ class Laplacian(Operators):
             "sign": 1.0,
             "other": None,
             "A_coeffs": A_coeffs,
-            "adjust_rhs": rhs_adj,
+            "adjust_rhs": FDC.laplacian.adjust_rhs,
         }
 
         return self
@@ -225,7 +224,6 @@ class Grad(Operators):
             raise TypeError("FDM: invalid input type!")
 
         A_coeffs = FDC.grad.build_A_coeffs(var)
-        rhs_adj = FDC.grad.adjust_rhs(var)
 
         self._var = var
         self._ops[0] = {
@@ -236,7 +234,7 @@ class Grad(Operators):
             "sign": 1.0,
             "other": None,
             "A_coeffs": A_coeffs,
-            "adjust_rhs": rhs_adj,
+            "adjust_rhs": FDC.grad.adjust_rhs,
         }
         return self
 
@@ -279,36 +277,37 @@ class Div(Operators):
     def __call__(self, *inputs: Any) -> Div:
         """It is important to note that the order of inputs is important here. The first input is the convective variable (`var_j`), and the second input is the field to be discretized (`var_i`)."""
 
-        assert len(inputs) == 2, "FDM Div: input length must be 2!"
-        assert isinstance(
-            inputs[0], Field | float | Tensor
-        ), "FDM Div: inputs[0] must be Field or float or Tensor type!"
-        assert isinstance(
-            inputs[1], Field
-        ), "FDM Div: inputs[1] must be Field type!"
+        if isinstance(inputs, tuple):
+            assert (
+                isinstance(inputs[0], float)
+                or isinstance(inputs[0], Tensor)
+                or isinstance(inputs[0], Field)
+            ), "FDM Grad: if additional parameter is provided, it must be a float or Tensor or Field!"
+            var_j = inputs[0]
+            var_i = inputs[1]
+        elif isinstance(inputs, Field):
+            var_j = 1.0
+            var_i = inputs[0]
+        else:
+            raise TypeError("FDM: invalid input type!")
 
-        self._var_j = inputs[0]
-        self._var_i = inputs[1]
+        self._var_j = var_j
+        self._var_i = var_i
 
-        A_coeffs = FDC.div.build_A_coeffs(inputs[0], inputs[1])
-        rhs_adj = FDC.div.adjust_rhs(inputs[1])
+        A_coeffs = FDC.div.build_A_coeffs(var_j, var_i, self.config)
 
         self._ops[0] = {
             "name": self.__class__.__name__,
             "Aop": self.Aop,
-            "target": inputs[1],
-            "param": (inputs[0], self.config),
+            "target": var_i,
+            "param": (var_j, self.config),
             "sign": 1.0,
             "other": None,
             "A_coeffs": A_coeffs,
-            "adjust_rhs": self.update_rhs,
+            "adjust_rhs": FDC.div.adjust_rhs,
         }
 
         return self
-
-    @staticmethod
-    def update_rhs(rhs: Tensor, bcs: list[BC_type], mesh: Mesh) -> None:
-        pass
 
     @property
     def var(self) -> Field:
@@ -316,14 +315,17 @@ class Div(Operators):
 
     @staticmethod
     def Aop(
-        var_j: Field, config: dict[str, dict[str, str]], var_i: Field
+        var_j: Field | float | Tensor,
+        config: dict[str, dict[str, str]],
+        var_i: Field,
+        A_coeffs: tuple[list[Tensor], ...],
     ) -> Tensor:
 
-        # Div operator need config options
-        fdc = FDC()
-        fdc.update_config("div", "limiter", config["div"]["limiter"])
+        if isinstance(var_j, Field):
+            A_coeffs = FDC.div.build_A_coeffs(var_j, var_i, config)
+            rhs_adj = FDC.div.adjust_rhs(var_i)
 
-        return fdc.div.apply(var_j, var_i)
+        return FDC().div.apply(A_coeffs, var_i)
 
 
 class Ddt(Operators):
@@ -376,7 +378,6 @@ class FDM:
             * `div`: Divergence (central difference, upwind)
             * `laplacian`: Laplacian (central difference)
             * `grad`: Gradient (central difference, but poorly treats the edges. You must set proper boundary conditions.)
-        * `rhs` simply return `torch.Tensor`.
         * And temporal discretization using Euler Implicit can be accessed via `ddt`.
 
     Updates:
@@ -397,8 +398,15 @@ class FDM:
         # or
         >>> FDM().grad(var: Field)
     """
-    # div: Div = Div()
-    """Divergence operator: `div(var_j, var_i)`."""
+    div: Div = Div()
+    """Divergence operator. Returns `Tensor`:
+        >>> FDM().div(var_i: Field)
+        # or
+        >>> FDM().div(coeff: float | Tensor, var_i: Field)
+        # or
+        >>> FDM().div(var_j: Field, var_i: Field)
+    """
+
     # ddt: Ddt = Ddt()
     """Time discretization: `ddt(var)`."""
 

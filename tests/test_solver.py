@@ -33,9 +33,9 @@ def func_n1(
     """
 
     if n_vec.sum() > 0:
-        return -torch.sin(5.0 * grid[0][mask])
-    else:
         return torch.sin(5.0 * grid[0][mask])
+    else:
+        return -torch.sin(5.0 * grid[0][mask])
 
 
 @pytest.mark.parametrize(["dim"], [[1], [2], [3]])
@@ -165,6 +165,7 @@ def test_poisson_2d_pure_neumann() -> None:
     """
     Reference:
         - https://fenicsproject.org/olddocs/dolfin/1.5.0/python/demo/documented/auto-adaptive-poisson/python/documentation.html
+        - https://mathematica.stackexchange.com/questions/191476/poisson-equation-with-pure-neumann-boundary-conditions
     """
     # Construct mesh
     mesh = Mesh(Box[0:1, 0:1], None, [101, 101])
@@ -178,9 +179,61 @@ def test_poisson_2d_pure_neumann() -> None:
     # Target variable
     var = Field("p", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=0.0)
     rhs = torch.zeros_like(var())
-    rhs[0] = -10 * torch.exp(
+    rhs[0] = 10 * torch.exp(
         -((mesh.X - 0.5) ** 2 + (mesh.Y - 0.5) ** 2) / 0.02
     )
+
+    solver = Solver(
+        {
+            "fdm": {
+                "method": "bicgstab",
+                "tol": 1e-6,
+                "max_it": 1000,
+                "report": True,
+            }
+        }
+    )
+    fdm = FDM()
+
+    solver.set_eq(-fdm.laplacian(var) == rhs.clone())
+    solver.solve()
+
+    var <<= torch.zeros_like(var())
+
+    solver.set_eq(fdm.laplacian(var) == rhs.clone())
+    solver.solve()
+
+    if DISPLAY_PLOT:
+        import matplotlib.pyplot as plt
+
+        _, ax = plt.subplots(subplot_kw={"projection": "3d"})
+        ax.plot_surface(mesh.X, mesh.Y, var()[0], cmap="coolwarm")
+        plt.show()
+
+
+def test_poisson_1d_periodic() -> None:
+    """
+    Solves the Poisson equation: d^2 V/dx^2 = sin(x), using second order centered
+    finite differences, with periodic boundary conditions V(0) = V(L)
+    The analytical solution is V(x) = -sin(x).
+
+    Reference: http://boccelliengineering.altervista.org/junk/poisson_octave_fortran/simple_poisson_solvers.html
+    """
+
+    # Construct mesh
+    mesh = Mesh(Box[0:pi], None, [64])
+
+    # xl - xr - yl - yr
+    f_bc = mixed_bcs(
+        [None, None],
+        ["periodic", "periodic"],
+    )  # BC config
+
+    # Target variable
+    var = Field("p", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=0.0)
+
+    rhs = torch.zeros_like(var())
+    rhs[0] = torch.sin(mesh.X)
 
     solver = Solver(
         {
@@ -194,20 +247,18 @@ def test_poisson_2d_pure_neumann() -> None:
     )
     fdm = FDM()
 
-    solver.set_eq(fdm.laplacian(1.0, var) == rhs.clone())
+    solver.set_eq(fdm.laplacian(var) == rhs)
     solver.solve()
 
-    var <<= torch.zeros_like(var())
-
-    solver.set_eq(fdm.laplacian(var) == rhs.clone())
-    solver.solve()
+    assert_close(var()[0], -torch.sin(mesh.X), rtol=0.1, atol=0.01)
 
     if DISPLAY_PLOT:
         import matplotlib.pyplot as plt
-        from matplotlib import cm
 
-        _, ax = plt.subplots(subplot_kw={"projection": "3d"})
-        ax.plot_surface(mesh.X, mesh.Y, var()[0], cmap="coolwarm")
+        _, ax = plt.subplots()
+        ax.plot(mesh.X, -torch.sin(mesh.X), "b-", label="Exact")
+        ax.plot(mesh.X, var()[0], "r^", label="FDM")
+        ax.legend(loc="lower right")
         plt.show()
 
 
@@ -249,7 +300,6 @@ def test_poisson_2d_periodic() -> None:
 
     if DISPLAY_PLOT:
         import matplotlib.pyplot as plt
-        from matplotlib import cm
 
         _, ax = plt.subplots(subplot_kw={"projection": "3d"})
         ax.plot_surface(mesh.X, mesh.Y, var()[0], cmap="coolwarm")

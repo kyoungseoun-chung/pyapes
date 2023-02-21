@@ -122,6 +122,9 @@ def test_fdc_ops(domain: Box, spacing: list[float]) -> None:
 
     assert_close(grad[0][0][slicer], grad_manuel[0][slicer])
 
+    # Div operator
+    div = fdc.div(var)
+
 
 def _grad_manuel_op(var: Tensor, dx: Tensor, dim: int) -> list[Tensor]:
     """Only test grad-x"""

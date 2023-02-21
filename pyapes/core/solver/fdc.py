@@ -239,9 +239,6 @@ class Laplacian(Discretizer):
                         if bc.bc_n_dir < 0:
                             # At lower side
                             Am[j][i][bc.bc_mask_prev] = 0.0
-                        else:
-                            # At upper side
-                            Ap[j][i][bc.bc_mask_prev] = 0.0
                     else:
                         # Dirichlet BC: Do nothing
                         pass
@@ -274,8 +271,14 @@ class Laplacian(Discretizer):
                             (2 / 3) * (at_bc * bc.bc_n_vec[j]) / dx[j]
                         )
                     elif bc.bc_type == "periodic":
+                        if bc.bc_n_dir < 0:
+                            prev_mask = bc.bc_mask_forward
+                        else:
+                            # Do nothing and skip process
+                            continue
+
                         rhs_adj[i][bc.bc_mask_prev] += (
-                            var()[i][bc.bc_mask_forward]
+                            var()[i][prev_mask]
                             / dx[j] ** 2
                             * float(bc.bc_n_dir)
                         )
@@ -345,8 +348,9 @@ class Grad(Discretizer):
                             at_bc * bc.bc_n_vec[j]
                         )
                     elif bc.bc_type == "periodic":
+
                         rhs_adj[i][bc.bc_mask_prev] += (
-                            var()[i][bc.bc_mask_forward]
+                            var()[i][bc.bc_mask_prev]
                             / (2.0 * dx[j])
                             * float(bc.bc_n_dir)
                         )
@@ -460,6 +464,7 @@ class Div(Discretizer):
 
         if limiter == "none":
             Ap, Ac, Am = _adv_central(adv, var_i, (Ap, Ac, Am))
+            pass
         elif limiter == "upwind":
             Ap, Ac, Am = _adv_upwind(adv, var_i)
         elif limiter == "quick":
