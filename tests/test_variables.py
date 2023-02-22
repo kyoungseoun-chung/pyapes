@@ -25,9 +25,7 @@ def test_fields(domain: Box, spacing: list[float], dim: int) -> None:
 
     var = Field("any", 1, mesh, {"domain": None, "obstacle": None})
 
-    test_tensor = torch.rand(
-        *var.size, dtype=mesh.dtype.float, device=mesh.device
-    )
+    test_tensor = torch.rand(*var.size, dtype=mesh.dtype.float, device=mesh.device)
 
     var += test_tensor
     assert_close(var(), test_tensor)
@@ -72,9 +70,7 @@ def test_field_bcs_pad(domain: Box, spacing: list[float]) -> None:
     mesh = Mesh(domain, None, spacing, "cpu", "double")
 
     f_bc_d = homogeneous_bcs(mesh.dim, 0.44, "dirichlet")
-    var = Field(
-        "d", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random"
-    )
+    var = Field("d", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random")
 
     for bc in var.bcs:
         bc.apply(var(), mesh.grid, 0)
@@ -96,9 +92,7 @@ def test_field_bcs_pad(domain: Box, spacing: list[float]) -> None:
         assert_close(padded[-1, :, :], padded[-2, :, :])
 
     f_bc_d = homogeneous_bcs(mesh.dim, 1.0, "neumann")
-    var = Field(
-        "d", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random"
-    )
+    var = Field("d", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random")
 
     for bc in var.bcs:
         bc.apply(var(), mesh.grid, 0)
@@ -111,9 +105,7 @@ def test_field_bcs_pad(domain: Box, spacing: list[float]) -> None:
         assert_close(padded[-1] - padded[-2], padded[-2] - padded[-3])
     elif mesh.dim == 2:
         assert_close(padded[1, :] - padded[0, :], padded[2, :] - padded[1, :])
-        assert_close(
-            padded[-1, :] - padded[-2, :], padded[-2, :] - padded[-3, :]
-        )
+        assert_close(padded[-1, :] - padded[-2, :], padded[-2, :] - padded[-3, :])
     else:
         assert_close(
             padded[1, :, :] - padded[0, :, :],
@@ -125,9 +117,7 @@ def test_field_bcs_pad(domain: Box, spacing: list[float]) -> None:
         )
 
     f_bc_d = homogeneous_bcs(mesh.dim, None, "symmetry")
-    var = Field(
-        "d", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random"
-    )
+    var = Field("d", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random")
     for bc in var.bcs:
         bc.apply(var(), mesh.grid, 0)
 
@@ -146,9 +136,7 @@ def test_field_bcs_pad(domain: Box, spacing: list[float]) -> None:
         assert_close(padded[-1, :, :], padded[-3, :, :])
 
     f_bc_d = homogeneous_bcs(mesh.dim, None, "periodic")
-    var = Field(
-        "d", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random"
-    )
+    var = Field("d", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random")
     for bc in var.bcs:
         bc.apply(var(), mesh.grid, 0)
 
@@ -180,9 +168,7 @@ def test_field_bcs(domain: Box, spacing: list[float]) -> None:
     mesh = Mesh(domain, None, spacing, "cpu", "double")
 
     f_bc_d = homogeneous_bcs(mesh.dim, 0.44, "dirichlet")
-    var = Field(
-        "d", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random"
-    )
+    var = Field("d", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random")
 
     for bc in var.bcs:
         bc.apply(var(), mesh.grid, 0)
@@ -198,9 +184,7 @@ def test_field_bcs(domain: Box, spacing: list[float]) -> None:
         assert_close(var()[0][:, :, -1].mean().item(), 0.44)
 
     f_bc_d = homogeneous_bcs(mesh.dim, 1.0, "neumann")
-    var = Field(
-        "n", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random"
-    )
+    var = Field("n", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random")
 
     for bc in var.bcs:
         bc.apply(var(), mesh.grid, 0)
@@ -217,9 +201,7 @@ def test_field_bcs(domain: Box, spacing: list[float]) -> None:
 
     # WIP: periodic bcs is wrong here
     f_bc_d = homogeneous_bcs(mesh.dim, None, "periodic")
-    var = Field(
-        "p", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random"
-    )
+    var = Field("p", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random")
 
     for bc in var.bcs:
         bc.apply(var(), mesh.grid, 0)
@@ -235,9 +217,7 @@ def test_field_bcs(domain: Box, spacing: list[float]) -> None:
         assert_close(var()[0][-1, :, :], var()[0][0, :, :])
 
     f_bc_d = homogeneous_bcs(mesh.dim, None, "symmetry")
-    var = Field(
-        "s", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random"
-    )
+    var = Field("s", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random")
 
     bc_xl = var.get_bc("d-xl")
 

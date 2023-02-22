@@ -72,9 +72,7 @@ class BC(ABC):
 
         self._bc_type = self.__class__.__name__.lower()
 
-        self._bc_mask_prev = torch.roll(
-            self.bc_mask, -self.bc_n_dir, self.bc_face_dim
-        )
+        self._bc_mask_prev = torch.roll(self.bc_mask, -self.bc_n_dir, self.bc_face_dim)
         self._bc_mask_prev2 = torch.roll(
             self.bc_mask, -self.bc_n_dir * 2, self.bc_face_dim
         )
@@ -84,9 +82,7 @@ class BC(ABC):
         self._bc_mask_forward2 = torch.roll(
             self.bc_mask, self.bc_n_dir * 2, self.bc_face_dim
         )
-        self._bc_n_vec = torch.zeros(
-            3, dtype=self.dtype.float, device=self.device
-        )
+        self._bc_n_vec = torch.zeros(3, dtype=self.dtype.float, device=self.device)
         self._bc_n_vec[self.bc_face_dim] = self.bc_n_dir
 
     def bc_mask_shift(self, shift: int) -> Tensor:
@@ -178,9 +174,7 @@ class BC(ABC):
         return self.__class__.__name__.lower()
 
     @abstractmethod
-    def apply(
-        self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int
-    ) -> None:
+    def apply(self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int) -> None:
         """Apply BCs.
 
         Args:
@@ -194,9 +188,7 @@ class BC(ABC):
 class Dirichlet(BC):
     r"""Apply Dirichlet boundary conditions."""
 
-    def apply(
-        self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int
-    ) -> None:
+    def apply(self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int) -> None:
 
         assert self.bc_val is not None, "BC: bc_val is not specified!"
 
@@ -220,9 +212,7 @@ class Neumann(BC):
         - Gradient is calculated using the 1st order forward difference.
     """
 
-    def apply(
-        self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int
-    ) -> None:
+    def apply(self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int) -> None:
         """Apply Neumann BC in the second-order accuracy."""
 
         assert self.bc_val is not None, "BC: bc_val is not specified!"
@@ -258,9 +248,7 @@ class Neumann(BC):
 class Symmetry(BC):
     r"""Apply Neumann boundary conditions."""
 
-    def apply(
-        self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int
-    ) -> None:
+    def apply(self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int) -> None:
 
         assert grid
 
@@ -270,17 +258,14 @@ class Symmetry(BC):
 class Periodic(BC):
     r"""Apply Periodic boundary conditions."""
 
-    def apply(
-        self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int
-    ) -> None:
+    def apply(self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int) -> None:
 
         assert grid
 
-        var_p = var[var_dim][self.bc_mask_prev]
-
         if self.bc_n_dir < 0:
             # Left hand side take other side's value
-            var[var_dim, self.bc_mask] = var[var_dim, self.bc_mask_forward]
+            # var[var_dim, self.bc_mask] = var[var_dim, self.bc_mask_forward]
+            pass
         else:
             # Right hand side keep its value
             pass

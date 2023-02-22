@@ -23,13 +23,13 @@ def test_ops_comp_grad():
 
     test_field = X**2 + 2 * Y**2
 
-    grad_roll_x = (
-        torch.roll(test_field, -1, 0) - torch.roll(test_field, 1, 0)
-    ) / (2 * dx)
+    grad_roll_x = (torch.roll(test_field, -1, 0) - torch.roll(test_field, 1, 0)) / (
+        2 * dx
+    )
     tic = time.perf_counter()
-    grad_roll_y = (
-        torch.roll(test_field, -1, 1) - torch.roll(test_field, 1, 1)
-    ) / (2 * dy)
+    grad_roll_y = (torch.roll(test_field, -1, 1) - torch.roll(test_field, 1, 1)) / (
+        2 * dy
+    )
     t_roll = time.perf_counter() - tic
 
     assert_close(grad_roll_x[1:-1, 1:-1], 2 * X[1:-1, 1:-1])

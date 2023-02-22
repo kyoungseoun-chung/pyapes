@@ -12,6 +12,7 @@ import torch
 from torch import Tensor
 
 from pyapes.core.mesh import Mesh
+from pyapes.core.mesh.tools import boundary_slicer
 from pyapes.core.mesh.tools import inner_slicer
 from pyapes.core.solver.fdm import OPStype
 from pyapes.core.variables import Field
@@ -78,11 +79,11 @@ def cg(
     # Initial iterations
     itr = 0
 
+    slicer = boundary_slicer(mesh.dim, var.bcs)
+
     # Initial values
     _apply_bc_otf(var, mesh)
     Ad = torch.zeros_like(rhs)
-
-    slicer = inner_slicer(mesh.dim)
 
     # Initial residue
     # Ax - b = r
@@ -104,8 +105,7 @@ def cg(
 
         # Magnitude of the jump
         alpha = _nan_to_num(
-            torch.sum(r * r, dim=var.mesh_axis)
-            / torch.sum(d() * Ad, dim=var.mesh_axis)
+            torch.sum(r * r, dim=var.mesh_axis) / torch.sum(d() * Ad, dim=var.mesh_axis)
         )
         # Iterated solution
         var.set_var_tensor(var() + alpha * d())
@@ -173,7 +173,7 @@ def bicgstab(
     # Initial residue
     itr = 0
 
-    slicer = inner_slicer(mesh.dim)
+    slicer = boundary_slicer(mesh.dim, var.bcs)
 
     _apply_bc_otf(var, mesh)
 
@@ -231,8 +231,7 @@ def bicgstab(
 
         # omega dot(t, s) / dot(t, t)
         omega = _nan_to_num(
-            torch.sum(t * s(), dim=var.mesh_axis)
-            / torch.sum(t * t, dim=var.mesh_axis)
+            torch.sum(t * s(), dim=var.mesh_axis) / torch.sum(t * t, dim=var.mesh_axis)
         )
 
         rho_next = -omega * torch.sum(r0 * t, dim=var.mesh_axis)

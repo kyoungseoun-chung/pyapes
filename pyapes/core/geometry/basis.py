@@ -5,6 +5,9 @@ from typing import Union
 
 DIR = ["x", "y", "z"]
 DIR_TO_NUM: dict[str, int] = {"x": 0, "y": 1, "z": 2}
+"""Direction to number. e.g. `x -> 0, y -> 1, z -> 2`."""
+SIDE_TO_NUM: dict[str, int] = {"l": 0, "r": 1}
+"""Side to number. e.g. `l -> 0, r -> 1`."""
 NUM_TO_DIR: dict[int, str] = {0: "x", 1: "y", 2: "z"}
 FDIR = ["xl", "xr", "yl", "yr", "zl", "zr"]  # could be used for bc identifier?
 FDIR_TO_NUM: dict[str, int] = {

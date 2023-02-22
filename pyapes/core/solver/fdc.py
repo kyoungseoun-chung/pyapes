@@ -23,7 +23,7 @@ from pyapes.core.variables.bcs import BC
 
 @dataclass
 class Discretizer(ABC):
-    """Collection of the operators for explicit finite difference discretizations.
+    """Collection of the operators for explicit finite difference discretization.
     Currently, all operators are meaning in `var[:][inner_slicer(mesh.dim)]` region.
     Therefore, to use in the `FDM` solver, the boundary conditions `var` should be applied before/during the `linalg` process.
     """
@@ -84,14 +84,12 @@ class Discretizer(ABC):
         return discretized
 
     def reset(self) -> None:
-        """Restting all the attributes to `None`."""
+        """Resetting all the attributes to `None`."""
 
         self.A_coeffs = None
         self.rhs_adj = None
 
-    def __call__(
-        self, var: Field, edge: bool = False
-    ) -> Tensor | list[Tensor]:
+    def __call__(self, var: Field, edge: bool = False) -> Tensor | list[Tensor]:
         """By calling the class with the input `Field` variable, the discretization is conducted."""
 
         if self.A_coeffs is None:
@@ -109,9 +107,7 @@ class Discretizer(ABC):
             return self.apply(self.A_coeffs, var)
 
 
-def _treat_edge(
-    discretized: Tensor | list[Tensor], var: Field, ops: str, dim: int
-):
+def _treat_edge(discretized: Tensor | list[Tensor], var: Field, ops: str, dim: int):
     """Treat edge of discretized variable using the forward/backward difference.
     Here the edge means the domain (mesh) boundary.
 
@@ -204,9 +200,11 @@ class Laplacian(Discretizer):
         var: Field,
     ) -> tuple[list[Tensor], list[Tensor], list[Tensor]]:
 
+        App = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
         Ap = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
         Ac = [-2.0 * torch.ones_like(var()) for _ in range(var.mesh.dim)]
         Am = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
+        Amm = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
 
         dx = var.dx
         # Treat boundaries
@@ -236,14 +234,9 @@ class Laplacian(Discretizer):
                             Ac[j][i][bc.bc_mask_prev] = -2 / 3
                             Am[j][i][bc.bc_mask_prev] = 2 / 3
                     elif bc.bc_type == "periodic":
-                        if bc.bc_n_dir < 0:
-                            # At lower side
-                            Am[j][i][bc.bc_mask_prev] = 0.0
-                        else:
-                            Ap[j][i][bc.bc_mask_prev] = 0.0
-
+                        pass
                     else:
-                        # Dirichlet BC: Do nothing
+                        # Do nothing
                         pass
 
                 Ap[j][i] /= dx[j] ** 2
@@ -273,14 +266,8 @@ class Laplacian(Discretizer):
                         rhs_adj[i][bc.bc_mask_prev] += (
                             (2 / 3) * (at_bc * bc.bc_n_vec[j]) / dx[j]
                         )
-                    elif bc.bc_type == "periodic":
-                        prev_mask = bc.bc_mask_forward
-
-                        rhs_adj[i][bc.bc_mask_prev] -= var()[i][prev_mask] / (
-                            dx[j] ** 2
-                        )
                     else:
-                        # Dirichlet and Symmetry BC: Do nothing
+                        # Do nothing
                         pass
 
         return rhs_adj
@@ -358,9 +345,7 @@ class Grad(Discretizer):
         return rhs_adj
 
 
-def _grad_central_adjust(
-    var: Field, A_ops: tuple[list[Tensor], ...], dim: int
-) -> None:
+def _grad_central_adjust(var: Field, A_ops: tuple[list[Tensor], ...], dim: int) -> None:
     """Function separated from the class to be re-used in Div central scheme.
 
     Args:
@@ -443,16 +428,12 @@ class Div(Discretizer):
             adv = var_j()
 
         # Shape check
-        assert (
-            adv.shape == var_i().shape
-        ), "FDC Div: adv shape must match var_i shape"
+        assert adv.shape == var_i().shape, "FDC Div: adv shape must match var_i shape"
 
         if config is not None and "limiter" in config["div"]:
             limiter = config["div"]["limiter"]
         else:
-            warnings.warn(
-                "FDM: no limiter is specified. Use `none` as default."
-            )
+            warnings.warn("FDM: no limiter is specified. Use `none` as default.")
             limiter = "none"
 
         Ap = [torch.ones_like(var_i()) for _ in range(var_i.mesh.dim)]
@@ -465,13 +446,9 @@ class Div(Discretizer):
         elif limiter == "upwind":
             Ap, Ac, Am = _adv_upwind(adv, var_i)
         elif limiter == "quick":
-            raise NotImplementedError(
-                "FDC Div: quick scheme is not implemented yet."
-            )
+            raise NotImplementedError("FDC Div: quick scheme is not implemented yet.")
         else:
-            raise RuntimeError(
-                f"FDC Div: {limiter=} is an unknown limiter type."
-            )
+            raise RuntimeError(f"FDC Div: {limiter=} is an unknown limiter type.")
 
         return Ap, Ac, Am
 
@@ -549,14 +526,14 @@ def _return_bc_val(bc: BC, var: Field, dim: int) -> Tensor | float:
 
 
 class FDC:
-    """Collection of Finite Difference discretizations. The operation is explicit, therefore, all methods return a tensor."""
+    """Collection of Finite Difference discretization. The operation is explicit, therefore, all methods return a tensor."""
 
     config: Optional[dict[str, dict[str, str]]] = None
     """Configuration for the discretization."""
     div: Div = Div()
     """Divergence operator: `div(var_j, var_i)`."""
     laplacian: Laplacian = Laplacian()
-    """Laplacian operator: `laplacian(coeff, var)`."""
+    """Laplacian operator: `laplacian(coeffs, var)`."""
     grad: Grad = Grad()
     """Gradient operator: `grad(var)`."""
     ddt: Ddt = Ddt()
@@ -573,7 +550,7 @@ class FDC:
 
 @dataclass
 class FDC_old:
-    """Collection of the operators for explicit finite difference discretizations."""
+    """Collection of the operators for explicit finite difference discretization."""
 
     config: Optional[dict[str, dict[str, str]]] = None
 
@@ -618,9 +595,7 @@ class FDC_old:
         if self.config is not None and "limiter" in self.config["div"]:
             limiter = self.config["div"]["limiter"]
         else:
-            warnings.warn(
-                "FDM: no limiter is specified. Use `none` as default."
-            )
+            warnings.warn("FDM: no limiter is specified. Use `none` as default.")
             limiter = "none"
 
         if var_j.name == var_i.name:
@@ -647,17 +622,12 @@ class FDC_old:
                     bc_ir = var_i.get_bc(f"d-{NUM_TO_DIR[j]}r")
 
                     # m_val = fill_pad(pad(var_i()[i]), j, 1, slicer)
-                    m_val = fill_pad_bc(
-                        pad(var_i()[i]), 1, slicer, [bc_il, bc_ir], j
-                    )
+                    m_val = fill_pad_bc(pad(var_i()[i]), 1, slicer, [bc_il, bc_ir], j)
 
                     d_val += (
                         var_j()[j]
                         * (
-                            (
-                                torch.roll(m_val, -1, j)
-                                - torch.roll(m_val, 1, j)
-                            )
+                            (torch.roll(m_val, -1, j) - torch.roll(m_val, 1, j))
                             / (2 * dx[j])
                         )[slicer]
                     )
@@ -720,15 +690,12 @@ class FDC_old:
                 bc_l = var.get_bc(f"d-{NUM_TO_DIR[j]}l")
                 bc_r = var.get_bc(f"d-{NUM_TO_DIR[j]}r")
 
-                var_padded = fill_pad_bc(
-                    pad(var()[i]), 1, slicer, [bc_l, bc_r], j
-                )
+                var_padded = fill_pad_bc(pad(var()[i]), 1, slicer, [bc_l, bc_r], j)
 
                 g_val.append(
-                    (
-                        torch.roll(var_padded, -1, j)
-                        - torch.roll(var_padded, 1, j)
-                    )[slicer]
+                    (torch.roll(var_padded, -1, j) - torch.roll(var_padded, 1, j))[
+                        slicer
+                    ]
                     / (2 * dx[j])
                 )
             grad.append(torch.stack(g_val))

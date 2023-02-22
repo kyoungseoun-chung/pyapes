@@ -54,46 +54,34 @@ def _bc_interpolate(
         else:
             if bc.type == "dirichlet":
 
-                var_interp += torch.roll(
-                    var_padded, -bc.bc_n_dir, bc.bc_face_dim
-                )
+                var_interp += torch.roll(var_padded, -bc.bc_n_dir, bc.bc_face_dim)
             elif bc.type == "neumann":
 
                 var_dummy = torch.zeros_like(var_padded)
 
-                var_rolled = torch.roll(
-                    var_padded, bc.bc_n_dir, bc.bc_face_dim
-                )
+                var_rolled = torch.roll(var_padded, bc.bc_n_dir, bc.bc_face_dim)
                 del_var = var_rolled - var_padded
 
                 var_dummy[slicer] = (var_padded - del_var)[slicer]
-                var_interp += torch.roll(
-                    var_dummy, bc.bc_n_dir, bc.bc_face_dim
-                )
+                var_interp += torch.roll(var_dummy, bc.bc_n_dir, bc.bc_face_dim)
 
             elif bc.type == "symmetry":
 
                 var_dummy = torch.zeros_like(var_padded)
                 var_dummy[slicer] = var_padded[slicer]
 
-                var_interp += torch.roll(
-                    var_dummy, bc.bc_n_dir, bc.bc_face_dim
-                )
+                var_interp += torch.roll(var_dummy, bc.bc_n_dir, bc.bc_face_dim)
 
             elif bc.type == "periodic":
                 var_dummy = torch.zeros_like(var_padded)
-                var_interp += torch.roll(
-                    var_padded, bc.bc_n_dir, bc.bc_face_dim
-                )
+                var_interp += torch.roll(var_padded, bc.bc_n_dir, bc.bc_face_dim)
             else:
                 ValueError(f"BC: {bc.type} is not supported!")
 
     return var_interp
 
 
-def fill_pad(
-    var_padded: Tensor, dim: int, pad_length: int, slicer: list
-) -> Tensor:
+def fill_pad(var_padded: Tensor, dim: int, pad_length: int, slicer: list) -> Tensor:
     """Fill padded tensor with values from inner part.
 
     Note:

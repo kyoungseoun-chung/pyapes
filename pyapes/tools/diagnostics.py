@@ -75,9 +75,7 @@ class SaveDictionary(FieldData):
 
             data_save_dict.setdefault(key, data_to_save)
 
-        _save_to_vtk(
-            self.save_dir, file_name, self.g_min, self.g_dx, data_save_dict
-        )
+        _save_to_vtk(self.save_dir, file_name, self.g_min, self.g_dx, data_save_dict)
 
 
 def _save_to_vtk(

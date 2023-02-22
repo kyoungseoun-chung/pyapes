@@ -28,9 +28,7 @@ def poisson_rhs_nd(mesh: Mesh, var: Field) -> Tensor:
         rhs[0] = 6.0 * mesh.X * mesh.Y * (1.0 - mesh.Y) - 2.0 * (mesh.X**3)
     else:
         rhs[0] = (
-            torch.sin(pi * mesh.X)
-            * torch.sin(pi * mesh.Y)
-            * torch.sin(pi * mesh.Z)
+            torch.sin(pi * mesh.X) * torch.sin(pi * mesh.Y) * torch.sin(pi * mesh.Z)
         )
     return rhs
 
@@ -39,12 +37,7 @@ def poisson_exact_nd(mesh: Mesh) -> Tensor:
     """Exact solution of the poisson equation from the given references."""
 
     if mesh.dim == 1:
-        return (
-            7.0 / 9.0
-            - 2.0 / 9.0 * mesh.X
-            + mesh.X**2 / 2.0
-            - mesh.X**4 / 6.0
-        )
+        return 7.0 / 9.0 - 2.0 / 9.0 * mesh.X + mesh.X**2 / 2.0 - mesh.X**4 / 6.0
     elif mesh.dim == 2:
         return mesh.Y * (1.0 - mesh.Y) * (mesh.X**3)
     else:

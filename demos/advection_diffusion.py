@@ -15,14 +15,12 @@ from pyapes.core.variables.bcs import homogeneous_bcs
 
 
 def sol_exact(mesh, epsilon):
-    return mesh.X - (
-        torch.exp(-(1 - mesh.X) / epsilon) - exp(-1 / epsilon)
-    ) / (1 - exp(-1 / epsilon))
+    return mesh.X - (torch.exp(-(1 - mesh.X) / epsilon) - exp(-1 / epsilon)) / (
+        1 - exp(-1 / epsilon)
+    )
 
 
-def advection_diffusion(
-    epsilon: float, mesh: Mesh
-) -> tuple[Tensor, Tensor, Tensor]:
+def advection_diffusion(epsilon: float, mesh: Mesh) -> tuple[Tensor, Tensor, Tensor]:
 
     f_bc = homogeneous_bcs(1, 0.0, "dirichlet")
 
