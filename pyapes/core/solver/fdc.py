@@ -239,6 +239,9 @@ class Laplacian(Discretizer):
                         if bc.bc_n_dir < 0:
                             # At lower side
                             Am[j][i][bc.bc_mask_prev] = 0.0
+                        else:
+                            Ap[j][i][bc.bc_mask_prev] = 0.0
+
                     else:
                         # Dirichlet BC: Do nothing
                         pass
@@ -271,16 +274,10 @@ class Laplacian(Discretizer):
                             (2 / 3) * (at_bc * bc.bc_n_vec[j]) / dx[j]
                         )
                     elif bc.bc_type == "periodic":
-                        if bc.bc_n_dir < 0:
-                            prev_mask = bc.bc_mask_forward
-                        else:
-                            # Do nothing and skip process
-                            continue
+                        prev_mask = bc.bc_mask_forward
 
-                        rhs_adj[i][bc.bc_mask_prev] += (
-                            var()[i][prev_mask]
-                            / dx[j] ** 2
-                            * float(bc.bc_n_dir)
+                        rhs_adj[i][bc.bc_mask_prev] -= var()[i][prev_mask] / (
+                            dx[j] ** 2
                         )
                     else:
                         # Dirichlet and Symmetry BC: Do nothing

@@ -276,7 +276,14 @@ class Periodic(BC):
 
         assert grid
 
-        var[var_dim, self.bc_mask] = var[var_dim, self.bc_mask_forward]
+        var_p = var[var_dim][self.bc_mask_prev]
+
+        if self.bc_n_dir < 0:
+            # Left hand side take other side's value
+            var[var_dim, self.bc_mask] = var[var_dim, self.bc_mask_forward]
+        else:
+            # Right hand side keep its value
+            pass
 
 
 def _bc_val_type_check(bc_val: BC_val_type):
