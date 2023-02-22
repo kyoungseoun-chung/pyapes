@@ -40,7 +40,7 @@ class OPStype(TypedDict):
     """Additional information. e.g. `dt` in `Ddt`."""
     A_coeffs: tuple[list[Tensor], ...]
     """Coefficients of the discretization."""
-    adjust_rhs: Callable
+    adjust_rhs: Callable[[Field], Tensor]
     """Tensor used to adjust rhs."""
 
 

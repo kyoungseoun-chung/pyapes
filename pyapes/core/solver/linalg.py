@@ -201,6 +201,7 @@ def bicgstab(
 
         var.save_old()
         beta = rho_next / rho * alpha / omega
+
         rho = rho_next
 
         # Update p in-place
@@ -213,6 +214,9 @@ def bicgstab(
 
         # alpha = rho / dot(r0, v)
         alpha = _nan_to_num(rho / torch.sum(r0 * v, dim=var.mesh_axis))
+
+        if torch.isnan(v).sum() > 0:
+            pass
 
         s.set_var_tensor(r - alpha * v)
 

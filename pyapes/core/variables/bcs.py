@@ -264,11 +264,14 @@ class Periodic(BC):
 
         if self.bc_n_dir < 0:
             # Left hand side take other side's value
-            # var[var_dim, self.bc_mask] = var[var_dim, self.bc_mask_forward]
-            pass
+            var_p = var[var_dim, self.bc_mask_prev]
+            var_f = var[var_dim, self.bc_mask_forward]
+            var_ff = var[var_dim, self.bc_mask_forward2]
+            var[var_dim, self.bc_mask] = var_p - var_f + var_ff
+
         else:
             # Right hand side keep its value
-            pass
+            var[var_dim, self.bc_mask] = var[var_dim, self.bc_mask_forward]
 
 
 def _bc_val_type_check(bc_val: BC_val_type):

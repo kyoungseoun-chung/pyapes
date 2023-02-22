@@ -63,11 +63,7 @@ class Discretizer(ABC):
             for idx in range(var.dim):
                 grad_d = []
                 for dim in range(var.mesh.dim):
-                    grad_d.append(
-                        coeffs[0][dim][idx] * torch.roll(var()[idx], -1, dim)
-                        + coeffs[1][dim][idx] * var()[idx]
-                        + coeffs[2][dim][idx] * torch.roll(var()[idx], 1, dim)
-                    )
+                    grad_d.append(_coeff_var_sum(coeffs, var, idx, dim))
                 dis_var_dim.append(torch.stack(grad_d))
             discretized = torch.stack(dis_var_dim)
         else:
@@ -75,11 +71,7 @@ class Discretizer(ABC):
 
             for idx in range(var.dim):
                 for dim in range(var.mesh.dim):
-                    discretized[idx] += (
-                        coeffs[0][dim][idx] * torch.roll(var()[idx], -1, dim)
-                        + coeffs[1][dim][idx] * var()[idx]
-                        + coeffs[2][dim][idx] * torch.roll(var()[idx], 1, dim)
-                    )
+                    discretized[idx] += _coeff_var_sum(coeffs, var, idx, dim)
 
         return discretized
 
@@ -107,7 +99,24 @@ class Discretizer(ABC):
             return self.apply(self.A_coeffs, var)
 
 
-def _treat_edge(discretized: Tensor | list[Tensor], var: Field, ops: str, dim: int):
+def _coeff_var_sum(
+    coeffs: tuple[list[Tensor], ...], var: Field, idx: int, dim: int
+) -> Tensor:
+    """Sum the coefficients and the variable.
+    Here, `len(coeffs) = 5` to implement `quick` scheme for `div` operator in the future.
+    """
+
+    summed = torch.zeros_like(var()[idx])
+
+    for i, c in enumerate(coeffs):
+        summed += c[dim][idx] * torch.roll(var()[idx], -2 + i, dim)
+
+    return summed
+
+
+def _treat_edge(
+    discretized: Tensor | list[Tensor], var: Field, ops: str, dim: int
+) -> None:
     """Treat edge of discretized variable using the forward/backward difference.
     Here the edge means the domain (mesh) boundary.
 
@@ -196,9 +205,7 @@ class Laplacian(Discretizer):
         self._op_type = __class__.__name__
 
     @staticmethod
-    def build_A_coeffs(
-        var: Field,
-    ) -> tuple[list[Tensor], list[Tensor], list[Tensor]]:
+    def build_A_coeffs(var: Field) -> tuple[list[Tensor], ...]:
 
         App = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
         Ap = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
@@ -233,8 +240,6 @@ class Laplacian(Discretizer):
                             Ap[j][i][bc.bc_mask_prev] = 0.0
                             Ac[j][i][bc.bc_mask_prev] = -2 / 3
                             Am[j][i][bc.bc_mask_prev] = 2 / 3
-                    elif bc.bc_type == "periodic":
-                        pass
                     else:
                         # Do nothing
                         pass
@@ -243,7 +248,7 @@ class Laplacian(Discretizer):
                 Ac[j][i] /= dx[j] ** 2
                 Am[j][i] /= dx[j] ** 2
 
-        return Ap, Ac, Am
+        return App, Ap, Ac, Am, Amm
 
     @staticmethod
     def adjust_rhs(var: Field) -> Tensor:
@@ -292,23 +297,23 @@ class Grad(Discretizer):
         self._op_type = __class__.__name__
 
     @staticmethod
-    def build_A_coeffs(
-        var: Field,
-    ) -> tuple[list[Tensor], list[Tensor], list[Tensor]]:
+    def build_A_coeffs(var: Field) -> tuple[list[Tensor], ...]:
         r"""Build the coefficients for the discretization of the gradient operator using the second-order central finite difference method.
 
         ..math::
             \nabla \Phi = \frac{\Phi^{i+1} - \Phi^{i-1}}{2 \Delta x}
         """
+        App = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
         Ap = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
         Ac = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
         Am = [-1.0 * torch.ones_like(var()) for _ in range(var.mesh.dim)]
+        Amm = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
 
         for i in range(var.dim):
 
             _grad_central_adjust(var, (Ap, Ac, Am), i)
 
-        return Ap, Ac, Am
+        return App, Ap, Ac, Am, Amm
 
     @staticmethod
     def adjust_rhs(var: Field) -> Tensor:
@@ -355,7 +360,7 @@ def _grad_central_adjust(var: Field, A_ops: tuple[list[Tensor], ...], dim: int) 
         it is not the dimension of the mesh!
     """
 
-    Ap, Ac, Am = A_ops
+    _, Ap, Ac, Am, _ = A_ops
 
     dx = var.dx
     # Treat boundaries
@@ -471,7 +476,7 @@ def _adv_central(
     # Leading dimension is the dimension of the mesh
     # The following dimension is the dimension of the variable
     # A_[mesh.dim][var.dim]
-    Ap, Ac, Am = A_ops
+    _, Ap, Ac, Am, _ = A_ops
 
     for i in range(var.dim):
         _grad_central_adjust(var, (Ap, Ac, Am), i)
@@ -552,16 +557,6 @@ class FDC:
 class FDC_old:
     """Collection of the operators for explicit finite difference discretization."""
 
-    config: Optional[dict[str, dict[str, str]]] = None
-
-    def update_config(self, scheme: str, target: str, val: str):
-        """Update config values."""
-
-        if self.config is not None:
-            self.config[scheme][target] = val
-        else:
-            self.config = {scheme: {target: val}}
-
     def ddt(self, dt: float, var: Field) -> Tensor:
         """Time derivative of a given field.
 
@@ -580,11 +575,6 @@ class FDC_old:
             ddt.append((var()[i] - var_o) / dt)
 
         return torch.stack(ddt)
-
-    def rhs(self, var: Field | Tensor | float) -> Field | Tensor | float:
-        """Simply assign a given field to RHS of PDE."""
-
-        return var
 
     def div(self, var_j: Field, var_i: Field) -> Tensor:
         """Divergence of two fields.
@@ -664,96 +654,3 @@ class FDC_old:
             div.append(d_val)
 
         return torch.stack(div)
-
-    def grad(self, var: Field) -> Tensor:
-        r"""Explicit discretization: Gradient
-
-        Args:
-            var: Field object to be discretized ($\Phi$).
-
-        Returns:
-            dict[int, dict[str, Tensor]]: returns jacobian of input Field. if `var.dim` is 1, it will be equivalent to `grad` of scalar field.
-        """
-
-        grad = []
-        dx = var.dx
-
-        pad = create_pad(var.mesh.dim)
-        slicer = inner_slicer(var.mesh.dim)
-
-        for i in range(var.dim):
-
-            g_val = []
-
-            for j in range(var.mesh.dim):
-
-                bc_l = var.get_bc(f"d-{NUM_TO_DIR[j]}l")
-                bc_r = var.get_bc(f"d-{NUM_TO_DIR[j]}r")
-
-                var_padded = fill_pad_bc(pad(var()[i]), 1, slicer, [bc_l, bc_r], j)
-
-                g_val.append(
-                    (torch.roll(var_padded, -1, j) - torch.roll(var_padded, 1, j))[
-                        slicer
-                    ]
-                    / (2 * dx[j])
-                )
-            grad.append(torch.stack(g_val))
-
-        return torch.stack(grad)
-
-    def laplacian(self, gamma: float, var: Field) -> Tensor:
-        r"""Explicit discretization: Laplacian
-
-        Args:
-            var: Field object to be discretized ($\Phi$).
-
-        Returns:
-            dict[int, Tensor]: resulting `torch.Tensor`. `int` represents variable dimension, and `str` indicates `Mesh` dimension.
-
-        """
-
-        laplacian = []
-
-        dx = var.dx
-
-        for i in range(var.dim):
-
-            l_val = torch.zeros_like(var()[i])
-
-            for j in range(var.mesh.dim):
-                ddx = dx[j] ** 2
-
-                l_val_1d = (
-                    torch.roll(var()[i], -1, j)
-                    - 2 * var()[i]
-                    + torch.roll(var()[i], 1, j)
-                ) / ddx
-
-                # Treat BC
-                bc_l = var.get_bc(f"d-{NUM_TO_DIR[j]}l")
-                bc_r = var.get_bc(f"d-{NUM_TO_DIR[j]}r")
-
-                if bc_l is not None and bc_l.bc_treat:
-                    # Mask forwards
-                    mask_f = torch.roll(bc_l.bc_mask, 1, j)
-                    mask_ff = torch.roll(bc_l.bc_mask, 2, j)
-
-                    l_val_1d[mask_f] = (
-                        -2 / 3 * var()[i][mask_f] + 2 / 3 * var()[i][mask_ff]
-                    ) / ddx
-
-                if bc_r is not None and bc_r.bc_treat:
-                    # Mask backward
-                    mask_b = torch.roll(bc_r.bc_mask, -1, j)
-                    mask_bb = torch.roll(bc_r.bc_mask, -2, j)
-
-                    l_val_1d[mask_b] = (
-                        -2 / 3 * var()[i][mask_b] + 2 / 3 * var()[i][mask_bb]
-                    ) / ddx
-
-                l_val += l_val_1d * gamma
-
-            laplacian.append(l_val)
-
-        return torch.stack(laplacian)

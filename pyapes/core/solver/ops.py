@@ -60,9 +60,9 @@ class Solver:
 
         # NOTE: SHOULD BE REMOVED?!
         # Adjusting RHS based on the boundary conditions
-        # if self.rhs is not None:
-        #     for e in self.eqs:
-        #         self.rhs += self.eqs[e]["adjust_rhs"]
+        if self.rhs is not None:
+            for e in self.eqs:
+                self.rhs += self.eqs[e]["adjust_rhs"](self.var)
 
         # Resetting ops and rhs to avoid unnecessary copy when fdm is used multiple times in separate solvers
         eq.ops = {}
@@ -141,9 +141,5 @@ def _Aop(target: Field, eqs: dict[int, OPStype]) -> Tensor:
     if eqs[0]["name"].lower() == "ddt":
 
         res += eqs[0]["Aop"](*eqs[0]["param"], target)
-
-    # Subtract RHS
-    for e in eqs:
-        res -= eqs[e]["adjust_rhs"](target)
 
     return res
