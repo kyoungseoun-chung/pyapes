@@ -32,9 +32,7 @@ class OPStype(TypedDict):
     """Linear system operator. `Aop` is equivalent to `Ax` in `Ax = b`."""
     target: Field
     """Target field to be discretized."""
-    param: tuple[float | Tensor | None, ...] | tuple[
-        Field, dict[str, dict[str, str]]
-    ]
+    param: tuple[float | Tensor | None, ...] | tuple[Field, dict[str, dict[str, str]]]
     """Additional parameters other than target. e.g. `coeff` in `laplacian(coeff, var)`."""
     sign: float | int
     """Sign to be applied."""
@@ -42,7 +40,7 @@ class OPStype(TypedDict):
     """Additional information. e.g. `dt` in `Ddt`."""
     A_coeffs: tuple[list[Tensor], ...]
     """Coefficients of the discretization."""
-    adjust_rhs: Callable
+    adjust_rhs: Callable[[Field], Tensor]
     """Tensor used to adjust rhs."""
 
 
@@ -410,9 +408,7 @@ class FDM:
     # ddt: Ddt = Ddt()
     """Time discretization: `ddt(var)`."""
 
-    def __init__(
-        self, config: dict[str, dict[str, str]] | None = None
-    ) -> None:
+    def __init__(self, config: dict[str, dict[str, str]] | None = None) -> None:
         """Initialize FDM. If `config` is provided, `config` will be set via `self.set_config` function.
 
         Args:

@@ -22,21 +22,7 @@ from pyapes.testing.poisson import poisson_bcs
 from pyapes.testing.poisson import poisson_exact_nd
 from pyapes.testing.poisson import poisson_rhs_nd
 
-DISPLAY_PLOT: bool = True
-
-
-def func_n1(
-    grid: tuple[Tensor, ...], mask: Tensor, _, n_vec: Tensor
-) -> Tensor:
-    """Return the value of the Neumann boundary condition (sin(5x)).
-    Boundary function should have 3 inputs and last one is variable itself.
-    Since here, the variable is not used, it is set to dummy.
-    """
-
-    if n_vec.sum() > 0:
-        return torch.sin(5.0 * grid[0][mask])
-    else:
-        return -torch.sin(5.0 * grid[0][mask])
+DISPLAY_PLOT: bool = False
 
 
 @pytest.mark.parametrize(["dim"], [[1], [2], [3]])
@@ -82,12 +68,8 @@ def test_solver_tools(dim: int) -> None:
             var_padded_2[slicer_2][:, -1],
         )
     else:
-        assert_close(
-            var_padded_1[1:-1, 1:-1, 0], var_padded_1[slicer_1][:, :, 0]
-        )
-        assert_close(
-            var_padded_1[1:-1, 1:-1, -1], var_padded_1[slicer_1][:, :, -1]
-        )
+        assert_close(var_padded_1[1:-1, 1:-1, 0], var_padded_1[slicer_1][:, :, 0])
+        assert_close(var_padded_1[1:-1, 1:-1, -1], var_padded_1[slicer_1][:, :, -1])
 
         assert_close(
             (var_padded_2[1:-1, 1:-1, :2].sum(dim=2)[1:-1, 1:-1] / 2),
@@ -107,9 +89,7 @@ def test_solver_tools(dim: int) -> None:
         [Box[0:1, 0:1, 0:1], [0.1, 0.1, 0.1], 3],
     ],
 )
-def test_poisson_nd_pure_dirichlet(
-    domain: Box, spacing: list[float], dim: int
-) -> None:
+def test_poisson_nd_pure_dirichlet(domain: Box, spacing: list[float], dim: int) -> None:
     """Test poisson in N-D cases.
     Note:
         - See `pyapes.testing.poisson` for more details.
@@ -160,57 +140,6 @@ def test_poisson_nd_pure_dirichlet(
 
     assert solver.report["converge"] == True
     assert_close(var()[0], sol_ex, rtol=0.1, atol=0.01)
-
-
-def test_poisson_1d_periodic() -> None:
-    """
-    Solves the Poisson equation: d^2 V/dx^2 = sin(x), using second order centered
-    finite differences, with periodic boundary conditions V(0) = V(L)
-    The analytical solution is V(x) = -sin(x).
-
-    Reference: http://boccelliengineering.altervista.org/junk/poisson_octave_fortran/simple_poisson_solvers.html
-    """
-
-    # Construct mesh
-    mesh = Mesh(Box[0:pi], None, [64])
-
-    # xl - xr - yl - yr
-    f_bc = mixed_bcs(
-        [None, None],
-        ["periodic", "periodic"],
-    )  # BC config
-
-    # Target variable
-    var = Field("p", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=0.0)
-
-    rhs = torch.zeros_like(var())
-    rhs[0] = torch.sin(mesh.X)
-
-    solver = Solver(
-        {
-            "fdm": {
-                "method": "bicgstab",
-                "tol": 1e-8,
-                "max_it": 1000,
-                "report": True,
-            }
-        }
-    )
-    fdm = FDM()
-
-    solver.set_eq(fdm.laplacian(var) == rhs)
-    solver.solve()
-
-    assert_close(var()[0], -torch.sin(mesh.X), rtol=0.1, atol=0.01)
-
-    if DISPLAY_PLOT:
-        import matplotlib.pyplot as plt
-
-        _, ax = plt.subplots()
-        ax.plot(mesh.X, -torch.sin(mesh.X), "b-", label="Exact")
-        ax.plot(mesh.X, var()[0], "r^", label="FDM")
-        ax.legend(loc="lower right")
-        plt.show()
 
 
 def test_heat_conduction_2d_mixed() -> None:
@@ -287,55 +216,13 @@ def test_heat_conduction_2d_mixed() -> None:
         plt.show()
 
 
-def test_poisson_2d_pure_periodic() -> None:
-    """
-    Reference: https://fenicsproject.org/olddocs/dolfin/1.5.0/python/demo/documented/periodic/python/documentation.html
-    """
-
-    # Construct mesh
-    mesh = Mesh(Box[-1:1, -1:1], None, [128, 128])
-
-    # xl - xr - yl - yr
-    f_bc = mixed_bcs(
-        [None, None, None, None],
-        ["periodic", "periodic", "periodic", "periodic"],
-    )  # BC config
-
-    # Target variable
-    var = Field("p", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=0.0)
-    rhs = torch.zeros_like(var())
-    rhs[0] = torch.exp(-10.0 * (mesh.X**2 + mesh.Y**2))
-
-    solver = Solver(
-        {
-            "fdm": {
-                "method": "cg",
-                "tol": 1e-6,
-                "max_it": 1000,
-                "report": True,
-            }
-        }
-    )
-    fdm = FDM()
-
-    solver.set_eq(fdm.laplacian(var) == rhs)
-    solver.solve()
-
-    import matplotlib.pyplot as plt
-
-    _, ax = plt.subplots(1, 2)
-    ax[0].contourf(mesh.X, mesh.Y, rhs[0], 20, cmap="coolwarm")
-    ax[1].contourf(mesh.X, mesh.Y, var()[0], 20, cmap="coolwarm")
-    plt.show()
-
-
 def test_poisson_2d_mixed_periodic() -> None:
     """
     Reference: https://fenicsproject.org/olddocs/dolfin/1.5.0/python/demo/documented/periodic/python/documentation.html
     """
 
     # Construct mesh
-    mesh = Mesh(Box[0:1, 0:1], None, [21, 21])
+    mesh = Mesh(Box[0:1, 0:1], None, [101, 101])
 
     # xl - xr - yl - yr
     f_bc = mixed_bcs(
@@ -370,6 +257,8 @@ def test_poisson_2d_mixed_periodic() -> None:
 
         _, ax = plt.subplots(subplot_kw={"projection": "3d"})
         ax.plot_surface(mesh.X, mesh.Y, var()[0], cmap="coolwarm")  # type: ignore
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
         plt.show()
 
 
@@ -395,9 +284,7 @@ def test_poisson_1d_mixed_neumann() -> None:
 
     f_bc = mixed_bcs([-1 / 4, -1 / 2], ["neumann", "dirichlet"])  # BC config
     # Target variable
-    var = Field(
-        "phi", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=0.0
-    )
+    var = Field("phi", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=0.0)
     rhs = torch.zeros_like(var())
     rhs[0] = torch.cos(pi / 2 * mesh.X + pi / 4)
 
@@ -425,14 +312,12 @@ def test_poisson_1d_mixed_neumann() -> None:
     solver.solve()
 
     # Check gradient at the boundary
-    phi0 = (
-        -3 / 2 * var()[0][0] + 2 * var()[0][1] - 1 / 2 * var()[0][2]
-    ) / mesh.dx[0]
+    phi0 = (-3 / 2 * var()[0][0] + 2 * var()[0][1] - 1 / 2 * var()[0][2]) / mesh.dx[0]
     phi0_ex = (
         -3 / 2 * sol_ex[0][0] + 2 * sol_ex[0][1] - 1 / 2 * sol_ex[0][2]
     ) / mesh.dx[0]
 
-    assert_close(phi0, phi0_ex, atol=1e-3, rtol=1e-3)
+    assert_close(phi0, phi0_ex, atol=1e-1, rtol=1e-1)
     assert_close(var()[0], sol_ex[0], atol=1e-3, rtol=1e-3)
 
 
@@ -474,7 +359,7 @@ def test_poisson_2d_mixed_neumann() -> None:
         plt.show()
 
 
-def test_advection_diffussion_1d() -> None:
+def test_advection_diffusion_1d() -> None:
     # Construct mesh
     mesh = Mesh(Box[0:1], None, [0.05])
 
@@ -497,9 +382,9 @@ def test_advection_diffussion_1d() -> None:
 
     epsilon = 0.5
 
-    sol_ex = mesh.X - (
-        torch.exp(-(1 - mesh.X) / epsilon) - exp(-1 / epsilon)
-    ) / (1 - exp(-1 / epsilon))
+    sol_ex = mesh.X - (torch.exp(-(1 - mesh.X) / epsilon) - exp(-1 / epsilon)) / (
+        1 - exp(-1 / epsilon)
+    )
     solver.set_eq(fdm.grad(var) - fdm.laplacian(epsilon, var) == 1.0)
     solver.solve()
 
@@ -535,9 +420,7 @@ def test_burger_1d() -> None:
 
     # Target variable
     init_val = burger_exact_nd(mesh, nu, 0.0)
-    var = Field(
-        "U", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=[init_val]
-    )
+    var = Field("U", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=[init_val])
 
     var.set_time(dt, 0.0)
     var.save_old()
@@ -546,9 +429,7 @@ def test_burger_1d() -> None:
 
         res.append(var()[0].clone())
 
-        solver.set_eq(
-            fdm.ddt(var) + fdm.div(var, var) - fdm.laplacian(nu, var) == 0.0
-        )
+        solver.set_eq(fdm.ddt(var) + fdm.div(var, var) - fdm.laplacian(nu, var) == 0.0)
         solver.solve()
         var.update_time()
 

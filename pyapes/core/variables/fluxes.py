@@ -138,12 +138,7 @@ class Flux:
 
                 # sumAll face_val * face_are / cell_volume
                 c_val.update(
-                    {
-                        j: (
-                            self._face[i][j]["r"] * Ar_V
-                            - self._face[i][j]["l"] * Al_V
-                        )
-                    }
+                    {j: (self._face[i][j]["r"] * Ar_V - self._face[i][j]["l"] * Al_V)}
                 )
             self._center[i] = c_val
 

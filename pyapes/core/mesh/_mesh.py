@@ -72,9 +72,7 @@ class Mesh:
         elif float in GeoTypeIdentifier(spacing):
             # Node information
             self._dx: list[float] = [float(s) for s in spacing]
-            self._nx: list[int] = [
-                int(l / d + 1.0) for l, d in zip(self._lx, self._dx)
-            ]
+            self._nx: list[int] = [int(l / d + 1.0) for l, d in zip(self._lx, self._dx)]
 
         else:
             raise TypeError("Mesh: spacing only accept int or float")
@@ -109,9 +107,7 @@ class Mesh:
         if len(self.o_mask) > 0:
             for o_idx in self.o_mask:
                 for om in self.o_mask[o_idx]:
-                    self.t_mask = torch.logical_or(
-                        self.t_mask, self.o_mask[o_idx][om]
-                    )
+                    self.t_mask = torch.logical_or(self.t_mask, self.o_mask[o_idx][om])
 
     def __repr__(self) -> str:
         desc = f"{self.domain} with dx={self.dx.tolist()}"
@@ -198,11 +194,7 @@ class Mesh:
         """Return total number of grid points."""
 
         return int(
-            torch.prod(
-                torch.tensor(
-                    self._nx, dtype=self.dtype.int, device=self.device
-                )
-            )
+            torch.prod(torch.tensor(self._nx, dtype=self.dtype.int, device=self.device))
         )
 
     @property
@@ -219,9 +211,7 @@ class Mesh:
     @property
     def dx(self) -> Tensor:
         """Mesh spacing."""
-        return torch.tensor(
-            self._dx, dtype=self.dtype.float, device=self.device
-        )
+        return torch.tensor(self._dx, dtype=self.dtype.float, device=self.device)
 
     @cached_property
     def dg(self) -> list[Tensor]:

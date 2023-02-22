@@ -65,9 +65,7 @@ def configs() -> Container:
     ref_configs.append({"name": "lambda_ref", "val": lambda_ref})
 
     # Reference Reynolds number
-    ref_configs.append(
-        {"name": "Re_ref", "val": 200 * 5 / 9 * 1.2 / 1.5 / 1.2}
-    )
+    ref_configs.append({"name": "Re_ref", "val": 200 * 5 / 9 * 1.2 / 1.5 / 1.2})
 
     # Reference Prandtl number
     ref_configs.append({"name": "Pr_ref", "val": 2.0})
@@ -76,9 +74,7 @@ def configs() -> Container:
     ref_configs.append({"name": "Sc_ref", "val": 1.0})
 
     # Reference Rayleigh number
-    Ra = (
-        L_ref**3 * g * rho_ref * cp_ref * T_ref / nu_ref / lambda_ref / T_ref
-    )
+    Ra = L_ref**3 * g * rho_ref * cp_ref * T_ref / nu_ref / lambda_ref / T_ref
     ref_configs.append({"name": "Ra_ref", "val": Ra})
 
     # Reference Froude number
@@ -117,9 +113,7 @@ def configs() -> Container:
         np.asarray([0, 0, 1], dtype=np.int64),
     ]
 
-    LX = np.asarray(LX_max, dtype=np.float64) - np.asarray(
-        LX_min, dtype=np.float64
-    )
+    LX = np.asarray(LX_max, dtype=np.float64) - np.asarray(LX_min, dtype=np.float64)
 
     # Wall geometry
     wall_e_x = [

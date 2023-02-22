@@ -32,19 +32,13 @@ def test_fdc_edge() -> None:
 
     fdc = FDC()
 
-    grad_torch = torch.gradient(
-        var()[0], spacing=mesh.dx[0].item(), edge_order=2
-    )
+    grad_torch = torch.gradient(var()[0], spacing=mesh.dx[0].item(), edge_order=2)
     grad_fdc = fdc.grad(var, edge=True)
 
     assert_close(grad_torch[0], grad_fdc[0][0])
 
-    lap_torch_1 = torch.gradient(
-        grad_torch[0], spacing=mesh.dx[0].item(), edge_order=2
-    )
-    lap_torch_2 = torch.gradient(
-        grad_torch[1], spacing=mesh.dx[0].item(), edge_order=2
-    )
+    lap_torch_1 = torch.gradient(grad_torch[0], spacing=mesh.dx[0].item(), edge_order=2)
+    lap_torch_2 = torch.gradient(grad_torch[1], spacing=mesh.dx[0].item(), edge_order=2)
 
     lap_torch = lap_torch_1[0] + lap_torch_2[0]
 
@@ -87,13 +81,9 @@ def test_fdc_ops(domain: Box, spacing: list[float]) -> None:
 
     # Check Neumann BC
     # Lower BC
-    phi0 = (
-        -3 / 2 * var()[0][0] + 2 * var()[0][1] - 1 / 2 * var()[0][2]
-    ) / mesh.dx[0]
+    phi0 = (-3 / 2 * var()[0][0] + 2 * var()[0][1] - 1 / 2 * var()[0][2]) / mesh.dx[0]
     # Upper BC
-    phiN = (
-        3 / 2 * var()[0][-1] - 2 * var()[0][-2] + 1 / 2 * var()[0][-3]
-    ) / mesh.dx[0]
+    phiN = (3 / 2 * var()[0][-1] - 2 * var()[0][-2] + 1 / 2 * var()[0][-3]) / mesh.dx[0]
 
     # Check Neumann BCs in the second order accuracy
     assert_close(phi0.mean(), torch.tensor(-2.0))
@@ -133,9 +123,7 @@ def _grad_manuel_op(var: Tensor, dx: Tensor, dim: int) -> list[Tensor]:
 
     grad_manuel = []
 
-    grad_manuel.append(
-        (torch.roll(var, -1, 0) - torch.roll(var, 1, 0)) / (2 * dx)
-    )
+    grad_manuel.append((torch.roll(var, -1, 0) - torch.roll(var, 1, 0)) / (2 * dx))
 
     x_inner = (torch.roll(var, -1, 0) - torch.roll(var, 1, 0)) / (2 * dx)
     # Var has no dependency on y direction
@@ -176,9 +164,7 @@ def _lap_manuel_op(var: Tensor, dx: Tensor, dim: int) -> Tensor:
             torch.roll(var, -1, i) - 2 * var + torch.roll(var, 1, i)
         ) / dx**2
 
-    x_inner = (
-        torch.roll(var, -1, 0) - 2 * var + torch.roll(var, 1, 0)
-    ) / dx**2
+    x_inner = (torch.roll(var, -1, 0) - 2 * var + torch.roll(var, 1, 0)) / dx**2
     # Var has no dependency on y direction
     # In y direction
     x_inner[1] = (2 / 3 * var[2] - 2 / 3 * var[1]) / dx**2
@@ -233,11 +219,7 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
     solver.set_eq(fdm.laplacian(2.0, var_i) == 0.0)
 
     target = (
-        (
-            torch.roll(var_i()[0], -1, 0)
-            - 2 * var_i()[0]
-            + torch.roll(var_i()[0], 1, 0)
-        )
+        (torch.roll(var_i()[0], -1, 0) - 2 * var_i()[0] + torch.roll(var_i()[0], 1, 0))
         / (mesh.dx[0] ** 2)
         * 2.0
     )
@@ -255,11 +237,7 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
     t_div = (var_i()[0] - torch.roll(var_i()[0], 1, 0)) / mesh.dx[0] * 5.0
 
     t_laplacian = (
-        (
-            torch.roll(var_i()[0], -1, 0)
-            - 2 * var_i()[0]
-            + torch.roll(var_i()[0], 1, 0)
-        )
+        (torch.roll(var_i()[0], -1, 0) - 2 * var_i()[0] + torch.roll(var_i()[0], 1, 0))
         / (mesh.dx[0] ** 2)
         * 3.0
     )
@@ -274,9 +252,9 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
 
         solver.set_eq(fdm.grad(var_i) - fdm.laplacian(3.0, var_i) == 2.0)
 
-        t_grad = (
-            torch.roll(var_i()[0], -1, 0) - torch.roll(var_i()[0], 1, 0)
-        ) / (2 * mesh.dx[0])
+        t_grad = (torch.roll(var_i()[0], -1, 0) - torch.roll(var_i()[0], 1, 0)) / (
+            2 * mesh.dx[0]
+        )
 
         t_laplacian = (
             (
@@ -299,17 +277,12 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
     rhs = torch.rand_like(var_i())
 
     solver.set_eq(
-        fdm.ddt(var_i) + fdm.div(var_j, var_i) + fdm.laplacian(3.0, var_i)
-        == rhs
+        fdm.ddt(var_i) + fdm.div(var_j, var_i) + fdm.laplacian(3.0, var_i) == rhs
     )
     t_div = (var_i()[0] - torch.roll(var_i()[0], 1, 0)) / mesh.dx[0] * 5.0
 
     t_laplacian = (
-        (
-            torch.roll(var_i()[0], -1, 0)
-            - 2 * var_i()[0]
-            + torch.roll(var_i()[0], 1, 0)
-        )
+        (torch.roll(var_i()[0], -1, 0) - 2 * var_i()[0] + torch.roll(var_i()[0], 1, 0))
         / (mesh.dx[0] ** 2)
         * 3.0
     )

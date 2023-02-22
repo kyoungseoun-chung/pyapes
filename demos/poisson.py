@@ -45,9 +45,7 @@ def poisson():
 
     _, ax = plt.subplots()
 
-    ax.plot(
-        mesh.X, sol_ex, label="Exact", marker="x", linestyle="None", color="r"
-    )
+    ax.plot(mesh.X, sol_ex, label="Exact", marker="x", linestyle="None", color="r")
     ax.plot(mesh.X, var()[0], label="Numerical", color="b", linestyle="--")
     ax.set_xlim(0, 1)
     ax.set_ylim(0.75, 0.9)

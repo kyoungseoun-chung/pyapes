@@ -107,9 +107,7 @@ class RichPBar(tqdm):  # pragma: no cover
         pass
 
     def display(self, *_, **__):
-        self._prog.update(
-            self._task_id, completed=self.n, description=self.desc
-        )
+        self._prog.update(self._task_id, completed=self.n, description=self.desc)
 
     def reset(self, total=None):
         """

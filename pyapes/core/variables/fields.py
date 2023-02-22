@@ -94,10 +94,7 @@ class Field:
                 for d in range(self.dim):
                     self.VAR[d] += self.init_val[d]
 
-            elif (
-                isinstance(self.init_val, str)
-                and self.init_val.lower() == "random"
-            ):
+            elif isinstance(self.init_val, str) and self.init_val.lower() == "random":
                 self.VAR = torch.rand_like(self.VAR)
 
             else:
@@ -306,9 +303,7 @@ class Field:
         elif isinstance(other, Union[float, int]):
             self.VAR *= other
         else:
-            raise TypeError(
-                "Field: you can only multiply Field, int, or float!"
-            )
+            raise TypeError("Field: you can only multiply Field, int, or float!")
 
         return self
 

@@ -60,16 +60,16 @@ class Solver:
 
         # NOTE: SHOULD BE REMOVED?!
         # Adjusting RHS based on the boundary conditions
-        # if self.rhs is not None:
-        #     for e in self.eqs:
-        #         self.rhs += self.eqs[e]["adjust_rhs"]
+        if self.rhs is not None:
+            for e in self.eqs:
+                self.rhs += self.eqs[e]["adjust_rhs"](self.var)
 
-        # Restting ops and rhs to avoid unnecessary copy when fdm is used multiple times in separate solvers
+        # Resetting ops and rhs to avoid unnecessary copy when fdm is used multiple times in separate solvers
         eq.ops = {}
         eq.rhs = None
 
     def Aop(self, var: Field) -> Tensor:
-        """Aop interface mostly for debuging."""
+        """Aop interface mostly for debugging."""
 
         assert (
             self.rhs is not None
@@ -124,9 +124,7 @@ def _Aop(target: Field, eqs: dict[int, OPStype]) -> Tensor:
         if eqs[op]["name"].lower() == "ddt":
             continue
         elif op > 1 and eqs[op]["name"].lower() == "ddt":
-            raise ValueError(
-                "FDM: ddt is not allowed in the middle of the equation!"
-            )
+            raise ValueError("FDM: ddt is not allowed in the middle of the equation!")
 
         # Compute A @ x
         Ax = (
@@ -143,9 +141,5 @@ def _Aop(target: Field, eqs: dict[int, OPStype]) -> Tensor:
     if eqs[0]["name"].lower() == "ddt":
 
         res += eqs[0]["Aop"](*eqs[0]["param"], target)
-
-    # Substact RHS
-    for e in eqs:
-        res -= eqs[e]["adjust_rhs"](target)
 
     return res
