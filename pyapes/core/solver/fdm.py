@@ -38,7 +38,7 @@ class OPStype(TypedDict):
     """Sign to be applied."""
     other: dict[str, float] | None
     """Additional information. e.g. `dt` in `Ddt`."""
-    A_coeffs: tuple[list[Tensor], ...]
+    A_coeffs: list[list[Tensor]]
     """Coefficients of the discretization."""
     adjust_rhs: Callable[[Field], Tensor]
     """Tensor used to adjust rhs."""
@@ -183,9 +183,7 @@ class Laplacian(Operators):
 
     @staticmethod
     def Aop(
-        param: float | Tensor | None,
-        var: Field,
-        A_coeffs: tuple[list[Tensor], ...],
+        param: float | Tensor | None, var: Field, A_coeffs: list[list[Tensor]]
     ) -> Tensor:
         if param is None:
             return FDC().laplacian.apply(A_coeffs, var)
@@ -242,9 +240,7 @@ class Grad(Operators):
 
     @staticmethod
     def Aop(
-        param: float | Tensor | None,
-        var: Field,
-        A_coeffs: tuple[list[Tensor], ...],
+        param: float | Tensor | None, var: Field, A_coeffs: list[list[Tensor]]
     ) -> Tensor:
 
         if param is None:
@@ -272,20 +268,20 @@ class Div(Operators):
         var_i: convective variable ($\vec{u}_j$)
     """
 
-    def __call__(self, *inputs: Any) -> Div:
-        """It is important to note that the order of inputs is important here. The first input is the convective variable (`var_j`), and the second input is the field to be discretized (`var_i`)."""
+    def __call__(self, *args: Any) -> Div:
+        """It is important to note that the order of args is important here. The first input is the convective variable (`var_j`), and the second input is the field to be discretized (`var_i`)."""
 
-        if isinstance(inputs, tuple):
+        if isinstance(args, tuple):
             assert (
-                isinstance(inputs[0], float)
-                or isinstance(inputs[0], Tensor)
-                or isinstance(inputs[0], Field)
+                isinstance(args[0], float)
+                or isinstance(args[0], Tensor)
+                or isinstance(args[0], Field)
             ), "FDM Grad: if additional parameter is provided, it must be a float or Tensor or Field!"
-            var_j = inputs[0]
-            var_i = inputs[1]
-        elif isinstance(inputs, Field):
+            var_j = args[0]
+            var_i = args[1]
+        elif isinstance(args, Field):
             var_j = 1.0
-            var_i = inputs[0]
+            var_i = args[0]
         else:
             raise TypeError("FDM: invalid input type!")
 
@@ -316,7 +312,7 @@ class Div(Operators):
         var_j: Field | float | Tensor,
         config: dict[str, dict[str, str]],
         var_i: Field,
-        A_coeffs: tuple[list[Tensor], ...],
+        A_coeffs: list[list[Tensor]],
     ) -> Tensor:
 
         if isinstance(var_j, Field):

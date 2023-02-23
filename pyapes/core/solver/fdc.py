@@ -28,7 +28,7 @@ class Discretizer(ABC):
     Therefore, to use in the `FDM` solver, the boundary conditions `var` should be applied before/during the `linalg` process.
     """
 
-    A_coeffs: tuple[list[Tensor], list[Tensor], list[Tensor]] | None = None
+    A_coeffs: list[list[Tensor]] | None = None
     """Tuple of A operation matrix coefficients."""
     rhs_adj: Tensor | None = None
     """RHS adjustment tensor."""
@@ -40,7 +40,7 @@ class Discretizer(ABC):
 
     @staticmethod
     @abstractmethod
-    def build_A_coeffs(var: Field) -> tuple[list[Tensor], ...]:
+    def build_A_coeffs(var: Field) -> list[list[Tensor]]:
         """Build the operation matrix coefficients to be used for the discretization.
         `var: Field` is required due to the boundary conditions. Should always return three tensors in `Ap`, `Ac`, and `Am` order.
         """
@@ -52,7 +52,7 @@ class Discretizer(ABC):
         """Return a tensor that is used to adjust `rhs` of the PDE."""
         ...
 
-    def apply(self, coeffs: tuple[list[Tensor], ...], var: Field) -> Tensor:
+    def apply(self, coeffs: list[list[Tensor]], var: Field) -> Tensor:
         """Apply the discretization to the input `Field` variable."""
 
         assert coeffs is not None, "FDC: A_coeffs is not defined!"
@@ -100,11 +100,13 @@ class Discretizer(ABC):
 
 
 def _coeff_var_sum(
-    coeffs: tuple[list[Tensor], ...], var: Field, idx: int, dim: int
+    coeffs: list[list[Tensor]], var: Field, idx: int, dim: int
 ) -> Tensor:
     """Sum the coefficients and the variable.
     Here, `len(coeffs) = 5` to implement `quick` scheme for `div` operator in the future.
     """
+
+    assert len(coeffs) == 5, "FDC: the total number of coefficient tensor should be 5!"
 
     summed = torch.zeros_like(var()[idx])
 
@@ -205,7 +207,7 @@ class Laplacian(Discretizer):
         self._op_type = __class__.__name__
 
     @staticmethod
-    def build_A_coeffs(var: Field) -> tuple[list[Tensor], ...]:
+    def build_A_coeffs(var: Field) -> list[list[Tensor]]:
 
         App = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
         Ap = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
@@ -248,7 +250,7 @@ class Laplacian(Discretizer):
                 Ac[j][i] /= dx[j] ** 2
                 Am[j][i] /= dx[j] ** 2
 
-        return App, Ap, Ac, Am, Amm
+        return [App, Ap, Ac, Am, Amm]
 
     @staticmethod
     def adjust_rhs(var: Field) -> Tensor:
@@ -284,12 +286,12 @@ class Grad(Discretizer):
 
     Example:
 
-        >>> mesh = Mesh(Box[0:1, 0:1], None, [10, 10]) # 2D mesh with 10x10 cells
-        >>> var = Field("test_field", 1, mesh, ...) # scalar field
-        >>> fdm = FDM()
-        >>> grad = fdm.grad(var)
-        >>> grad.shape
-        torch.Size([1, 2, 10, 10])
+    >>> mesh = Mesh(Box[0:1, 0:1], None, [10, 10]) # 2D mesh with 10x10 cells
+    >>> var = Field("test_field", 1, mesh, ...) # scalar field
+    >>> fdm = FDM()
+    >>> grad = fdm.grad(var)
+    >>> grad.shape
+    torch.Size([1, 2, 10, 10])
 
     """
 
@@ -297,7 +299,7 @@ class Grad(Discretizer):
         self._op_type = __class__.__name__
 
     @staticmethod
-    def build_A_coeffs(var: Field) -> tuple[list[Tensor], ...]:
+    def build_A_coeffs(var: Field) -> list[list[Tensor]]:
         r"""Build the coefficients for the discretization of the gradient operator using the second-order central finite difference method.
 
         ..math::
@@ -313,7 +315,7 @@ class Grad(Discretizer):
 
             _grad_central_adjust(var, (Ap, Ac, Am), i)
 
-        return App, Ap, Ac, Am, Amm
+        return [App, Ap, Ac, Am, Amm]
 
     @staticmethod
     def adjust_rhs(var: Field) -> Tensor:
@@ -360,7 +362,7 @@ def _grad_central_adjust(var: Field, A_ops: tuple[list[Tensor], ...], dim: int) 
         it is not the dimension of the mesh!
     """
 
-    _, Ap, Ac, Am, _ = A_ops
+    Ap, Ac, Am = A_ops
 
     dx = var.dx
     # Treat boundaries
@@ -415,10 +417,8 @@ class Div(Discretizer):
 
     @staticmethod
     def build_A_coeffs(
-        var_j: Field | float | Tensor,
-        var_i: Field,
-        config: dict[str, dict[str, str]],
-    ) -> tuple[list[Tensor], list[Tensor], list[Tensor]]:
+        var_j: Field | float | Tensor, var_i: Field, config: dict[str, dict[str, str]]
+    ) -> list[list[Tensor]]:
         r"""Build the coefficients for the discretization of the gradient operator using the second-order central finite difference method.
 
         ..math::
@@ -441,21 +441,23 @@ class Div(Discretizer):
             warnings.warn("FDM: no limiter is specified. Use `none` as default.")
             limiter = "none"
 
+        App = [torch.zeros_like(var_i()) for _ in range(var_i.mesh.dim)]
         Ap = [torch.ones_like(var_i()) for _ in range(var_i.mesh.dim)]
         Ac = [torch.zeros_like(var_i()) for _ in range(var_i.mesh.dim)]
         Am = [-1.0 * torch.ones_like(var_i()) for _ in range(var_i.mesh.dim)]
+        Amm = [torch.zeros_like(var_i()) for _ in range(var_i.mesh.dim)]
 
         if limiter == "none":
-            Ap, Ac, Am = _adv_central(adv, var_i, (Ap, Ac, Am))
+            Ap, Ac, Am = _adv_central(adv, var_i, [Ap, Ac, Am])
             pass
         elif limiter == "upwind":
-            Ap, Ac, Am = _adv_upwind(adv, var_i)
+            Ap, Ac, Am = _adv_upwind(adv, var_i, [Ap, Ac, Am])
         elif limiter == "quick":
             raise NotImplementedError("FDC Div: quick scheme is not implemented yet.")
         else:
             raise RuntimeError(f"FDC Div: {limiter=} is an unknown limiter type.")
 
-        return Ap, Ac, Am
+        return [App, Ap, Ac, Am, Amm]
 
     @staticmethod
     def adjust_rhs(var: Field) -> Tensor:
@@ -463,8 +465,8 @@ class Div(Discretizer):
 
 
 def _adv_central(
-    adv: Tensor, var: Field, A_ops: tuple[list[Tensor], ...]
-) -> tuple[list[Tensor], list[Tensor], list[Tensor]]:
+    adv: Tensor, var: Field, A_ops: list[list[Tensor]]
+) -> list[list[Tensor]]:
     """Discretization of the advection tern using central difference.
 
     Args:
@@ -485,19 +487,26 @@ def _adv_central(
     Ac = [adv * ac for ac in Ac]
     Am = [adv * am for am in Am]
 
-    return Ap, Ac, Am
+    A_ops[1] = Ap
+    A_ops[2] = Ac
+    A_ops[3] = Am
+
+    return A_ops
 
 
 def _adv_upwind(
-    adv: Tensor, var: Field
-) -> tuple[list[Tensor], list[Tensor], list[Tensor]]:
-    Ap = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
-    Ac = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
-    Am = [-1.0 * torch.ones_like(var()) for _ in range(var.mesh.dim)]
+    adv: Tensor, var: Field, A_ops: list[list[Tensor]]
+) -> list[list[Tensor]]:
+
+    _, Ap, Ac, Am, _ = A_ops
 
     dx = var.dx
 
-    return Ap, Ac, Am
+    A_ops[1] = Ap
+    A_ops[2] = Ac
+    A_ops[3] = Am
+
+    return A_ops
 
 
 class Ddt(Discretizer):
