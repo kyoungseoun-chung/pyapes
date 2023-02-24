@@ -31,7 +31,7 @@ class OPStype(TypedDict):
     Aop: Callable[
         [Tensor | float | None, Field, list[list[Tensor]]], Tensor
     ] | Callable[
-        [Field | Tensor | float | None, dict[str, str], Field, list[list[Tensor]]],
+        [Field | Tensor | float, dict[str, str], Field, list[list[Tensor]]],
         Tensor,
     ]
     """Linear system operator. `Aop` is equivalent to `Ax` in `Ax = b`."""
@@ -48,7 +48,7 @@ class OPStype(TypedDict):
     A_coeffs: list[list[Tensor]]
     """Coefficients of the discretization."""
     adjust_rhs: Callable[[Field], Tensor] | Callable[
-        [Field, Field, dict[str, str]], Tensor
+        [Field | float | Tensor, Field, dict[str, str]], Tensor
     ]
     """Tensor used to adjust rhs."""
 
@@ -189,6 +189,8 @@ class Laplacian(Operators):
     def Aop(
         param: float | Tensor | None, var: Field, A_coeffs: list[list[Tensor]]
     ) -> Tensor:
+        """Compute `Ax` of the linear system `Ax = b`. If param is not None, the whole operation is multiplied by param."""
+
         if param is None:
             return FDC().laplacian.apply(A_coeffs, var)
         else:
@@ -244,6 +246,7 @@ class Grad(Operators):
     def Aop(
         param: float | Tensor | None, var: Field, A_coeffs: list[list[Tensor]]
     ) -> Tensor:
+        """Compute `Ax` of the linear system `Ax = b`. If param is not None, the whole operation is multiplied by param."""
         if param is None:
             return FDC().grad.apply(A_coeffs, var)
         else:
@@ -311,16 +314,20 @@ class Div(Operators):
 
     @staticmethod
     def Aop(
-        var_j: Field | float | Tensor,
+        var_j: Field | Tensor | float,
         config: dict[str, str],
         var_i: Field,
         A_coeffs: list[list[Tensor]],
     ) -> Tensor:
-        if isinstance(var_j, Field):
-            A_coeffs = FDC.div.build_A_coeffs(var_j, var_i, config)
-            rhs_adj = FDC.div.adjust_rhs(var_j, var_i, config)
+        """Compute `Ax` for the linear system of `Ax=b`. If `var_j` is either `Tensor` or `float`, assume that the advection term is constant. Therefore, reuse `A_coeffs`. Otherwise, update `A_coeffs` every step to compute `Ax`."""
 
-        return FDC().div.apply(A_coeffs, var_i)
+        if isinstance(var_j, Tensor | float):
+            # Reuse A_coeffs
+            return FDC().div.apply(A_coeffs, var_i)
+        else:
+            # Update A_coeffs
+            _A_coeffs = FDC.div.build_A_coeffs(var_j, var_i, config)
+            return FDC().div.apply(_A_coeffs, var_i)
 
 
 class Ddt(Operators):

@@ -22,7 +22,7 @@ from pyapes.testing.poisson import poisson_bcs
 from pyapes.testing.poisson import poisson_exact_nd
 from pyapes.testing.poisson import poisson_rhs_nd
 
-DISPLAY_PLOT: bool = False
+DISPLAY_PLOT: bool = True
 
 
 @pytest.mark.parametrize(["dim"], [[1], [2], [3]])

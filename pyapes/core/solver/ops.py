@@ -58,11 +58,21 @@ class Solver:
         # RHS of the equation
         self.rhs = eq.rhs
 
-        # NOTE: SHOULD BE REMOVED?!
         # Adjusting RHS based on the boundary conditions
         if self.rhs is not None:
             for e in self.eqs:
-                self.rhs += self.eqs[e]["adjust_rhs"](self.var)
+                if self.eqs[e]["name"] == "Div":
+                    var_j = self.eqs[e]["param"][0]
+
+                    assert var_j is not None
+
+                    config = self.eqs[e]["param"][1]
+
+                    assert isinstance(config, dict)
+
+                    self.rhs += self.eqs[e]["adjust_rhs"](var_j, self.var, config)
+                else:
+                    self.rhs += self.eqs[e]["adjust_rhs"](self.var)
 
         # Resetting ops and rhs to avoid unnecessary copy when fdm is used multiple times in separate solvers
         eq.ops = {}
@@ -114,8 +124,6 @@ def _Aop(target: Field, eqs: dict[int, OPStype]) -> Tensor:
     Note:
         - This function is intentionally separated from `Solver` class to make the `solve` process more transparent. (`rhs` and `eqs` are explicitly passed to the function)
     """
-
-    # NOTE: I THINK, RHS ADJUSTMENT SHOULD BE INCLUDED HERE
 
     res = torch.zeros_like(target())
 

@@ -57,10 +57,10 @@ class Discretizer(ABC):
         """Return a tensor that is used to adjust `rhs` of the PDE."""
         ...
 
-    def apply(self, coeffs: list[list[Tensor]], var: Field) -> Tensor:
+    def apply(self, A_coeffs: list[list[Tensor]], var: Field) -> Tensor:
         """Apply the discretization to the input `Field` variable."""
 
-        assert coeffs is not None, "FDC: A_coeffs is not defined!"
+        assert A_coeffs is not None, "FDC: A_A_coeffs is not defined!"
 
         # Grad operator returns Jacobian but Laplacian, Div, and Ddt return scalar (sum over j-index)
         if self.op_type == "Grad":
@@ -68,7 +68,7 @@ class Discretizer(ABC):
             for idx in range(var.dim):
                 grad_d = []
                 for dim in range(var.mesh.dim):
-                    grad_d.append(_coeff_var_sum(coeffs, var, idx, dim))
+                    grad_d.append(_A_coeff_var_sum(A_coeffs, var, idx, dim))
                 dis_var_dim.append(torch.stack(grad_d))
             discretized = torch.stack(dis_var_dim)
         else:
@@ -76,7 +76,7 @@ class Discretizer(ABC):
 
             for idx in range(var.dim):
                 for dim in range(var.mesh.dim):
-                    discretized[idx] += _coeff_var_sum(coeffs, var, idx, dim)
+                    discretized[idx] += _A_coeff_var_sum(A_coeffs, var, idx, dim)
 
         return discretized
 
@@ -150,18 +150,20 @@ class Discretizer(ABC):
             return self.apply(self.A_coeffs, var_i)
 
 
-def _coeff_var_sum(
-    coeffs: list[list[Tensor]], var: Field, idx: int, dim: int
+def _A_coeff_var_sum(
+    A_coeffs: list[list[Tensor]], var: Field, idx: int, dim: int
 ) -> Tensor:
     """Sum the coefficients and the variable.
-    Here, `len(coeffs) = 5` to implement `quick` scheme for `div` operator in the future.
+    Here, `len(A_coeffs) = 5` to implement `quick` scheme for `div` operator in the future.
     """
 
-    assert len(coeffs) == 5, "FDC: the total number of coefficient tensor should be 5!"
+    assert (
+        len(A_coeffs) == 5
+    ), "FDC: the total number of coefficient tensor should be 5!"
 
     summed = torch.zeros_like(var()[idx])
 
-    for i, c in enumerate(coeffs):
+    for i, c in enumerate(A_coeffs):
         summed += c[dim][idx] * torch.roll(var()[idx], -2 + i, dim)
 
     return summed
