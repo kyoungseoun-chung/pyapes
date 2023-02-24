@@ -244,8 +244,8 @@ def _treat_edge(
             ) / (var.mesh.dx[idx])
 
     elif ops == "Div":
-        raise NotImplementedError(
-            f"FDC: edge treatment of {ops=} is not implemented yet!"
+        warnings.warn(
+            "FDC: edge treatment of Div is supported! Div assumes user already specified the boundary in the domain."
         )
     else:
         raise RuntimeError(f"FDC: edge treatment of {ops=} is not supported!")
@@ -373,12 +373,20 @@ class Grad(Discretizer):
 
 
 def _grad_rhs_adjust(
-    var: Field, rhs_adj: Tensor, dim: int, adv: Tensor | None = None
+    var: Field, rhs_adj: Tensor, dim: int, gamma: tuple[Tensor, ...] | None = None
 ) -> None:
     """Adjust the RHS for the gradient operator. This function is seperated from the class to be reused in the `Div` operator."""
 
-    if adv is None:
-        adv = torch.ones_like(var())
+    if gamma is None:
+        gamma_min = torch.ones_like(var())
+        gamma_max = torch.ones_like(var())
+    else:
+        if len(gamma) == 1:
+            gamma_min = 2.0 * gamma[0]
+            gamma_max = 2.0 * gamma[0]
+        else:
+            gamma_min = 2.0 * gamma[0]
+            gamma_max = 2.0 * gamma[1]
 
     dx = var.dx
 
@@ -387,24 +395,29 @@ def _grad_rhs_adjust(
         for bc in var.bcs:
             if bc.bc_type == "neumann":
                 at_bc = _return_bc_val(bc, var, dim)
-                rhs_adj[dim][bc.bc_mask_prev] += (
-                    (1 / 3) * (at_bc * bc.bc_n_vec[j]) * adv[dim][bc.bc_mask_prev]
-                )
-            elif bc.bc_type == "periodic":
 
-                rhs_adj[dim][bc.bc_mask_prev] += (
-                    var()[dim][bc.bc_mask_prev]
-                    / (2.0 * dx[j])
-                    * float(bc.bc_n_dir)
-                    * adv[dim][bc.bc_mask_prev]
-                )
+                if bc.bc_n_dir < 0:
+                    rhs_adj[dim][bc.bc_mask_prev] -= (
+                        (1 / 3)
+                        * (at_bc * bc.bc_n_vec[j])
+                        * gamma_max[dim][bc.bc_mask_prev]
+                    )
+                else:
+                    rhs_adj[dim][bc.bc_mask_prev] -= (
+                        (1 / 3)
+                        * (at_bc * bc.bc_n_vec[j])
+                        * gamma_min[dim][bc.bc_mask_prev]
+                    )
             else:
                 # Dirichlet and Symmetry BC: Do nothing
                 pass
 
 
 def _grad_central_adjust(
-    var: Field, A_ops: list[list[Tensor]], dim: int, adv: Tensor | None = None
+    var: Field,
+    A_ops: list[list[Tensor]],
+    dim: int,
+    gamma: tuple[Tensor, ...] | None = None,
 ) -> None:
     """Adjust gradient's A_ops to accommodate boundary conditions.
 
@@ -415,8 +428,16 @@ def _grad_central_adjust(
         it is not the dimension of the mesh!
     """
 
-    if adv is None:
-        adv = torch.ones_like(var())
+    if gamma is None:
+        gamma_min = torch.ones_like(var())
+        gamma_max = torch.ones_like(var())
+    else:
+        if len(gamma) == 1:
+            gamma_min = gamma[0]
+            gamma_max = gamma[0]
+        else:
+            gamma_min = gamma[0]
+            gamma_max = gamma[1]
 
     Ap, Ac, Am = A_ops
 
@@ -433,18 +454,19 @@ def _grad_central_adjust(
 
             if bc.bc_type == "neumann" or bc.bc_type == "symmetry":
 
-                adv_at_mask_p = adv[dim][bc.bc_mask_prev]
+                gmx_at_mask = gamma_max[dim][bc.bc_mask_prev]
+                gmn_at_mask = gamma_min[dim][bc.bc_mask_prev]
 
                 if bc.bc_n_dir < 0:
                     # At lower side
-                    Ap[j][dim][bc.bc_mask_prev] = 4 / 3 * adv_at_mask_p
-                    Ac[j][dim][bc.bc_mask_prev] = -4 / 3 * adv_at_mask_p
+                    Ap[j][dim][bc.bc_mask_prev] += 1 / 3 * gmx_at_mask
+                    Ac[j][dim][bc.bc_mask_prev] -= 1 / 3 * gmn_at_mask
                     Am[j][dim][bc.bc_mask_prev] = 0.0
                 else:
                     # At upper side
                     Ap[j][dim][bc.bc_mask_prev] = 0.0
-                    Ac[j][dim][bc.bc_mask_prev] = -4 / 3 * adv_at_mask_p
-                    Am[j][dim][bc.bc_mask_prev] = 4 / 3 * adv_at_mask_p
+                    Ac[j][dim][bc.bc_mask_prev] += 1 / 3 * gmn_at_mask
+                    Am[j][dim][bc.bc_mask_prev] -= 1 / 3 * gmx_at_mask
             elif bc.bc_type == "periodic":
                 if bc.bc_n_dir < 0:
                     # At lower side
@@ -465,7 +487,6 @@ class Div(Discretizer):
     """Divergence operator.
     It supports `central` and `upwind` discretization methods.
 
-    WIP
     FUTURE: quick scheme
     """
 
@@ -516,9 +537,11 @@ class Div(Discretizer):
 
             if limiter == "none":
                 for i in range(var_i.dim):
-                    _grad_rhs_adjust(var_i, rhs_adj, i, adv)
+                    _grad_rhs_adjust(var_i, rhs_adj, i, (adv,))
             elif limiter == "upwind":
-                pass
+                gamma_min, gamma_max = _gamma_from_adv(adv, var_i)
+                for i in range(var_i.dim):
+                    _grad_rhs_adjust(var_i, rhs_adj, i, (gamma_min, gamma_max))
             elif limiter == "quick":
                 raise NotImplementedError(
                     "FDC Div: quick scheme is not implemented yet."
@@ -540,7 +563,6 @@ def _check_limiter(config: dict[str, str] | None) -> str:
         return "none"
 
 
-# NOTE: wrong! need var.dim since adv = var_j
 def _adv_central(
     adv: Tensor, var: Field, A_ops: list[list[Tensor]]
 ) -> list[list[Tensor]]:
@@ -565,7 +587,7 @@ def _adv_central(
             Ac[j][i] *= adv[i]
             Am[j][i] *= adv[i]
 
-        _grad_central_adjust(var, [Ap, Ac, Am], i)
+        _grad_central_adjust(var, [Ap, Ac, Am], i, (adv,))
 
     return [Ap, Ac, Am]
 
@@ -573,94 +595,16 @@ def _adv_central(
 def _adv_upwind(adv: Tensor, var: Field) -> list[list[Tensor]]:
     """Upwind discretization of the advection term."""
 
-    zeros = torch.zeros_like(var())
-    gamma_min = torch.min(adv, zeros)
-    gamma_max = torch.max(adv, zeros)
+    gamma_min, gamma_max = _gamma_from_adv(adv, var)
 
     Ap = [gamma_min for _ in range(var.mesh.dim)]
     Ac = [gamma_min + gamma_max for _ in range(var.mesh.dim)]
     Am = [-gamma_max for _ in range(var.mesh.dim)]
 
     for i in range(var.dim):
-        _div_upwind_adjust(var, [Ap, Ac, Am], gamma_min, gamma_max, i)
+        _grad_central_adjust(var, [Ap, Ac, Am], i, (gamma_min, gamma_max))
 
     return [Ap, Ac, Am]
-
-
-# NOTE: maybe we can merge this with _grad_central_adjust?
-def _div_upwind_adjust(
-    var: Field,
-    A_ops: list[list[Tensor]],
-    gamma_min: Tensor,
-    gamma_max: Tensor,
-    dim: int,
-) -> None:
-    """Adjust `Div`'s upwind A_ops to accommodate boundary conditions. Similar to `_grad_upwind_adjust`.
-
-    Args:
-        var (Field): input variable to be discretized
-        A_ops (tuple[list[Tensor], ...]): tuple of lists of tensors containing the coefficients of the discretization. `len(A_ops) == 3` since we need `Ap`, `Ac`, and `Am` coefficients.
-        dim (int): variable dimension. It should be in the range of `var.dim`. Defaults to 0.
-        it is not the dimension of the mesh!
-    """
-
-    Ap, Ac, Am = A_ops
-
-    dx = var.dx
-
-    # Treat boundaries
-    for j in range(var.mesh.dim):
-
-        # Treat BC
-        for bc in var.bcs:
-            # If discretization direction is not the same as the BC surface normal direction, do nothing
-            if bc.bc_n_vec[j] == 0:
-                continue
-
-            if bc.bc_type == "neumann" or bc.bc_type == "symmetry":
-
-                if bc.bc_n_dir < 0:
-
-                    adv_p = (
-                        1 / 3 * gamma_max[j][dim][bc.bc_mask_prev]
-                        + gamma_min[j][dim][bc.bc_mask_prev]
-                    )
-                    adv_c = (
-                        -1 / 3 * gamma_max[j][dim][bc.bc_mask_prev]
-                        - gamma_min[j][dim][bc.bc_mask_prev]
-                    )
-
-                    # At lower side
-                    Ap[j][dim][bc.bc_mask_prev] = adv_p
-                    Ac[j][dim][bc.bc_mask_prev] = adv_c
-                    Am[j][dim][bc.bc_mask_prev] = 0.0
-                else:
-                    adv_c = (
-                        gamma_max[j][dim][bc.bc_mask_prev]
-                        + 1 / 3 * gamma_min[j][dim][bc.bc_mask_prev]
-                    )
-                    adv_m = (
-                        -gamma_max[j][dim][bc.bc_mask_prev]
-                        - 1 / 3 * gamma_min[j][dim][bc.bc_mask_prev]
-                    )
-                    # At upper side
-                    Ap[j][dim][bc.bc_mask_prev] = 0.0
-                    Ac[j][dim][bc.bc_mask_prev] = adv_c
-                    Am[j][dim][bc.bc_mask_prev] = adv_m
-            elif bc.bc_type == "periodic":
-                if bc.bc_n_dir < 0:
-                    # At lower side
-                    Am[j][dim][bc.bc_mask_prev] = 0.0
-                else:
-                    # At upper side
-                    Ap[j][dim][bc.bc_mask_prev] = 0.0
-            else:
-                # Dirichlet BC: Do nothing
-                pass
-
-        Ap[j][dim] /= 2.0 * dx[j]
-        Ac[j][dim] /= 2.0 * dx[j]
-        Am[j][dim] /= 2.0 * dx[j]
 
 
 def _div_var_j_to_tensor(var_j: Field | Tensor | float, var_i: Field) -> Tensor:
@@ -676,6 +620,15 @@ def _div_var_j_to_tensor(var_j: Field | Tensor | float, var_i: Field) -> Tensor:
         adv = var_j()
 
     return adv
+
+
+def _gamma_from_adv(adv: Tensor, var: Field) -> tuple[Tensor, Tensor]:
+
+    zeros = torch.zeros_like(var())
+    gamma_min = torch.min(adv, zeros)
+    gamma_max = torch.max(adv, zeros)
+
+    return gamma_min, gamma_max
 
 
 class Ddt(Discretizer):
@@ -729,107 +682,3 @@ class FDC:
             self.config[scheme][target] = val
         else:
             self.config = {scheme: {target: val}}
-
-
-# NOTE: Legacy code. Will be removed in the future.
-# @dataclass
-# class FDC_old:
-#     """Collection of the operators for explicit finite difference discretization."""
-
-#     def ddt(self, dt: float, var: Field) -> Tensor:
-#         """Time derivative of a given field.
-
-#         Note:
-#             - If `var` does not have old `VARo`, attribute, current `VAR` will be treated as `VARo`.
-#         """
-
-#         ddt = []
-
-#         for i in range(var.dim):
-#             try:
-#                 var_o = var.VARo[i]
-#             except AttributeError:
-#                 # If not saved, use current value (treat for the first iteration)
-#                 var_o = var()[i]
-#             ddt.append((var()[i] - var_o) / dt)
-
-#         return torch.stack(ddt)
-
-#     def div(self, var_j: Field, var_i: Field) -> Tensor:
-#         """Divergence of two fields.
-#         Note:
-#             - To avoid the checkerboard problem, flux limiter is used. It supports `none`, `upwind` and `quick` limiter. (here, `none` is equivalent to the second order central difference.)
-#         """
-
-#         if self.config is not None and "limiter" in self.config["div"]:
-#             limiter = self.config["div"]["limiter"]
-#         else:
-#             warnings.warn("FDM: no limiter is specified. Use `none` as default.")
-#             limiter = "none"
-
-#         if var_j.name == var_i.name:
-#             # If var_i and var_j are the same field, use the same tensor.
-#             var_j.set_var_tensor(var_i().clone())
-
-#         div = []
-
-#         dx = var_j.dx
-
-#         for i in range(var_i.dim):
-
-#             d_val = torch.zeros_like(var_i()[i])
-
-#             for j in range(var_j.dim):
-
-#                 if limiter == "none":
-#                     """Central difference scheme."""
-
-#                     pad = create_pad(var_i.mesh.dim)
-#                     slicer = inner_slicer(var_i.mesh.dim)
-
-#                     bc_il = var_i.get_bc(f"d-{NUM_TO_DIR[j]}l")
-#                     bc_ir = var_i.get_bc(f"d-{NUM_TO_DIR[j]}r")
-
-#                     # m_val = fill_pad(pad(var_i()[i]), j, 1, slicer)
-#                     m_val = fill_pad_bc(pad(var_i()[i]), 1, slicer, [bc_il, bc_ir], j)
-
-#                     d_val += (
-#                         var_j()[j]
-#                         * (
-#                             (torch.roll(m_val, -1, j) - torch.roll(m_val, 1, j))
-#                             / (2 * dx[j])
-#                         )[slicer]
-#                     )
-
-#                 elif limiter == "upwind":
-
-#                     pad = create_pad(var_i.mesh.dim)
-#                     slicer = inner_slicer(var_i.mesh.dim)
-
-#                     var_i_pad = fill_pad(pad(var_i()[i]), j, 1, slicer)
-#                     var_j_pad = fill_pad(pad(var_j()[j]), j, 1, slicer)
-
-#                     m_val_p = (torch.roll(var_j_pad, -1, j) + var_j_pad) / 2
-#                     m_val_m = (torch.roll(var_j_pad, 1, j) + var_j_pad) / 2
-
-#                     f_val_p = (m_val_p + m_val_p.abs()) * var_i_pad / 2 - (
-#                         m_val_p - m_val_p.abs()
-#                     ) * torch.roll(var_i_pad, -1, j) / 2
-
-#                     f_val_m = (m_val_m + m_val_m.abs()) * torch.roll(
-#                         var_i_pad, 1, j
-#                     ) / 2 - (m_val_p - m_val_p.abs()) * var_i_pad / 2
-
-#                     d_val += ((f_val_p - f_val_m) / dx[j])[slicer]
-
-#                 elif limiter == "quick":
-#                     pad = create_pad(var_i.mesh.dim, 2)
-#                     slicer = inner_slicer(var_i.mesh.dim, 2)
-
-#                     pass
-#                 else:
-#                     raise ValueError("FDM: Unknown limiter.")
-
-#             div.append(d_val)
-
-#         return torch.stack(div)
