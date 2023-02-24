@@ -26,7 +26,6 @@ class DType:
     precision: Union[str, int] = "double"
 
     def __post_init__(self):
-
         if self.precision in DTYPE_SINGLE:
             # Set default precision to single
             torch.set_default_tensor_type(torch.FloatTensor)
@@ -82,7 +81,6 @@ class TorchDevice:
     device_type: str = "cpu"
 
     def __init__(self, device_type: str = "cpu"):
-
         assert device_type in TORCH_DEVICE
 
         self._device = torch.device(device_type.lower())
@@ -93,5 +91,4 @@ class TorchDevice:
         return self._device
 
     def __repr__(self) -> str:
-
         return f"Device on {self.device}"

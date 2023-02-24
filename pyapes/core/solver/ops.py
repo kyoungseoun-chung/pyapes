@@ -120,7 +120,6 @@ def _Aop(target: Field, eqs: dict[int, OPStype]) -> Tensor:
     res = torch.zeros_like(target())
 
     for op in eqs:
-
         if eqs[op]["name"].lower() == "ddt":
             continue
         elif op > 1 and eqs[op]["name"].lower() == "ddt":
@@ -139,7 +138,6 @@ def _Aop(target: Field, eqs: dict[int, OPStype]) -> Tensor:
         res += Ax
 
     if eqs[0]["name"].lower() == "ddt":
-
         res += eqs[0]["Aop"](*eqs[0]["param"], target)
 
     return res

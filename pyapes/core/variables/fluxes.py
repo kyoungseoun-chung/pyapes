@@ -143,7 +143,6 @@ class Flux:
             self._center[i] = c_val
 
     def limiter(self, l_type: str) -> None:
-
         raise NotImplementedError
 
     def __mul__(self, target: float | int) -> Flux:
@@ -151,7 +150,6 @@ class Flux:
 
         for i in self._face:
             for j in self._face[i]:
-
                 self._face[i][j]["l"] *= target
                 self._face[i][j]["r"] *= target
 

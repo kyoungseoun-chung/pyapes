@@ -36,7 +36,6 @@ class Mesh:
         device: str = "cpu",
         dtype: Union[str, int] = "double",
     ):
-
         assert device in TORCH_DEVICE, "Mesh: device only accept cpu or cuda"
         self.device = TorchDevice(device).device
 
@@ -220,7 +219,6 @@ class Mesh:
         del_grid: list[Tensor] = []
 
         for idx, g in enumerate(self.grid):
-
             g_del = torch.zeros_like(g)
 
             g_rp = torch.roll(g.clone(), -1, idx) - g
@@ -289,7 +287,6 @@ def boundary_mask(mesh: Mesh) -> tuple[dict, dict]:
 
     # Loop over all faces
     for obj in domain.config:
-
         mask = torch.zeros(*nx, dtype=dtype.bool, device=device)
         mask = get_box_mask(x, dx, domain.config[obj], mask, dim)
 
@@ -299,7 +296,6 @@ def boundary_mask(mesh: Mesh) -> tuple[dict, dict]:
 
     # For the inner objects
     if obstacle is not None:
-
         for i, obj in enumerate(obstacle):
             obj_mask = {}
             if obj.type == "box":
@@ -315,7 +311,6 @@ def boundary_mask(mesh: Mesh) -> tuple[dict, dict]:
                     obj_mask.update({mask_face_id: mask})
                 object_mask.update({i: obj_mask})
             else:
-
                 raise NotImplementedError(
                     "Mask: non box type inner obstacle is not supported yet!"
                 )
@@ -344,9 +339,7 @@ def get_box_mask(
         _ix[i] = torch.argmin(abs(x[i] - x_p[i]))
 
     if dim == 1:
-        mask[
-            _ix[0] : _ix[0] + _nx[0],
-        ] = True
+        mask[_ix[0] : _ix[0] + _nx[0],] = True
     elif dim == 2:
         mask[
             _ix[0] : _ix[0] + _nx[0],

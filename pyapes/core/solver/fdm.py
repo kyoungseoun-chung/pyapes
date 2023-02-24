@@ -28,11 +28,18 @@ class OPStype(TypedDict):
 
     name: str
     """Operator names"""
-    Aop: Callable[..., Tensor]
+    Aop: Callable[
+        [Tensor | float | None, Field, list[list[Tensor]]], Tensor
+    ] | Callable[
+        [Field | Tensor | float | None, dict[str, str], Field, list[list[Tensor]]],
+        Tensor,
+    ]
     """Linear system operator. `Aop` is equivalent to `Ax` in `Ax = b`."""
     target: Field
     """Target field to be discretized."""
-    param: tuple[float | Tensor | None, ...] | tuple[Field, dict[str, dict[str, str]]]
+    param: tuple[float | Tensor | None, ...] | tuple[
+        Field | Tensor | float, dict[str, str]
+    ]
     """Additional parameters other than target. e.g. `coeff` in `laplacian(coeff, var)`."""
     sign: float | int
     """Sign to be applied."""
@@ -40,7 +47,9 @@ class OPStype(TypedDict):
     """Additional information. e.g. `dt` in `Ddt`."""
     A_coeffs: list[list[Tensor]]
     """Coefficients of the discretization."""
-    adjust_rhs: Callable[[Field], Tensor]
+    adjust_rhs: Callable[[Field], Tensor] | Callable[
+        [Field, Field, dict[str, str]], Tensor
+    ]
     """Tensor used to adjust rhs."""
 
 
@@ -94,7 +103,6 @@ class Operators:
         return self._config
 
     def __eq__(self, other: Field | Tensor | float) -> Operators:
-
         if isinstance(other, Tensor):
             self._rhs = other
         elif isinstance(other, Field):
@@ -109,14 +117,12 @@ class Operators:
         return self
 
     def __add__(self, other: Operators) -> Operators:
-
         idx = list(self._ops.keys())
         self._ops.update({idx[-1] + 1: other.ops[0]})
 
         return self
 
     def __sub__(self, other: Operators) -> Operators:
-
         idx = list(self._ops.keys())
         other.ops[0]["sign"] = -1
         self._ops.update({idx[-1] + 1: other.ops[0]})
@@ -124,7 +130,6 @@ class Operators:
         return self
 
     def __neg__(self) -> Operators:
-
         self._ops[0]["sign"] = -1
 
         return self
@@ -147,7 +152,6 @@ class Laplacian(Operators):
     """
 
     def __call__(self, *args: Any) -> Laplacian:
-
         if len(args) == 2:
             assert isinstance(
                 args[0], float | Tensor
@@ -204,9 +208,7 @@ class Grad(Operators):
     """
 
     def __call__(self, *inputs: Any) -> Grad:
-
         if isinstance(inputs, tuple):
-
             assert isinstance(inputs[0], float) or isinstance(
                 inputs[0], Tensor
             ), "FDM Grad: if additional parameter is provided, it must be a float or Tensor!"
@@ -242,7 +244,6 @@ class Grad(Operators):
     def Aop(
         param: float | Tensor | None, var: Field, A_coeffs: list[list[Tensor]]
     ) -> Tensor:
-
         if param is None:
             return FDC().grad.apply(A_coeffs, var)
         else:
@@ -315,10 +316,9 @@ class Div(Operators):
         var_i: Field,
         A_coeffs: list[list[Tensor]],
     ) -> Tensor:
-
         if isinstance(var_j, Field):
             A_coeffs = FDC.div.build_A_coeffs(var_j, var_i, config)
-            rhs_adj = FDC.div.adjust_rhs(var_i)
+            rhs_adj = FDC.div.adjust_rhs(var_j, var_i, config)
 
         return FDC().div.apply(A_coeffs, var_i)
 
@@ -331,7 +331,6 @@ class Ddt(Operators):
     """
 
     def __call__(self, var: Field) -> Ddt:
-
         try:
             dt = var.dt
         except AttributeError:

@@ -17,7 +17,6 @@ def burger_exact_nd(mesh: Mesh, nu: float, t: float) -> Tensor:
     """Exact solution of the burgers equation from the given references."""
 
     if mesh.dim == 1:
-
         phi = torch.exp(-((mesh.X - 4 * t) ** 2) / (4 * nu * (t + 1))) + torch.exp(
             -((mesh.X - 4 * t - 2 * pi) ** 2) / (4 * nu * (t + 1))
         )

@@ -58,7 +58,6 @@ class Box(Geometry, metaclass=BoxType):
         lower: list[float] or tuple[float, ...],
         upper: list[float] or tuple[float, ...],
     ):
-
         assert len(lower) == len(upper), "Box: length of inputs has to be matched!"
 
         # Make sure to be a list and contains float

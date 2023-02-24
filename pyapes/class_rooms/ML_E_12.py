@@ -9,7 +9,6 @@ ROOM = "ML E 12"
 
 
 def configs() -> Container:
-
     stair_depth = 0.9
     stair_width = 9.55
     stair_height = 0.14

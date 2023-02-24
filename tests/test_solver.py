@@ -183,7 +183,6 @@ def test_heat_conduction_2d_mixed() -> None:
     solver.solve()
 
     def _exact_solution(x: Tensor, y: Tensor, n: int) -> Tensor:
-
         sol_ex = torch.zeros_like(x)
 
         for i in range(1, n + 1):
@@ -426,7 +425,6 @@ def test_burger_1d() -> None:
     var.save_old()
 
     for _ in range(n_itr):
-
         res.append(var()[0].clone())
 
         solver.set_eq(fdm.ddt(var) + fdm.div(var, var) - fdm.laplacian(nu, var) == 0.0)

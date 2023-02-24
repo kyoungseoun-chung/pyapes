@@ -9,7 +9,6 @@ import torch
 
 
 def test_getsize() -> None:
-
     from pyapes.tools.utils import getsize
 
     @dataclass

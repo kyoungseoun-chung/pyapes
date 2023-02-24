@@ -79,7 +79,6 @@ class Geometry:
         raise NotImplementedError
 
     def __eq__(self, other: Any):
-
         return (self.lower == other.lower) and (self.size == other.size)
 
     def __repr__(self) -> str:

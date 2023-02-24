@@ -187,7 +187,6 @@ def _treat_edge(
         # Treat edge with the second order forward/backward difference
 
         for idx in range(var.mesh.dim):
-
             slicer_1[idx] = 0
             slicer_2[idx] = 1
             slicer_3[idx] = 2
@@ -218,7 +217,6 @@ def _treat_edge(
 
     elif ops == "Grad":
         for idx in range(var.mesh.dim):
-
             slicer_1[idx] = 0
             slicer_2[idx] = 1
             slicer_3[idx] = 2
@@ -259,15 +257,12 @@ class Laplacian(Discretizer):
 
     @staticmethod
     def build_A_coeffs(var: Field) -> list[list[Tensor]]:
-
         App, Ap, Ac, Am, Amm = default_A_ops(var, 2)
 
         dx = var.dx
         # Treat boundaries
         for i in range(var.dim):
-
             for j in range(var.mesh.dim):
-
                 if var.bcs is None:
                     # Do nothing
                     continue
@@ -301,19 +296,16 @@ class Laplacian(Discretizer):
 
     @staticmethod
     def adjust_rhs(var: Field) -> Tensor:
-
         rhs_adj = torch.zeros_like(var())
         dx = var.dx
 
         # Treat boundaries
         for i in range(var.dim):
-
             if var.bcs is None:
                 # Do nothing
                 continue
 
             for j in range(var.mesh.dim):
-
                 for bc in var.bcs:
                     if bc.bc_type == "neumann":
                         at_bc = _return_bc_val(bc, var, i)
@@ -362,7 +354,6 @@ class Grad(Discretizer):
 
     @staticmethod
     def adjust_rhs(var: Field) -> Tensor:
-
         rhs_adj = torch.zeros_like(var())
 
         if var.bcs is not None:
@@ -391,7 +382,6 @@ def _grad_rhs_adjust(
     dx = var.dx
 
     for j in range(var.mesh.dim):
-
         for bc in var.bcs:
             if bc.bc_type == "neumann":
                 at_bc = _return_bc_val(bc, var, dim)
@@ -445,7 +435,6 @@ def _grad_central_adjust(
 
     # Treat boundaries
     for j in range(var.mesh.dim):
-
         # Treat BC
         for bc in var.bcs:
             # If discretization direction is not the same as the BC surface normal direction, do nothing
@@ -453,7 +442,6 @@ def _grad_central_adjust(
                 continue
 
             if bc.bc_type == "neumann" or bc.bc_type == "symmetry":
-
                 gmx_at_mask = gamma_max[dim][bc.bc_mask_prev]
                 gmn_at_mask = gamma_min[dim][bc.bc_mask_prev]
 
@@ -527,11 +515,9 @@ class Div(Discretizer):
 
     @staticmethod
     def adjust_rhs(var_j: Field, var_i: Field, config: dict[str, str]) -> Tensor:
-
         rhs_adj = torch.zeros_like(var_i())
 
         if var_i.bcs is not None:
-
             adv = _div_var_j_to_tensor(var_j, var_i)
             limiter = _check_limiter(config)
 
@@ -580,9 +566,7 @@ def _adv_central(
     _, Ap, Ac, Am, _ = A_ops
 
     for i in range(var.dim):
-
         for j in range(var.mesh.dim):
-
             Ap[j][i] *= adv[i]
             Ac[j][i] *= adv[i]
             Am[j][i] *= adv[i]
@@ -623,7 +607,6 @@ def _div_var_j_to_tensor(var_j: Field | Tensor | float, var_i: Field) -> Tensor:
 
 
 def _gamma_from_adv(adv: Tensor, var: Field) -> tuple[Tensor, Tensor]:
-
     zeros = torch.zeros_like(var())
     gamma_min = torch.min(adv, zeros)
     gamma_max = torch.max(adv, zeros)

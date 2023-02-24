@@ -19,12 +19,10 @@ PATHLIKE = Union[str, Path, os.PathLike]
 
 @dataclass
 class FieldData:
-
     mesh: Mesh
     save_dir: PATHLIKE
 
     def __post_init__(self):
-
         # Get coordinate origin
         self.g_min = (
             self.mesh.x[0].min() - 0.5 * self.mesh.dx[0],
@@ -58,7 +56,6 @@ class SaveDictionary(FieldData):
         data_save_dict = dict()
 
         for key in dict_data:
-
             data_to_save = dict_data[key]
 
             # If the data is torch.Tensor, convert to numpy
@@ -107,7 +104,6 @@ def _save_to_vtk(
 
 class TensorBoardTracker:
     def __init__(self, log_dir: PATHLIKE, overwrite: bool = True):
-
         self.log_dir = log_dir
 
         _validate_log_dir(self.log_dir)

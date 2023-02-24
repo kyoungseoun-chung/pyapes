@@ -24,7 +24,6 @@ def create_pad(
 
 
 def boundary_slicer(dim: int, bcs: list[BC_type]) -> list[slice]:
-
     slice_idx: list[list[int | None]] = [[1, -1] for _ in range(dim)]
 
     for bc in bcs:

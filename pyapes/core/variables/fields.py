@@ -50,7 +50,6 @@ class Field:
     """If object inside and `object_interp=True`, interpolate the inside value of the object."""
 
     def __post_init__(self):
-
         # Initialize the variable as a zero tensor
         self._VAR = torch.zeros(
             self.dim,
@@ -64,13 +63,10 @@ class Field:
         # NOTE: Also need load data from file
         # Initialization value
         if self.init_val is not None:
-
             if isinstance(self.init_val, float):
-
                 self.VAR += self.init_val
 
             elif isinstance(self.init_val, list):
-
                 assert self.dim == len(
                     self.init_val
                 ), "Field: init_val should match with Field dimension!"
@@ -87,7 +83,6 @@ class Field:
                     )
 
             elif isinstance(self.init_val, Tensor):
-
                 assert self.dim == self.init_val.size(
                     0
                 ), "Field: init_val should match with Field dimension!"
@@ -98,7 +93,6 @@ class Field:
                 self.VAR = torch.rand_like(self.VAR)
 
             else:
-
                 raise ValueError("Field: unsupported data type!")
 
         if self.bc_config is not None:
@@ -112,7 +106,6 @@ class Field:
 
     @property
     def mesh_axis(self) -> list[int]:
-
         return [i + 1 for i in range(self.mesh.dim)]
 
     def set_time(self, dt: float, init_val: float | None = None) -> None:
@@ -243,7 +236,6 @@ class Field:
                     self._VAR[i] = val
 
     def __getitem__(self, idx: int | slice) -> torch.Tensor:
-
         if isinstance(idx, slice):
             return self.VAR
         else:
@@ -262,7 +254,6 @@ class Field:
         elif isinstance(other, float):
             self.VAR += other
         elif isinstance(other, list):
-
             assert (
                 len(other) == self.dim
             ), "Field: input vector should match with Field dimension!"
@@ -271,14 +262,12 @@ class Field:
                 self.VAR[i] += other[i]
 
         elif isinstance(other, Tensor):
-
             if other.size(0) == self.dim:
                 self.VAR = other
             else:
                 for i in range(other.size(0)):
                     self.VAR[i] += other[i]
         else:
-
             raise TypeError(
                 "Field: you can only add Field, float, Tensor, list[int], or list[float]!"
             )
@@ -367,10 +356,8 @@ class Field:
 
         # Setting boundary objects
         if self.bc_config is not None:
-
             # First domain
             if self.bc_config["domain"] is not None:
-
                 d_obj_config = self.mesh.domain.config
                 d_bc_config = self.bc_config["domain"]
 
@@ -379,7 +366,6 @@ class Field:
                 ), f"Field: domain config ({len(d_obj_config)}) mismatch with bc config ({len(d_bc_config)})!"
 
                 for bc in d_bc_config:
-
                     # Not sure about a proper typing checking here...
                     bc_val = cast(BC_val_type, bc["bc_val"])
                     bc_face = cast(str, bc["bc_face"])

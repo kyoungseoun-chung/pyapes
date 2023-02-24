@@ -75,7 +75,6 @@ def poisson_bcs(dim: int = 3, debug: bool = False) -> list[BC_config_type]:
 
 
 def poisson_1d_bc(grid: Tensor, mask: Tensor, *_) -> Tensor:
-
     return (
         7.0 / 9.0
         - 2.0 / 9.0 * grid[0][mask]
@@ -85,5 +84,4 @@ def poisson_1d_bc(grid: Tensor, mask: Tensor, *_) -> Tensor:
 
 
 def poisson_2d_bc(grid: Tensor, mask: Tensor, *_) -> Tensor:
-
     return grid[1][mask] * (1.0 - grid[1][mask]) * (grid[0][mask] ** 3)
