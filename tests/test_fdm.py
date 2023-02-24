@@ -32,11 +32,13 @@ def test_fdc_edge() -> None:
 
     fdc = FDC()
 
+    # Edge grad
     grad_torch = torch.gradient(var()[0], spacing=mesh.dx[0].item(), edge_order=2)
     grad_fdc = fdc.grad(var, edge=True)
 
     assert_close(grad_torch[0], grad_fdc[0][0])
 
+    # Edge lap
     lap_torch_1 = torch.gradient(grad_torch[0], spacing=mesh.dx[0].item(), edge_order=2)
     lap_torch_2 = torch.gradient(grad_torch[1], spacing=mesh.dx[0].item(), edge_order=2)
 
@@ -45,10 +47,11 @@ def test_fdc_edge() -> None:
     lap_fdc = fdc.laplacian(var, edge=True)
 
     assert_close(lap_torch, lap_fdc[0])
+
+    # Edge div
     pass
 
 
-# WIP: Revise all `FDC` tests
 @pytest.mark.parametrize(
     ["domain", "spacing"],
     [
@@ -113,7 +116,7 @@ def test_fdc_ops(domain: Box, spacing: list[float]) -> None:
     assert_close(grad[0][0][slicer], grad_manuel[0][slicer])
 
     # Div operator
-    div = fdc.div(var)
+    # div = fdc.div(var)
 
 
 def _grad_manuel_op(var: Tensor, dx: Tensor, dim: int) -> list[Tensor]:

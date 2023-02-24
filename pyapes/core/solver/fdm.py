@@ -288,13 +288,14 @@ class Div(Operators):
         self._var_j = var_j
         self._var_i = var_i
 
-        A_coeffs = FDC.div.build_A_coeffs(var_j, var_i, self.config)
+        A_coeffs = FDC.div.build_A_coeffs(var_j, var_i, self.config["div"])
 
+        # FIXME: check entries!
         self._ops[0] = {
             "name": self.__class__.__name__,
             "Aop": self.Aop,
             "target": var_i,
-            "param": (var_j, self.config),
+            "param": (var_j, self.config["div"]),
             "sign": 1.0,
             "other": None,
             "A_coeffs": A_coeffs,
@@ -310,7 +311,7 @@ class Div(Operators):
     @staticmethod
     def Aop(
         var_j: Field | float | Tensor,
-        config: dict[str, dict[str, str]],
+        config: dict[str, str],
         var_i: Field,
         A_coeffs: list[list[Tensor]],
     ) -> Tensor:
@@ -416,12 +417,11 @@ class FDM:
 
     def set_config(self, config: dict[str, dict[str, str]]) -> None:
         """Set the configuration options for the discretization operators.
+        The configuration should contain keys to identify the discretization scheme for each operator. e.g `config = {"div": {"scheme": "central"}}`.
 
         Args:
             config: configuration options for the discretization operators.
 
-        Returns:
-            FDM: self
         """
 
         self.config = config
