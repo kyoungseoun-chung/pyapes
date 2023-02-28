@@ -516,7 +516,9 @@ class Div(Discretizer):
         return [App, Ap, Ac, Am, Amm]
 
     @staticmethod
-    def adjust_rhs(var_j: Field, var_i: Field, config: dict[str, str]) -> Tensor:
+    def adjust_rhs(
+        var_j: Field | Tensor | float, var_i: Field, config: dict[str, str]
+    ) -> Tensor:
         rhs_adj = torch.zeros_like(var_i())
 
         if var_i.bcs is not None:
@@ -565,7 +567,7 @@ def _adv_central(
     # Leading dimension is the dimension of the mesh
     # The following dimension is the dimension of the variable
     # A_[mesh.dim][var.dim]
-    _, Ap, Ac, Am, _ = A_ops
+    Ap, Ac, Am = A_ops
 
     for i in range(var.dim):
         for j in range(var.mesh.dim):
@@ -583,9 +585,10 @@ def _adv_upwind(adv: Tensor, var: Field) -> list[list[Tensor]]:
 
     gamma_min, gamma_max = _gamma_from_adv(adv, var)
 
-    Ap = [gamma_min for _ in range(var.mesh.dim)]
-    Ac = [gamma_min + gamma_max for _ in range(var.mesh.dim)]
-    Am = [-gamma_max for _ in range(var.mesh.dim)]
+    # Here 2.0 is multiplied to achieve consistent implementation of _grad_central_adjust (all coeffs are divided by 2.0 * dx there)
+    Ap = [2.0 * gamma_min for _ in range(var.mesh.dim)]
+    Ac = [2.0 * gamma_max - gamma_min for _ in range(var.mesh.dim)]
+    Am = [-2.0 * gamma_max for _ in range(var.mesh.dim)]
 
     for i in range(var.dim):
         _grad_central_adjust(var, [Ap, Ac, Am], i, (gamma_min, gamma_max))

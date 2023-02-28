@@ -8,11 +8,15 @@ on the other hand, `fdm` returns operation matrix, `Aop` of each discretization 
 """
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass
+from typing import get_origin
 
 import torch
 from torch import Tensor
 
+from pyapes.core.solver.fdm import DIV_RHS
+from pyapes.core.solver.fdm import GEN_RHS
 from pyapes.core.solver.fdm import Operators
 from pyapes.core.solver.fdm import OPStype
 from pyapes.core.solver.linalg import solve
@@ -59,20 +63,20 @@ class Solver:
         self.rhs = eq.rhs
 
         # Adjusting RHS based on the boundary conditions
+        # NOTE: Could not fix type issue here.
         if self.rhs is not None:
             for e in self.eqs:
                 if self.eqs[e]["name"] == "Div":
-                    var_j = self.eqs[e]["param"][0]
+                    param = self.eqs[e]["param"]
 
-                    assert var_j is not None
+                    assert len(param) == 2
 
-                    config = self.eqs[e]["param"][1]
+                    rhs_func = self.eqs[e]["adjust_rhs"]
 
-                    assert isinstance(config, dict)
-
-                    self.rhs += self.eqs[e]["adjust_rhs"](var_j, self.var, config)
+                    self.rhs += rhs_func(param[0], self.var, param[1])  # type: ignore
                 else:
-                    self.rhs += self.eqs[e]["adjust_rhs"](self.var)
+                    rhs_func = self.eqs[e]["adjust_rhs"]
+                    self.rhs += rhs_func(self.var)  # type: ignore
 
         # Resetting ops and rhs to avoid unnecessary copy when fdm is used multiple times in separate solvers
         eq.ops = {}
@@ -134,10 +138,11 @@ def _Aop(target: Field, eqs: dict[int, OPStype]) -> Tensor:
             raise ValueError("FDM: ddt is not allowed in the middle of the equation!")
 
         # Compute A @ x
+        # NOTE: Could not fix type issue here.
         Ax = (
             eqs[op]["Aop"](*eqs[op]["param"], target, eqs[op]["A_coeffs"])
             * eqs[op]["sign"]
-        )
+        )  # type: ignore
 
         if eqs[op]["name"].lower() == "grad":
             # If operator is grad, re-shape to match the size of the target variable

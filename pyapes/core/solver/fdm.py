@@ -22,6 +22,9 @@ from pyapes.core.solver.fdc import FDC
 from pyapes.core.variables import Field
 from pyapes.core.variables.bcs import BC_type
 
+GEN_RHS = Callable[[Field], Tensor]
+DIV_RHS = Callable[[Field | Tensor | float, Field, dict[str, str]], Tensor]
+
 
 class OPStype(TypedDict):
     """Typed dict for the operation types."""
@@ -47,9 +50,8 @@ class OPStype(TypedDict):
     """Additional information. e.g. `dt` in `Ddt`."""
     A_coeffs: list[list[Tensor]]
     """Coefficients of the discretization."""
-    adjust_rhs: Callable[[Field], Tensor] | Callable[
-        [Field | float | Tensor, Field, dict[str, str]], Tensor
-    ]
+    adjust_rhs: GEN_RHS | DIV_RHS
+    # adjust_rhs: Any
     """Tensor used to adjust rhs."""
 
 
@@ -65,7 +67,7 @@ class Operators:
     # Init relevant attributes
     _ops: dict[int, OPStype] = field(default_factory=dict)
     _rhs: Tensor | None = None
-    _config: dict[str, dict[str, str]] = field(default_factory=dict)
+    _config: dict[str, str] = field(default_factory=dict)
 
     @property
     def ops(self) -> dict[int, OPStype]:
@@ -90,7 +92,7 @@ class Operators:
         """Primary Field variable to be discretized."""
         raise NotImplementedError
 
-    def update_config(self, config: dict[str, dict[str, str]]) -> None:
+    def update_config(self, config: dict[str, str]) -> None:
         """Update solver configuration.
 
         Args:
@@ -99,7 +101,7 @@ class Operators:
         self._config = config
 
     @property
-    def config(self) -> dict[str, dict[str, str]]:
+    def config(self) -> dict[str, str]:
         return self._config
 
     def __eq__(self, other: Field | Tensor | float) -> Operators:
@@ -151,17 +153,17 @@ class Laplacian(Operators):
         var: Field object to be discretized ($\Phi$)
     """
 
-    def __call__(self, *args: Any) -> Laplacian:
-        if len(args) == 2:
+    def __call__(self, *inputs: Any) -> Laplacian:
+        if len(inputs) == 2:
             assert isinstance(
-                args[0], float | Tensor
+                inputs[0], int | float | Tensor
             ), "FDM Laplacian: if additional parameter is provided, it must be a float or Tensor!"
 
-            coeffs = args[0]
-            var = args[1]
-        elif len(args) == 1:
+            coeffs = float(inputs[0]) if isinstance(inputs[0], int) else inputs[0]
+            var = inputs[1]
+        elif len(inputs) == 1:
             coeffs = None
-            var = args[0]
+            var = inputs[0]
         else:
             raise TypeError("FDM: invalid input type!")
 
@@ -210,16 +212,18 @@ class Grad(Operators):
     """
 
     def __call__(self, *inputs: Any) -> Grad:
-        if isinstance(inputs, tuple):
+        if len(inputs) == 2:
             assert isinstance(inputs[0], float) or isinstance(
                 inputs[0], Tensor
             ), "FDM Grad: if additional parameter is provided, it must be a float or Tensor!"
-
             coeffs = inputs[0]
             var = inputs[1]
-        elif isinstance(inputs, Field):
+        elif len(inputs) == 1:
+            assert isinstance(
+                inputs[0], Field
+            ), "FDM Grad: invalid input type! Input must be a Field."
             coeffs = None
-            var = inputs
+            var = inputs[0]
         else:
             raise TypeError("FDM: invalid input type!")
 
@@ -272,34 +276,35 @@ class Div(Operators):
         var_i: convective variable ($\vec{u}_j$)
     """
 
-    def __call__(self, *args: Any) -> Div:
+    def __call__(self, *inputs: Any) -> Div:
         """It is important to note that the order of args is important here. The first input is the convective variable (`var_j`), and the second input is the field to be discretized (`var_i`)."""
 
-        if isinstance(args, tuple):
+        if len(inputs) == 2:
             assert (
-                isinstance(args[0], float)
-                or isinstance(args[0], Tensor)
-                or isinstance(args[0], Field)
+                isinstance(inputs[0], float)
+                or isinstance(inputs[0], Tensor)
+                or isinstance(inputs[0], Field)
             ), "FDM Grad: if additional parameter is provided, it must be a float or Tensor or Field!"
-            var_j = args[0]
-            var_i = args[1]
-        elif isinstance(args, Field):
+            var_j = inputs[0]
+            var_i = inputs[1]
+        elif len(inputs) == 1:
             var_j = 1.0
-            var_i = args[0]
+            var_i = inputs[0]
         else:
             raise TypeError("FDM: invalid input type!")
+
+        assert isinstance(var_i, Field), "FDM Div: var_i must be a Field!"
 
         self._var_j = var_j
         self._var_i = var_i
 
-        A_coeffs = FDC.div.build_A_coeffs(var_j, var_i, self.config["div"])
+        A_coeffs = FDC.div.build_A_coeffs(var_j, var_i, self.config)
 
-        # FIXME: check entries!
         self._ops[0] = {
             "name": self.__class__.__name__,
             "Aop": self.Aop,
             "target": var_i,
-            "param": (var_j, self.config["div"]),
+            "param": (var_j, self.config),
             "sign": 1.0,
             "other": None,
             "A_coeffs": A_coeffs,
@@ -433,4 +438,4 @@ class FDM:
         self.config = config
 
         # Currently only `Div`` operator requires config
-        # self.div.update_config(config)
+        self.div.update_config(config["div"])
