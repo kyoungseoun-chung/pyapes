@@ -10,7 +10,6 @@ torch.set_default_dtype(torch.float64)
 
 
 def test_ops_comp_grad():
-
     nx = int(2**12)
 
     x = torch.linspace(0, 1, nx)

@@ -32,11 +32,13 @@ def test_fdc_edge() -> None:
 
     fdc = FDC()
 
+    # Edge grad
     grad_torch = torch.gradient(var()[0], spacing=mesh.dx[0].item(), edge_order=2)
     grad_fdc = fdc.grad(var, edge=True)
 
     assert_close(grad_torch[0], grad_fdc[0][0])
 
+    # Edge lap
     lap_torch_1 = torch.gradient(grad_torch[0], spacing=mesh.dx[0].item(), edge_order=2)
     lap_torch_2 = torch.gradient(grad_torch[1], spacing=mesh.dx[0].item(), edge_order=2)
 
@@ -45,10 +47,11 @@ def test_fdc_edge() -> None:
     lap_fdc = fdc.laplacian(var, edge=True)
 
     assert_close(lap_torch, lap_fdc[0])
+
+    # Edge div
     pass
 
 
-# WIP: Revise all `FDC` tests
 @pytest.mark.parametrize(
     ["domain", "spacing"],
     [
@@ -155,7 +158,6 @@ def _grad_manuel_op(var: Tensor, dx: Tensor, dim: int) -> list[Tensor]:
 
 
 def _lap_manuel_op(var: Tensor, dx: Tensor, dim: int) -> Tensor:
-
     dx = dx[0]
 
     lap_manuel = torch.zeros_like(var)
@@ -249,7 +251,6 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
 
     # Test 1D Advection Diffusion to see fdm.grad and fdm.div are interchangeable for this case.
     if mesh.dim == 1:
-
         solver.set_eq(fdm.grad(var_i) - fdm.laplacian(3.0, var_i) == 2.0)
 
         t_grad = (torch.roll(var_i()[0], -1, 0) - torch.roll(var_i()[0], 1, 0)) / (
@@ -299,11 +300,9 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
 
 
 class TestPrototype_LaplacianCoeffs:
-
     f_test = torch.linspace(0, 1, 6) ** 2
 
     def test_dirichlet(self):
-
         Am = torch.ones_like(self.f_test)
         Ap = torch.ones_like(Am)
         Ac = -2.0 * torch.ones_like(Am)
@@ -340,7 +339,6 @@ class TestPrototype_LaplacianCoeffs:
         assert_close(lap_manuel[1:-1], lap_A_ops[1:-1])
 
     def test_periodic(self):
-
         lap_manuel = self.lap_op(self.f_test)
         lap_manuel[1] = -2 * self.f_test[1] + self.f_test[2]
         lap_manuel[-2] = -2 * self.f_test[-2] + self.f_test[-3]

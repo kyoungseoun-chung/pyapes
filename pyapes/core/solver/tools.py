@@ -5,104 +5,43 @@
 import torch
 from torch import Tensor
 
-from pyapes.core.variables.bcs import BC_type
+from pyapes.core.variables import Field
 
 
-def fill_pad_bc(
-    var_padded: Tensor,
-    pad_length: int,
-    slicer: list[slice],
-    bcs: list[BC_type | None],
-    dim: int,
-) -> Tensor:
-    """Interpolate boundary conditions to padded tensor.
+def default_A_ops(var: Field, order: int) -> list[list[Tensor]]:
+    """Construct A_ops for the given order of the spatial discretization (the second order central difference scheme).
 
-    Args:
-        var_padded (Tensor): padded tensor.
-        pad_length (int): length of padding in one side.
-        slicer (tuple): inner part slicer
-        bcs (list[BC_type]): list of boundary conditions (in order of `l` to `r`).
-    """
+    Example:
 
-    # Make sure bcs are always for both sides l and r
-    assert len(bcs) == 2
+    - Below returned results are simplified for the sake of readability.
+    The actual results are the list of the tensor that has the same shape as the given `var`.
 
-    var_inner = var_padded[slicer].clone()
-
-    for _ in range(pad_length):
-
-        var_padded = _bc_interpolate(var_padded, bcs, slicer, dim)
-        var_padded[slicer] = var_inner
-
-    return var_padded
-
-
-def _bc_interpolate(
-    var_padded: Tensor,
-    bcs: list[BC_type | None],
-    slicer: list[slice],
-    dim: int,
-) -> Tensor:
-    """Interpolate boundary conditions to padded tensor."""
-
-    var_interp = torch.zeros_like(var_padded)
-
-    for idx, bc in enumerate(bcs):
-
-        if bc is None:
-            var_interp += torch.roll(var_padded, -1 + 2 * idx, dim)
-        else:
-            if bc.type == "dirichlet":
-
-                var_interp += torch.roll(var_padded, -bc.bc_n_dir, bc.bc_face_dim)
-            elif bc.type == "neumann":
-
-                var_dummy = torch.zeros_like(var_padded)
-
-                var_rolled = torch.roll(var_padded, bc.bc_n_dir, bc.bc_face_dim)
-                del_var = var_rolled - var_padded
-
-                var_dummy[slicer] = (var_padded - del_var)[slicer]
-                var_interp += torch.roll(var_dummy, bc.bc_n_dir, bc.bc_face_dim)
-
-            elif bc.type == "symmetry":
-
-                var_dummy = torch.zeros_like(var_padded)
-                var_dummy[slicer] = var_padded[slicer]
-
-                var_interp += torch.roll(var_dummy, bc.bc_n_dir, bc.bc_face_dim)
-
-            elif bc.type == "periodic":
-                var_dummy = torch.zeros_like(var_padded)
-                var_interp += torch.roll(var_padded, bc.bc_n_dir, bc.bc_face_dim)
-            else:
-                ValueError(f"BC: {bc.type} is not supported!")
-
-    return var_interp
-
-
-def fill_pad(var_padded: Tensor, dim: int, pad_length: int, slicer: list) -> Tensor:
-    """Fill padded tensor with values from inner part.
-
-    Note:
-        - It copies the edge of the inner part and fill the padded part with the copied values.
-        - Repeat process over `pad_length` times.
+    >>> App, Ap, Ac, Am, Amm = default_A_ops(var, order=1)
+    [0, ...], [1, ...], [-2, ...], [1, ...], [0, ...]
+    >>> App, Ap, Ac, Am, Amm = default_A_ops(var, order=2)
+    [0, ...], [1, ...], [0, ...], [-1, ...], [0, ...]
 
     Args:
-        var_padded (Tensor): padded tensor. Filled with zeros (usually).
-        dim (int): dimension to apply fill padding.
-        pad_length (int): length of padding in one side.
-        slicer (tuple): inner part slicer
+        var (Field): The field to be discretized.
+        order (int): The order of the spatial discretization. Should be either 1 or 2.
 
     Returns:
-        Tensor: padded tensor with values from inner part.
+        list[list[Tensor]]: A_ops for the given order of the spatial discretization. The coefficients are for `i+2`, `i+1`, `i`, `i-1`, `i-2` respectively.
     """
 
-    var_inner = var_padded[slicer].clone()
-    for _ in range(pad_length):
-        var_roll_p = torch.roll(var_padded, -1, dim)
-        var_roll_m = torch.roll(var_padded, 1, dim)
-        var_padded = var_roll_p + var_roll_m
-        var_padded[slicer] = var_inner
+    if order == 1:
+        App = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
+        Ap = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
+        Ac = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
+        Am = [-1.0 * torch.ones_like(var()) for _ in range(var.mesh.dim)]
+        Amm = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
+    elif order == 2:
+        App = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
+        Ap = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
+        Ac = [-2.0 * torch.ones_like(var()) for _ in range(var.mesh.dim)]
+        Am = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
+        Amm = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
+    else:
+        raise RuntimeError(f"Given {order=} should be either 1 or 2.")
 
-    return var_padded
+    return [App, Ap, Ac, Am, Amm]

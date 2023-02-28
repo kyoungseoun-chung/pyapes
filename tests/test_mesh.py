@@ -8,7 +8,6 @@ from pyapes.core.mesh import Mesh
 
 
 def test_mask() -> None:
-
     # with out object
     mesh = Mesh(Box[0:1, 0:1], None, [0.1, 0.1])
 

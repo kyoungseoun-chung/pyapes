@@ -8,11 +8,15 @@ on the other hand, `fdm` returns operation matrix, `Aop` of each discretization 
 """
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass
+from typing import get_origin
 
 import torch
 from torch import Tensor
 
+from pyapes.core.solver.fdm import DIV_RHS
+from pyapes.core.solver.fdm import GEN_RHS
 from pyapes.core.solver.fdm import Operators
 from pyapes.core.solver.fdm import OPStype
 from pyapes.core.solver.linalg import solve
@@ -58,11 +62,21 @@ class Solver:
         # RHS of the equation
         self.rhs = eq.rhs
 
-        # NOTE: SHOULD BE REMOVED?!
         # Adjusting RHS based on the boundary conditions
+        # NOTE: Could not fix type issue here.
         if self.rhs is not None:
             for e in self.eqs:
-                self.rhs += self.eqs[e]["adjust_rhs"](self.var)
+                if self.eqs[e]["name"] == "Div":
+                    param = self.eqs[e]["param"]
+
+                    assert len(param) == 2
+
+                    rhs_func = self.eqs[e]["adjust_rhs"]
+
+                    self.rhs += rhs_func(param[0], self.var, param[1])  # type: ignore
+                else:
+                    rhs_func = self.eqs[e]["adjust_rhs"]
+                    self.rhs += rhs_func(self.var)  # type: ignore
 
         # Resetting ops and rhs to avoid unnecessary copy when fdm is used multiple times in separate solvers
         eq.ops = {}
@@ -115,22 +129,20 @@ def _Aop(target: Field, eqs: dict[int, OPStype]) -> Tensor:
         - This function is intentionally separated from `Solver` class to make the `solve` process more transparent. (`rhs` and `eqs` are explicitly passed to the function)
     """
 
-    # NOTE: I THINK, RHS ADJUSTMENT SHOULD BE INCLUDED HERE
-
     res = torch.zeros_like(target())
 
     for op in eqs:
-
         if eqs[op]["name"].lower() == "ddt":
             continue
         elif op > 1 and eqs[op]["name"].lower() == "ddt":
             raise ValueError("FDM: ddt is not allowed in the middle of the equation!")
 
         # Compute A @ x
+        # NOTE: Could not fix type issue here.
         Ax = (
             eqs[op]["Aop"](*eqs[op]["param"], target, eqs[op]["A_coeffs"])
             * eqs[op]["sign"]
-        )
+        )  # type: ignore
 
         if eqs[op]["name"].lower() == "grad":
             # If operator is grad, re-shape to match the size of the target variable
@@ -139,7 +151,6 @@ def _Aop(target: Field, eqs: dict[int, OPStype]) -> Tensor:
         res += Ax
 
     if eqs[0]["name"].lower() == "ddt":
-
         res += eqs[0]["Aop"](*eqs[0]["param"], target)
 
     return res

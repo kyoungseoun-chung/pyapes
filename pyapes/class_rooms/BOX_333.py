@@ -16,7 +16,6 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 def configs() -> Container:
-
     ##########################################################################
     # Set reference values
     ##########################################################################
@@ -136,7 +135,6 @@ def configs() -> Container:
     ]
 
     for name, ex, xp, dir in zip(wall_name, wall_e_x, wall_x_p, wall_norm):
-
         obj_configs.append(
             {
                 "name": name,

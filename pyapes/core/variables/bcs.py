@@ -61,7 +61,6 @@ class BC(ABC):
     """Device. Since we do not store `Mesh` object here, explicitly pass device."""
 
     def __post_init__(self):
-
         _bc_val_type_check(self.bc_val)
         self._bc_face_dim = DIR_TO_NUM[self.bc_face[0]]
 
@@ -189,7 +188,6 @@ class Dirichlet(BC):
     r"""Apply Dirichlet boundary conditions."""
 
     def apply(self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int) -> None:
-
         assert self.bc_val is not None, "BC: bc_val is not specified!"
 
         if callable(self.bc_val):
@@ -249,7 +247,6 @@ class Symmetry(BC):
     r"""Apply Neumann boundary conditions."""
 
     def apply(self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int) -> None:
-
         assert grid
 
         var[var_dim, self.bc_mask] = var[var_dim, self.bc_mask_prev]
@@ -259,7 +256,6 @@ class Periodic(BC):
     r"""Apply Periodic boundary conditions."""
 
     def apply(self, var: Tensor, grid: tuple[Tensor, ...], var_dim: int) -> None:
-
         assert grid
 
         if self.bc_n_dir < 0:
@@ -278,7 +274,6 @@ def _bc_val_type_check(bc_val: BC_val_type):
     """Check whether the bc_val is of the correct type."""
 
     if not isinstance(bc_val, Callable):
-
         if type(bc_val) not in get_args(BC_val_type):
             raise TypeError(
                 f"BC: wrong bc variable -> {type(bc_val)} is not one of {get_args(BC_val_type)}!"

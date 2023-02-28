@@ -21,7 +21,6 @@ def sol_exact(mesh, epsilon):
 
 
 def advection_diffusion(epsilon: float, mesh: Mesh) -> tuple[Tensor, Tensor, Tensor]:
-
     f_bc = homogeneous_bcs(1, 0.0, "dirichlet")
 
     # Target variable
@@ -46,7 +45,6 @@ def advection_diffusion(epsilon: float, mesh: Mesh) -> tuple[Tensor, Tensor, Ten
 
 
 if __name__ == "__main__":
-
     sols_numeric: list[Tensor] = []
     sols_exact: list[Tensor] = []
     epsilons: list[float] = [1, 0.5, 0.2, 0.1, 0.02]

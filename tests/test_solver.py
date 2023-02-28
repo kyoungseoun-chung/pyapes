@@ -22,7 +22,7 @@ from pyapes.testing.poisson import poisson_bcs
 from pyapes.testing.poisson import poisson_exact_nd
 from pyapes.testing.poisson import poisson_rhs_nd
 
-DISPLAY_PLOT: bool = False
+DISPLAY_PLOT: bool = True
 
 
 @pytest.mark.parametrize(["dim"], [[1], [2], [3]])
@@ -183,7 +183,6 @@ def test_heat_conduction_2d_mixed() -> None:
     solver.solve()
 
     def _exact_solution(x: Tensor, y: Tensor, n: int) -> Tensor:
-
         sol_ex = torch.zeros_like(x)
 
         for i in range(1, n + 1):
@@ -426,7 +425,6 @@ def test_burger_1d() -> None:
     var.save_old()
 
     for _ in range(n_itr):
-
         res.append(var()[0].clone())
 
         solver.set_eq(fdm.ddt(var) + fdm.div(var, var) - fdm.laplacian(nu, var) == 0.0)

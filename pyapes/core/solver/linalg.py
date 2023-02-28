@@ -95,7 +95,6 @@ def cg(
     d.set_var_tensor(r.clone())
 
     while tol > tolerance:
-
         var.save_old()
 
         # CG steps
@@ -139,7 +138,6 @@ def cg(
             break
 
     else:
-
         # Add report of the results
         if report:
             _solution_report(itr, tol, "CG")
@@ -198,7 +196,6 @@ def bicgstab(
     finished: bool = False
 
     while not finished:
-
         var.save_old()
         beta = rho_next / rho * alpha / omega
 
@@ -275,7 +272,6 @@ def _apply_bc_otf(var: Field, mesh: Mesh) -> Field:
 
     # Apply BCs
     if len(var.bcs) > 0:
-
         if mesh.obstacle is not None:
             # Fill zero to inner obstacle
             # Loop over inner object and assign values

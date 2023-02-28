@@ -47,7 +47,6 @@ def human_readable_size(size, decimal_places=3):
     final_unit = ""
 
     for unit in ["B", "KiB", "MiB", "GiB", "TiB"]:
-
         if size < 1024.0:
             final_unit = unit
             break

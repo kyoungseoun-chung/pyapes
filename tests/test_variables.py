@@ -63,7 +63,6 @@ def test_fields(domain: Box, spacing: list[float], dim: int) -> None:
     ],
 )
 def test_field_bcs_pad(domain: Box, spacing: list[float]) -> None:
-
     from pyapes.core.solver.tools import fill_pad_bc
     from pyapes.core.mesh.tools import inner_slicer, create_pad
 

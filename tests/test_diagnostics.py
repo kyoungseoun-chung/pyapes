@@ -3,7 +3,6 @@ import numpy as np
 
 
 def test_tensorboard() -> None:
-
     import matplotlib.pyplot as plt
 
     from pyapes.tools.diagnostics import TensorBoardTracker
@@ -13,7 +12,6 @@ def test_tensorboard() -> None:
     tracker = TensorBoardTracker(save_dir, True)
 
     for i in range(10):
-
         tracker.add_scalar("test_scalar", i, i)
 
         x = np.arange(-3.0, 4.001, 0.1)
@@ -38,7 +36,6 @@ def test_tensorboard() -> None:
 
 
 def test_save_vtk():
-
     from tests.test_variables import test_get_box_333
     from pyapes.tools.diagnostics import SaveDictionary
 
