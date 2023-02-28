@@ -31,12 +31,6 @@ def boundary_slicer(dim: int, bcs: list[BC_type]) -> list[slice]:
             d_idx = DIR_TO_NUM[bc.bc_face[0]]
             s_idx = SIDE_TO_NUM[bc.bc_face[1]]
             slice_idx[d_idx][s_idx] = None
-
-            # if bc.bc_face[1] == "l":
-            #     s_idx = SIDE_TO_NUM[bc.bc_face[1]]
-            #     slice_idx[d_idx][s_idx] = None
-            # else:
-            #     pass
         else:
             # Do nothing
             pass

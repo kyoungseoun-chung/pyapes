@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-from ._box import Box
 from .basis import GeoTypeIdentifier
+from .box import Box
+from .cylinder import Cylinder
 
-__all__ = ["Box", "GeoTypeIdentifier"]
+__all__ = ["Box", "GeoTypeIdentifier", "Cylinder"]

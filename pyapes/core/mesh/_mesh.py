@@ -112,6 +112,17 @@ class Mesh:
         desc = f"{self.domain} with dx={self.dx.tolist()}"
         return desc
 
+    @property
+    def coord_sys(self) -> str:
+        """Coordinate system of the domain. e.g. `xyz` (Cartesian), `rz` (Axisymmetric)."""
+
+        if self.domain.type == "box":
+            return "xyz"
+        elif self.domain.type == "cylinder":
+            return "rz"
+        else:
+            raise TypeError(f"Mesh: domain type ({self.domain.type=}) not identifiable")
+
     def d_mask_dim(self, d_face: str) -> int:
         """Return the mask face dimension."""
 
