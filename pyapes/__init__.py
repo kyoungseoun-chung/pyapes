@@ -2,5 +2,5 @@
 
 __author__ = "Kyoungseoun Chung"
 __email__ = "kchung@student.ethz.ch"
-__copyright__ = "Copyright 2021, IFD, ETH Zurich"
-__version__ = "0.0.0"
+__copyright__ = "Copyright 2023, IFD, ETH Zurich"
+__version__ = "0.0.1"
