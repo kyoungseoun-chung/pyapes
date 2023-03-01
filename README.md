@@ -22,21 +22,23 @@ The goal of `pyapes` (should be/have) is
 
 ## Installation
 
-We recommend to use `poetry` to manage all dependencies.
+We recommend to use `poetry` to manage/install all dependencies.
 
-```bash
-git clone git@gitlab.ethz.ch:kchung/pyapes.git
-cd pyapes
-poetry install
-```
+- From `git`
 
-Or you can install via `pip`
+  ```bash
+  git clone git@gitlab.ethz.ch:kchung/pyapes.git
+  cd pyapes
+  poetry install
+  ```
 
-```bash
-python3 -m pip install pyapes
-# or
-poetry add pyapes
-```
+- From `pypi`
+
+  ```bash
+  python3 -m pip install pyapes
+  # or
+  poetry add pyapes
+  ```
 
 ## Dependencies
 
@@ -81,10 +83,9 @@ Check our [demos files](demos/)
     - [ ] Higher order flux limiters (`quick`)
 - Testing and validation
   - [ ] `Ddt` class (implementation is tested but haven't validated with practical test cases)
-  - [ ] Tests in higher dimension.
-  - Create test files
-    - `test_solver.py`
-      - [ ] The Burgers' equation
-      - [ ] The Navier-Stokes equation at low Reynolds numbers
-      - [ ] The Black-Scholes equation
-- Publish to pypi.org
+- Working on demo files
+  - [x] The Poisson equation
+  - [x] The advection-diffusion equation
+  - [ ] The Burgers' equation
+  - [ ] The Navier-Stokes equation at low Reynolds numbers
+  - [ ] The Black-Scholes equation
