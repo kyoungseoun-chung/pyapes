@@ -52,9 +52,19 @@ def default_A_ops(var: Field, order: int) -> list[list[Tensor]]:
             )
 
             App = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
-            Ap = [(1 + scale) * torch.ones_like(var()) for _ in range(var.mesh.dim)]
+            Ap = [
+                (1 + scale) * torch.ones_like(var())
+                if i == 0
+                else torch.ones_like(var())
+                for i in range(var.mesh.dim)
+            ]
             Ac = [-2.0 * torch.ones_like(var()) for _ in range(var.mesh.dim)]
-            Am = [(1 - scale) * torch.ones_like(var()) for _ in range(var.mesh.dim)]
+            Am = [
+                (1 - scale) * torch.ones_like(var())
+                if i == 0
+                else torch.ones_like(var())
+                for i in range(var.mesh.dim)
+            ]
             Amm = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
 
             raise NotImplementedError
