@@ -30,17 +30,34 @@ def default_A_ops(var: Field, order: int) -> list[list[Tensor]]:
     """
 
     if order == 1:
+        # Axisymmetric coordinate has same first order discretization as the cartesian case.
         App = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
         Ap = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
         Ac = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
         Am = [-1.0 * torch.ones_like(var()) for _ in range(var.mesh.dim)]
         Amm = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
     elif order == 2:
-        App = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
-        Ap = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
-        Ac = [-2.0 * torch.ones_like(var()) for _ in range(var.mesh.dim)]
-        Am = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
-        Amm = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
+        if var.mesh.coord_sys == "xyz":
+            App = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
+            Ap = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
+            Ac = [-2.0 * torch.ones_like(var()) for _ in range(var.mesh.dim)]
+            Am = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
+            Amm = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
+        else:
+            r_coord = var.mesh.X
+            dr = var.mesh.dx[0]
+
+            scale = torch.nan_to_num(
+                dr / (2 * r_coord), nan=0.0, posinf=0.0, neginf=0.0
+            )
+
+            App = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
+            Ap = [(1 + scale) * torch.ones_like(var()) for _ in range(var.mesh.dim)]
+            Ac = [-2.0 * torch.ones_like(var()) for _ in range(var.mesh.dim)]
+            Am = [(1 - scale) * torch.ones_like(var()) for _ in range(var.mesh.dim)]
+            Amm = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
+
+            raise NotImplementedError
     else:
         raise RuntimeError(f"Given {order=} should be either 1 or 2.")
 

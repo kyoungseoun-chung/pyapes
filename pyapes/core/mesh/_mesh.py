@@ -45,6 +45,10 @@ class Mesh:
         self.dtype = DType(dtype)
 
         self.domain = domain
+
+        if self.coord_sys == "rz":
+            assert self.dim == 2, "Mesh: rz coordinate system only accept 2D domain"
+
         self.obstacle = obstacle
 
         self._lower = torch.tensor(
@@ -172,7 +176,9 @@ class Mesh:
 
     @property
     def X(self) -> Tensor:
-        """Return X coordinate of the mesh."""
+        """Return X coordinate of the mesh.
+        In the axisymmetric case, this will represent radial direction.
+        """
         return self.grid[0]
 
     @property
