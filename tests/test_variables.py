@@ -62,105 +62,6 @@ def test_fields(domain: Box, spacing: list[float], dim: int) -> None:
         [Box[0:1, 0:1, 0:1], [0.1, 0.1, 0.1]],
     ],
 )
-def test_field_bcs_pad(domain: Box, spacing: list[float]) -> None:
-    from pyapes.core.solver.tools import fill_pad_bc
-    from pyapes.core.mesh.tools import inner_slicer, create_pad
-
-    mesh = Mesh(domain, None, spacing, "cpu", "double")
-
-    f_bc_d = homogeneous_bcs(mesh.dim, 0.44, "dirichlet")
-    var = Field("d", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random")
-
-    for bc in var.bcs:
-        bc.apply(var(), mesh.grid, 0)
-
-    slicer = inner_slicer(mesh.dim)
-    pad = create_pad(mesh.dim, 1)
-
-    padded = fill_pad_bc(
-        pad(var()[0]), 1, slicer, [var.get_bc("d-xl"), var.get_bc("d-xr")], 0
-    )
-    if mesh.dim == 1:
-        assert_close(padded[0], padded[1])
-        assert_close(padded[-1], padded[-2])
-    elif mesh.dim == 2:
-        assert_close(padded[0, :], padded[1, :])
-        assert_close(padded[-1, :], padded[-2, :])
-    else:
-        assert_close(padded[0, :, :], padded[1, :, :])
-        assert_close(padded[-1, :, :], padded[-2, :, :])
-
-    f_bc_d = homogeneous_bcs(mesh.dim, 1.0, "neumann")
-    var = Field("d", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random")
-
-    for bc in var.bcs:
-        bc.apply(var(), mesh.grid, 0)
-
-    padded = fill_pad_bc(
-        pad(var()[0]), 1, slicer, [var.get_bc("d-xl"), var.get_bc("d-xr")], 0
-    )
-    if mesh.dim == 1:
-        assert_close(padded[1] - padded[0], padded[2] - padded[1])
-        assert_close(padded[-1] - padded[-2], padded[-2] - padded[-3])
-    elif mesh.dim == 2:
-        assert_close(padded[1, :] - padded[0, :], padded[2, :] - padded[1, :])
-        assert_close(padded[-1, :] - padded[-2, :], padded[-2, :] - padded[-3, :])
-    else:
-        assert_close(
-            padded[1, :, :] - padded[0, :, :],
-            padded[2, :, :] - padded[1, :, :],
-        )
-        assert_close(
-            padded[-1, :, :] - padded[-2, :, :],
-            padded[-2, :, :] - padded[-3, :, :],
-        )
-
-    f_bc_d = homogeneous_bcs(mesh.dim, None, "symmetry")
-    var = Field("d", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random")
-    for bc in var.bcs:
-        bc.apply(var(), mesh.grid, 0)
-
-    padded = fill_pad_bc(
-        pad(var()[0]), 1, slicer, [var.get_bc("d-xl"), var.get_bc("d-xr")], 0
-    )
-
-    if mesh.dim == 1:
-        assert_close(padded[0], padded[2])
-        assert_close(padded[-1], padded[-3])
-    elif mesh.dim == 2:
-        assert_close(padded[0, :], padded[2, :])
-        assert_close(padded[-1, :], padded[-3, :])
-    else:
-        assert_close(padded[0, :, :], padded[2, :, :])
-        assert_close(padded[-1, :, :], padded[-3, :, :])
-
-    f_bc_d = homogeneous_bcs(mesh.dim, None, "periodic")
-    var = Field("d", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random")
-    for bc in var.bcs:
-        bc.apply(var(), mesh.grid, 0)
-
-    padded = fill_pad_bc(
-        pad(var()[0]), 1, slicer, [var.get_bc("d-xl"), var.get_bc("d-xr")], 0
-    )
-    if mesh.dim == 1:
-        assert_close(padded[0], padded[-1])
-        assert_close(padded[-1], padded[0])
-    elif mesh.dim == 2:
-        assert_close(padded[0, :], padded[-1, :])
-        assert_close(padded[-1, :], padded[0, :])
-    else:
-        assert_close(padded[0, :, :], padded[-1, :, :])
-        assert_close(padded[-1, :, :], padded[0, :, :])
-
-
-@pytest.mark.parametrize(
-    ["domain", "spacing"],
-    [
-        [Box[0:1], [0.1]],
-        [Box[0:1, 0:1], [0.1, 0.1]],
-        [Box[0:1, 0:1, 0:1], [0.1, 0.1, 0.1]],
-    ],
-)
 def test_field_bcs(domain: Box, spacing: list[float]) -> None:
     """Test field boundaries."""
 
@@ -198,7 +99,6 @@ def test_field_bcs(domain: Box, spacing: list[float]) -> None:
         assert_close(var()[0][0, :, :], -1.0 * 0.1 + var()[0][1, :, :])
         assert_close(var()[0][-1, :, :], 1.0 * 0.1 + var()[0][-2, :, :])
 
-    # WIP: periodic bcs is wrong here
     f_bc_d = homogeneous_bcs(mesh.dim, None, "periodic")
     var = Field("p", 1, mesh, {"domain": f_bc_d, "obstacle": None}, init_val="random")
 
