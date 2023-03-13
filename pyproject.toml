@@ -3,7 +3,7 @@ filterwarnings = ["ignore::DeprecationWarning:tensorboard[.*]"]
 
 [tool.poetry]
 name = "pyapes"
-version = "0.0.3"
+version = "0.0.4"
 description = "Python Awesome Partial differential Equation Solver"
 authors = ["Kyoungseoun Chung <kchung@student.ethz.ch>"]
 readme = "README.md"
@@ -13,7 +13,7 @@ python = "^3.10"
 tensorboard = "^2.12.0"
 torch = "^1.13.1"
 numpy = "^1.24.2"
-pymytools = "^0.0.1"
+pymytools = "^0.1.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.2.2"
