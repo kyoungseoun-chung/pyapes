@@ -11,6 +11,7 @@ from torch import Tensor
 from torch.testing import assert_close  # type: ignore
 
 from pyapes.core.geometry import Box
+from pyapes.core.geometry import Cylinder
 from pyapes.core.mesh import Mesh
 from pyapes.core.solver.fdm import FDM
 from pyapes.core.solver.ops import Solver
@@ -356,6 +357,16 @@ def test_poisson_2d_mixed_neumann() -> None:
         _, ax = plt.subplots(subplot_kw={"projection": "3d"})
         ax.plot_surface(mesh.X, mesh.Y, var()[0], cmap="coolwarm")  # type: ignore
         plt.show()
+
+
+def test_poisson_rz() -> None:
+    """Test axisymmetric poisson equation.
+
+    Reference:
+        - https://muleshko.faculty.unlv.edu/Newly%20Saved%20PDF%20pubs/ices03Corfu.pdf
+    """
+    # Construct mesh
+    mesh = Mesh(Cylinder[0:1, 0:1], None, [101, 101])
 
 
 def test_advection_diffusion_1d() -> None:
