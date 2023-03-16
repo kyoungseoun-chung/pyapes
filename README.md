@@ -1,9 +1,5 @@
 
-# THIS LIBRARY IS CURRENTLY WIP (LIMITED FEATURES ARE AVAILABLE)!! IT IS BETA STAGE
-
-# pyapes
-
-**PY**thon **A**wesome **P**artial differential **E**quation **S**olver (general purpose finite difference PDE solver)
+# pyapes: PYthon Awesome Partial differential Equation Solver (general purpose finite difference PDE solver)
 
 ![python](http://ForTheBadge.com/images/badges/made-with-python.svg)
 
@@ -45,28 +41,28 @@ We recommend to use `poetry` to manage/install all dependencies.
 - Core dependency
   - `python >= 3.10`
     - As of 19.02.2023, `torch` does not support 3.11 properly (for the official release). Therefore, stick to `python3.10`.
-  - `numpy >= 1.21.0`
   - `torch >= 1.10.0`
-  - `pyevtk >= 1.2.0`
-  - `tensorboard >= 2.7.0`
-- Misc dependency (Aesthetic)
-  - `tqdm >= 4.62.3`
-  - `rich >= 10.12.0`
+- Dependencies from my personal projects
+  - `pymyplot` (plotting tools)
+  - `pymytools` (misc. tools including data I/O, logging, etc.)
 
 ## Implemented Features
 
-- CPU/GPU computation using `torch`
+- CPU/GPU(CUDA) computation using `torch`
+- (OpenFOAM like) generically expressed solver
+
+  ```python
+    >>> solver.set_eq(fdm.laplacian(1.0, var) == rhs)
+    >>> solver.solve()
+  ```
+
 - FDM Discretizations
   - Spatial: `Grad`, `Laplacian`, `Div`
     - Supports flux limiter `upwind` for the `Div` operator
   - Temporal: `Ddt`
 - Boundary conditions:
   - Supports `Dirichlet`, `Neumann`, `Periodic`, and `Symmetry`
-- Testing and demonstration
-  - `Mesh`, `Field`, `FDM`
-  - `Solver`
-    - The Poisson equation
-    - The advection-diffusion equation
+- Demo cases in `jupter` notebooks
 
 ## Examples
 
