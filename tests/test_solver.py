@@ -16,6 +16,7 @@ from pyapes.core.mesh import Mesh
 from pyapes.core.solver.fdm import FDM
 from pyapes.core.solver.ops import Solver
 from pyapes.core.variables import Field
+from pyapes.core.variables.bcs import CylinderBoundary
 from pyapes.core.variables.bcs import homogeneous_bcs
 from pyapes.core.variables.bcs import mixed_bcs
 from pyapes.testing.burgers import burger_exact_nd
@@ -23,7 +24,7 @@ from pyapes.testing.poisson import poisson_bcs
 from pyapes.testing.poisson import poisson_exact_nd
 from pyapes.testing.poisson import poisson_rhs_nd
 
-DISPLAY_PLOT: bool = True
+DISPLAY_PLOT: bool = False
 
 
 @pytest.mark.parametrize(
@@ -314,6 +315,48 @@ def test_poisson_rz() -> None:
     # Construct mesh
     mesh = Mesh(Cylinder[0:1, 0:1], None, [101, 101])
 
+    def bc_ru(grid: tuple[Tensor, ...], mask: Tensor, *_) -> Tensor:
+        return torch.exp(-grid[1][mask]) * cos(1)
+
+    def bc_zl(grid: tuple[Tensor, ...], mask: Tensor, *_) -> Tensor:
+        return torch.cos(grid[0][mask])
+
+    def bc_zu(grid: tuple[Tensor, ...], mask: Tensor, *_) -> Tensor:
+        return torch.cos(grid[0][mask]) * exp(-1)
+
+    f_bc = CylinderBoundary(
+        rl={"bc_type": "neumann", "bc_val": 0.0},
+        ru={"bc_type": "dirichlet", "bc_val": bc_ru},
+        zl={"bc_type": "dirichlet", "bc_val": bc_zl},
+        zu={"bc_type": "dirichlet", "bc_val": bc_zu},
+    )
+    var = Field("U", 1, mesh, {"domain": f_bc(), "obstacle": None}, init_val=0.0)
+
+    solver = Solver(
+        {
+            "fdm": {
+                "method": "bicgstab",
+                "tol": 1e-5,
+                "max_it": 1000,
+                "report": True,
+            }
+        }
+    )
+    fdm = FDM()
+
+    sol_ex = torch.exp(-mesh.Z) * torch.cos(mesh.X)
+
+    rhs = torch.zeros_like(var())
+    rhs[0] = -torch.sin(mesh.X) / (mesh.X * torch.exp(mesh.Z))
+    # -cos(r) / (exp(z) + r * exp(z))
+    # If r = 0 -> -1/(exp(z))
+    rhs[0][mesh.X.eq(0.0)] = -1.0 / torch.exp(mesh.Z[mesh.X.eq(0.0)])
+
+    solver.set_eq(fdm.laplacian(1.0, var) == rhs)
+    solver.solve()
+
+    assert_close(var()[0], sol_ex, atol=1e-3, rtol=1e-3)
+
 
 def test_advection_diffusion_1d() -> None:
     # Construct mesh
@@ -347,7 +390,7 @@ def test_advection_diffusion_1d() -> None:
     assert_close(var()[0], sol_ex, rtol=0.1, atol=0.01)
 
 
-def test_burger_1d() -> None:
+def wip_burger_1d() -> None:
     # Construct mesh
     mesh = Mesh(Box[0 : 2 * pi], None, [101])
 

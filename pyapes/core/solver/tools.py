@@ -66,8 +66,6 @@ def default_A_ops(var: Field, order: int) -> list[list[Tensor]]:
                 for i in range(var.mesh.dim)
             ]
             Amm = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
-
-            raise NotImplementedError
     else:
         raise RuntimeError(f"Given {order=} should be either 1 or 2.")
 
