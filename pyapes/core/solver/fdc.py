@@ -381,8 +381,6 @@ def _grad_rhs_adjust(
             gamma_min = 2.0 * gamma[0]
             gamma_max = 2.0 * gamma[1]
 
-    dx = var.dx
-
     for j in range(var.mesh.dim):
         for bc in var.bcs:
             if bc.bc_type == "neumann":

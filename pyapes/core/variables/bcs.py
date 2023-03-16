@@ -7,11 +7,9 @@ Supporting conditions:
     * Symmetry
     * Periodic
 
-WIP:
-    * Inflow/Outflow
-
 Note:
-    * The boundary conditions are applied in `["xl", "xr", "yl", "yr", "zl", "zr"]` order.
+    * The boundary face is identified by `face_normal_dim` + `side` e.g. `["xl", "xu", "yl", "yu", "zl", "zu"]`.
+    * Or ["rl", "ru", "zl", "zu"] for rz coordinate.
 
 """
 from abc import ABC
@@ -19,6 +17,8 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Callable
 from typing import get_args
+from typing import NamedTuple
+from typing import TypedDict
 from typing import Union
 
 import torch
@@ -26,7 +26,9 @@ from torch import Tensor
 
 from pyapes.core.backend import DType
 from pyapes.core.geometry.basis import DIR_TO_NUM
+from pyapes.core.geometry.basis import DIR_TO_NUM_RZ
 from pyapes.core.geometry.basis import FDIR
+from pyapes.core.geometry.basis import FDIR_RZ
 
 BC_val_type = Union[
     int,
@@ -55,6 +57,10 @@ class BC(ABC):
     """Mask of the mesh where to apply BCs."""
     bc_var_name: str
     """Target variable name."""
+    bc_coord_sys: str
+    """Boundary coordinate system. Currently, either `xyz` or `rz`."""
+    mesh_dim: int
+    """Mesh dimension."""
     dtype: DType
     """Data type. Since we do not store `Mesh` object here, explicitly pass dtype."""
     device: torch.device
@@ -62,7 +68,10 @@ class BC(ABC):
 
     def __post_init__(self):
         _bc_val_type_check(self.bc_val)
-        self._bc_face_dim = DIR_TO_NUM[self.bc_face[0]]
+        if self.bc_coord_sys == "rz":
+            self._bc_face_dim = DIR_TO_NUM_RZ[self.bc_face[0]]
+        else:
+            self._bc_face_dim = DIR_TO_NUM[self.bc_face[0]]
 
         if self.bc_face[-1] == "l":
             self._bc_n_dir: int = -1
@@ -215,8 +224,7 @@ class Neumann(BC):
 
         assert self.bc_val is not None, "BC: bc_val is not specified!"
 
-        sign = float(self.bc_n_dir)
-        dx = sign * (
+        dx = (
             grid[self.bc_face_dim][self.bc_mask]
             - grid[self.bc_face_dim][self.bc_mask_prev]
         )
@@ -224,7 +232,7 @@ class Neumann(BC):
         var_p = var[var_dim][self.bc_mask_prev]
         var_pp = var[var_dim][self.bc_mask_prev2]
 
-        # BUG: NEED TO REVISE THIS!!!
+        # WIP: NEED TO REVISE THIS!!!
         # Neumann BC:
         # Second order forward-backward difference gives
         # p0 = 4/3 p1 - 1/3 p2 - 2/3 V dx
@@ -280,17 +288,98 @@ def _bc_val_type_check(bc_val: BC_val_type):
             )
 
 
-def mixed_bcs(
-    bc_val: list[
-        float
-        | None
-        | Callable[
-            [tuple[Tensor, ...], Tensor, Tensor, Tensor],
-            Tensor | list[Tensor] | float | list[float],
+class BCContainer(TypedDict):
+    """Type of dictionary used to declare the boundary conditions."""
+
+    bc_val: BC_val_type
+    bc_type: str
+
+
+class CylinderBoundary(NamedTuple):
+    """Setup interface for the configuration of the cylinder type boundary conditions.
+
+    Example:
+        >>> f_bc = BoxBoundary(
+            rl={"bc_type": "symmetric", "bc_val": None},
+            rr={"bc_type": "neumann", "bc_val": 0},
+            zl={"bc_type": "periodic", "bc_val": None},
+            zr={"bc_type": "dirichlet", "bc_val": 0.44},
+        )
+        >>> f_bc()
+        # Will return list[BC_config_type] (None entry will be ignored)
+        [
+            {"bc_face": "rl", "bc_type": "symmetric", "bc_val": None},
+            {"bc_face": "rr", "bc_type": "neumann", "bc_val": 0},
+            {"bc_face": "zl", "bc_type": "periodic", "bc_val": None},
+            {"bc_face": "zr", "bc_type": "dirichlet", "bc_val": 0.44},
         ]
-    ],
+
+    """
+
+    rl: BCContainer | None = None
+    ru: BCContainer | None = None
+    zl: BCContainer | None = None
+    zu: BCContainer | None = None
+
+    def __call__(self) -> list[BC_config_type]:
+        return _get_bc_dict(self, FDIR_RZ)
+
+
+class BoxBoundary(NamedTuple):
+    """Setup interface for the configuration of the box type boundary conditions.
+
+    Example:
+        >>> f_bc = BoxBoundary(
+            xl={"bc_type": "dirichlet", "bc_val": 0.44},
+            xr={"bc_type": "neumann", "bc_val": 0},
+            yl={"bc_type": "periodic", "bc_val": None},
+            yr={"bc_type": "symmetric", "bc_val": None},
+        )
+        >>> f_bc()
+        # Will return list[BC_config_type] (None entry will be ignored)
+        [
+            {"bc_face": "xl", "bc_type": "dirichlet", "bc_val": 0.44},
+            {"bc_face": "xr", "bc_type": "neumann", "bc_val": 0},
+            {"bc_face": "yl", "bc_type": "periodic", "bc_val": None},
+            {"bc_face": "yr", "bc_type": "symmetric", "bc_val": None},
+        ]
+
+    """
+
+    xl: BCContainer | None = None
+    xu: BCContainer | None = None
+    yl: BCContainer | None = None
+    yu: BCContainer | None = None
+    zl: BCContainer | None = None
+    zu: BCContainer | None = None
+
+    def __call__(self) -> list[BC_config_type]:
+        return _get_bc_dict(self, FDIR)
+
+
+def _get_bc_dict(
+    bc_config: CylinderBoundary | BoxBoundary, fdir: list[str]
+) -> list[BC_config_type]:
+    config: list[BC_config_type] = []
+
+    for face in fdir:
+        bc_dict = getattr(bc_config, face)
+        if bc_dict is not None:
+            config.append(
+                {
+                    "bc_face": face,
+                    "bc_type": bc_dict["bc_type"],
+                    "bc_val": bc_dict["bc_val"],
+                }
+            )
+
+    return config
+
+
+def mixed_bcs(
+    bc_val: list[BC_val_type],
     bc_type: list[str],
-):
+) -> list[BC_config_type]:
     """Simple pre-defined boundary condition.
 
     Warning:
@@ -298,14 +387,14 @@ def mixed_bcs(
 
     Args:
         dim (int): dimension of mesh
-        bc_val (list[float|Callable]): values at boundaries.
+        bc_val (BC_val_type): values at boundaries.
         bc_type (list[str]): Types of bcs
 
     Returns:
         list[BC_config_type]: list of dictionary used to declare the boundary conditions.
     """
 
-    bc_config = []
+    bc_config: list[BC_config_type] = []
     for i, (v, t) in enumerate(zip(bc_val, bc_type)):
         bc_config.append({"bc_face": FDIR[i], "bc_type": t, "bc_val": v})
     return bc_config

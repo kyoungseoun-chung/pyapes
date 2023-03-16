@@ -61,18 +61,9 @@ class Box(Geometry, metaclass=GeoBounder):
     def size(self) -> float:
         """Set size of the box."""
 
-        if self.dim == 1:
-            self._size = float(self.upper[0] - self.lower[0])
-        elif self.dim == 2:
-            self._size = float(
-                (self.upper[0] - self.lower[0]) * (self.upper[1] - self.lower[1])
-            )
-        else:
-            self._size = float(
-                (self.upper[0] - self.lower[0])
-                * (self.upper[1] - self.lower[1])
-                * (self.upper[2] - self.lower[2])
-            )
+        self._size = 1.0
+        for l, u in zip(self.lower, self.upper):
+            self._size *= float(u - l)
 
         return self._size
 

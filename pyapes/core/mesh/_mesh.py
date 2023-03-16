@@ -100,7 +100,11 @@ class Mesh:
         # Mesh mask
         self.d_mask, self.o_mask = boundary_mask(self)
 
-        self.t_mask = torch.zeros_like(self.d_mask["xl"])
+        self.t_mask = (
+            torch.zeros_like(self.d_mask["xl"])
+            if self.coord_sys == "xyz"
+            else torch.zeros_like(self.d_mask["rl"])
+        )
         """Mask combined all."""
 
         # Get all mask
@@ -185,25 +189,33 @@ class Mesh:
     def Y(self) -> Tensor:
         """Return Y coordinate of the mesh.
         Note:
-            If `self.dim > 1` return empty tensor.
+            - If `self.coord_sys == "rz"` return empty tensor.
+            - If `self.dim > 1` return empty tensor.
         """
-        return (
-            self.grid[1]
-            if self.dim > 1
-            else torch.tensor([], dtype=self.dtype.float, device=self.device)
-        )
+        if self.coord_sys == "xyz":
+            return (
+                self.grid[1]
+                if self.dim > 1
+                else torch.tensor([], dtype=self.dtype.float, device=self.device)
+            )
+        else:
+            return torch.tensor([], dtype=self.dtype.float, device=self.device)
 
     @property
     def Z(self) -> Tensor:
         """Return Z coordinate of the mesh.
         Note:
-            If `self.dim > 2` return empty tensor.
+            - If `self.coord_sys == "rz"` return Y coordinate.
+            - If `self.dim > 2` return empty tensor.
         """
-        return (
-            self.grid[2]
-            if self.dim > 2
-            else torch.tensor([], dtype=self.dtype.float, device=self.device)
-        )
+        if self.coord_sys == "xyz":
+            return (
+                self.grid[2]
+                if self.dim > 2
+                else torch.tensor([], dtype=self.dtype.float, device=self.device)
+            )
+        else:
+            return self.grid[1]
 
     @property
     def N(self) -> int:
@@ -215,9 +227,9 @@ class Mesh:
 
     @property
     def size(self) -> float:
-        """Total volume."""
+        """Total volume of the domain."""
 
-        return torch.prod(self.upper - self.lower).item()
+        return self.domain.size
 
     @property
     def lx(self) -> Tensor:
@@ -279,13 +291,8 @@ class Mesh:
 def boundary_mask(mesh: Mesh) -> tuple[dict, dict]:
     """Create a mask from the objects (self.mesh.objs).
 
-    Warning:
-        - Currently only works for the Patch. For the :py:class:`InnerObject`,
-          need separate treatment later
-
     Returns
         Created mask dictionary. Dictionary key is obj.id.
-
     """
     x = mesh.x
     dx = mesh.dx
@@ -315,7 +322,7 @@ def boundary_mask(mesh: Mesh) -> tuple[dict, dict]:
     if obstacle is not None:
         for i, obj in enumerate(obstacle):
             obj_mask = {}
-            if obj.type == "box":
+            if obj.type == "box" or obj.type == "cylinder":
                 for o in obj.config:
                     mask = torch.zeros(*nx, dtype=dtype.bool, device=device)
                     mask = get_box_mask(x, dx, obj.config[o], mask, dim)

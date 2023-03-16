@@ -29,9 +29,11 @@ class Cylinder(Geometry, metaclass=GeoBounder):
     ):
         assert (
             len(lower) == 2 and len(upper) == 2
-        ), "Cylinder: length of inputs has to be 2 since it is axisymmetric (r-z)!)"
+        ), "Cylinder: a length of inputs has to be 2 since it is axisymmetric (r-z)!)"
 
-        assert lower[0] == 0, "Cylinder: lower bound of radius has to be 0!"
+        assert (
+            lower[0] >= 0
+        ), "Cylinder: lower bound of radius has to be larger (or equal) to 0!"
 
         # Make sure to be a list and contains float
         self._lower = [float(i) for i in lower]
@@ -39,7 +41,7 @@ class Cylinder(Geometry, metaclass=GeoBounder):
 
         # Box element discriminator
         self.ex, self.xp, self.face, self._dim = bound_edge_and_corner(
-            self.lower, self.upper
+            self.lower, self.upper, "rz"
         )
 
         self._config: dict[int, dict[str, list[float] | str]] = {}

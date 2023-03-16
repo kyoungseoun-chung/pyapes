@@ -4,19 +4,15 @@ from typing import Any
 
 DIR = ["x", "y", "z"]
 DIR_TO_NUM: dict[str, int] = {"x": 0, "y": 1, "z": 2}
-"""Direction to number. e.g. `x -> 0, y -> 1, z -> 2`."""
-SIDE_TO_NUM: dict[str, int] = {"l": 0, "r": 1}
-"""Side to number. e.g. `l -> 0, r -> 1`."""
-NUM_TO_DIR: dict[int, str] = {0: "x", 1: "y", 2: "z"}
-FDIR = ["xl", "xr", "yl", "yr", "zl", "zr"]  # could be used for bc identifier?
-FDIR_TO_NUM: dict[str, int] = {
-    "xl": 0,
-    "xr": 1,
-    "yl": 2,
-    "yr": 3,
-    "zl": 4,
-    "zr": 5,
-}
+"""Direction to number in the xyz coordinate. e.g. `x -> 0, y -> 1, z -> 2`."""
+DIR_TO_NUM_RZ: dict[str, int] = {"r": 0, "z": 1}
+"""Direction to number in the rz coordinate."""
+SIDE_TO_NUM: dict[str, int] = {"l": 0, "u": 1}
+"""Side to number (lower and upper sides). e.g. `l -> 0, u -> 1`."""
+FDIR = ["xl", "xu", "yl", "yu", "zl", "zu"]
+"""Face identifier in the xyz coordinate. e.g. `xl` (face at x lower) and `xu` (face at x upper)."""
+FDIR_RZ = ["rl", "ru", "zl", "zu"]
+"""Face identifier in the rz coordinate. e.g. `rl` (face at r lower) and `ru` (face at r upper)."""
 
 
 class GeoTypeIdentifier(list):
@@ -123,7 +119,7 @@ class GeoBounder(type):
 
 
 def bound_edge_and_corner(
-    lower: list[float], upper: list[float]
+    lower: list[float], upper: list[float], coord: str = "xyz"
 ) -> tuple[list[list[float]], list[list[float]], list[str], int]:
     """Crate edge and  corner information based on input dimension.
 
@@ -141,12 +137,13 @@ def bound_edge_and_corner(
     dim = len(lower)
 
     assert dim > 0 and dim < 4, "Dimensions must be 1, 2 and 3!"
+    assert coord in ["xyz", "rz"], "Coordinate must be either xyz or rz!"
 
     if dim == 1:
         # 1D edge and corner
         xp = [[lower[0]], [upper[0]]]
         ex = [[lower[0] - xp[0][0]], [upper[0] - xp[1][0]]]
-        face = ["xl", "xr"]
+        face = ["xl", "xu"]
     elif dim == 2:
         # 2D edge and corner
         xp = [
@@ -161,7 +158,10 @@ def bound_edge_and_corner(
             [lower[0] - xp[2][0], upper[1] - xp[2][1]],
             [upper[0] - xp[3][0], upper[1] - xp[3][1]],
         ]
-        face = ["yl", "yr", "xl", "xr"]
+        if coord == "xyz":
+            face = ["yl", "yu", "xl", "xu"]
+        else:
+            face = ["zl", "zu", "rl", "ru"]
     else:
         # 3D edge and corner
         # Set of xp
@@ -181,6 +181,6 @@ def bound_edge_and_corner(
             [upper[0] - xp[4][0], upper[1] - xp[4][1], lower[2] - xp[4][2]],
             [upper[0] - xp[5][0], upper[1] - xp[5][1], upper[2] - xp[5][2]],
         ]
-        face = ["xl", "xr", "yl", "yr", "zl", "zr"]
+        face = ["xl", "xu", "yl", "yu", "zl", "zu"]
 
     return ex, xp, face, dim

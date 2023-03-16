@@ -377,6 +377,8 @@ class Field:
                             bc_face=bc_face,
                             bc_mask=self.mesh.d_mask[bc_face],
                             bc_var_name=self.name,
+                            bc_coord_sys=self.mesh.coord_sys,
+                            mesh_dim=self.mesh.dim,
                             dtype=self.mesh.dtype,
                             device=self.mesh.device,
                         )
