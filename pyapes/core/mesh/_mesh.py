@@ -179,6 +179,16 @@ class Mesh:
         return self.domain.dim
 
     @property
+    def R(self) -> Tensor:
+        """Return R coordinate of the mesh."""
+        if self.coord_sys == "xyz":
+            raise KeyError("Mesh: R coordinate only available in axisymmetric case.")
+        elif self.coord_sys == "rz":
+            return self.grid[0]
+        else:
+            raise NotImplementedError(f"Mesh: {self.coord_sys=} not implemented.")
+
+    @property
     def X(self) -> Tensor:
         """Return X coordinate of the mesh.
         In the axisymmetric case, this will represent radial direction.
