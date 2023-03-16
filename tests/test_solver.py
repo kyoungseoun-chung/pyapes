@@ -26,62 +26,6 @@ from pyapes.testing.poisson import poisson_rhs_nd
 DISPLAY_PLOT: bool = True
 
 
-@pytest.mark.parametrize(["dim"], [[1], [2], [3]])
-def test_solver_tools(dim: int) -> None:
-    """Testing `create_pad`, `inner_slicer` and `fill_pad` functions."""
-
-    from pyapes.core.mesh.tools import create_pad, inner_slicer
-    from pyapes.core.solver.tools import fill_pad
-
-    var_entry = 3
-    if dim == 1:
-        var = torch.rand(var_entry)
-    elif dim == 2:
-        var = torch.rand(var_entry, var_entry)
-    else:
-        var = torch.rand(var_entry, var_entry, var_entry)
-
-    pad_1 = create_pad(dim, 1)
-    pad_2 = create_pad(dim, 2)
-
-    slicer_1 = inner_slicer(dim, 1)
-    slicer_2 = inner_slicer(dim, 2)
-
-    var_padded_1 = fill_pad(pad_1(var), dim - 1, 1, slicer_1)
-    var_padded_2 = fill_pad(pad_2(var), dim - 1, 2, slicer_2)
-
-    if dim == 1:
-        assert_close(var_padded_1[0], var_padded_1[slicer_1][0])
-        assert_close(var_padded_1[-1], var_padded_1[slicer_1][-1])
-
-        assert_close((var_padded_2[:2].sum() / 2), var_padded_2[slicer_2][0])
-        assert_close((var_padded_2[-2:].sum() / 2), var_padded_2[slicer_2][-1])
-    elif dim == 2:
-        assert_close(var_padded_1[1:-1, 0], var_padded_1[slicer_1][:, 0])
-        assert_close(var_padded_1[1:-1, -1], var_padded_1[slicer_1][:, -1])
-
-        assert_close(
-            (var_padded_2[1:-1, :2].sum(dim=1)[1:-1] / 2),
-            var_padded_2[slicer_2][:, 0],
-        )
-        assert_close(
-            (var_padded_2[1:-1, -2:].sum(dim=1)[1:-1] / 2),
-            var_padded_2[slicer_2][:, -1],
-        )
-    else:
-        assert_close(var_padded_1[1:-1, 1:-1, 0], var_padded_1[slicer_1][:, :, 0])
-        assert_close(var_padded_1[1:-1, 1:-1, -1], var_padded_1[slicer_1][:, :, -1])
-
-        assert_close(
-            (var_padded_2[1:-1, 1:-1, :2].sum(dim=2)[1:-1, 1:-1] / 2),
-            var_padded_2[slicer_2][:, :, 0],
-        )
-        assert_close(
-            (var_padded_2[1:-1, 1:-1, -2:].sum(dim=2)[1:-1, 1:-1] / 2),
-            var_padded_2[slicer_2][:, :, -1],
-        )
-
-
 @pytest.mark.parametrize(
     ["domain", "spacing", "dim"],
     [
@@ -282,7 +226,9 @@ def test_poisson_1d_mixed_neumann() -> None:
     # Construct mesh
     mesh = Mesh(Box[-pi / 2 : pi / 4], None, [101])
 
+    # The sign of the Neumann BC value should follow the face normal direction
     f_bc = mixed_bcs([-1 / 4, -1 / 2], ["neumann", "dirichlet"])  # BC config
+
     # Target variable
     var = Field("phi", 1, mesh, {"domain": f_bc, "obstacle": None}, init_val=0.0)
     rhs = torch.zeros_like(var())

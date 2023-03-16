@@ -89,7 +89,7 @@ def test_fdc_ops(domain: Box, spacing: list[float]) -> None:
     phiN = (3 / 2 * var()[0][-1] - 2 * var()[0][-2] + 1 / 2 * var()[0][-3]) / mesh.dx[0]
 
     # Check Neumann BCs in the second order accuracy
-    assert_close(phi0.mean(), torch.tensor(-2.0))
+    assert_close(phi0.mean(), torch.tensor(2.0))
     assert_close(phiN.mean(), torch.tensor(2.0))
 
     # Set discretizer

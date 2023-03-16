@@ -247,7 +247,7 @@ class Neumann(BC):
             raise TypeError("Neumann: bc_val must be callable or list!")
 
         var[var_dim][self.bc_mask] = (
-            4 / 3 * var_p - 1 / 3 * var_pp + 2 / 3 * c_bc_val * dx
+            4 / 3 * var_p - 1 / 3 * var_pp + 2 / 3 * c_bc_val * dx * self.bc_n_dir
         )
 
 
