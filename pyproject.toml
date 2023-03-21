@@ -3,16 +3,16 @@ filterwarnings = ["ignore::DeprecationWarning:tensorboard[.*]"]
 
 [tool.poetry]
 name = "pyapes"
-version = "0.1.0"
+version = "0.1.1"
 description = "Python Awesome Partial differential Equation Solver"
 authors = ["Kyoungseoun Chung <kchung@student.ethz.ch>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.12"
-torch = "^1.13.1"
 pymyplot = "^0.2.7"
 pymytools = "^0.1.6"
+torch = "^2.0.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.2.2"
