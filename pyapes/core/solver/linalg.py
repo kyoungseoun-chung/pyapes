@@ -13,8 +13,8 @@ from torch import Tensor
 
 from pyapes.core.mesh import Mesh
 from pyapes.core.mesh.tools import boundary_slicer
-from pyapes.core.mesh.tools import inner_slicer
 from pyapes.core.solver.fdm import OPStype
+from pyapes.core.solver.tools import FDMSolverConfig
 from pyapes.core.variables import Field
 
 
@@ -23,7 +23,7 @@ def solve(
     rhs: Tensor,
     Aop: Callable[[Field, dict[int, OPStype]], Tensor],
     eqs: dict[int, OPStype],
-    config: dict[str, str | int | float | bool],
+    config: FDMSolverConfig,
     mesh: Mesh,
 ) -> dict[str, int | float | bool]:
     r"""Solve Poisson equation on the rectangular grid.
@@ -64,7 +64,7 @@ def cg(
     rhs: Tensor,
     Aop: Callable[[Field, dict[int, OPStype]], Tensor],
     eqs: dict[int, OPStype],
-    config: dict,
+    config: FDMSolverConfig,
     mesh: Mesh,
 ) -> dict[str, int | float | bool]:
     """Conjugate gradient descent method."""
@@ -152,7 +152,7 @@ def bicgstab(
     rhs: Tensor,
     Aop: Callable[[Field, dict[int, OPStype]], Tensor],
     eqs: dict[int, OPStype],
-    config: dict,
+    config: FDMSolverConfig,
     mesh: Mesh,
 ) -> dict[str, int | float | bool]:
     """Bi-conjugated gradient stabilized method.

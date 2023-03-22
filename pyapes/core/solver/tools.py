@@ -2,10 +2,28 @@
 """Collection of useful tools to be used in `pyABC.core.solver` module.
 
 """
+from typing import TypedDict
+
 import torch
 from torch import Tensor
 
 from pyapes.core.variables import Field
+
+
+class FDMSolverConfig(TypedDict):
+    method: str
+    tol: float
+    max_it: int
+    report: bool
+
+
+class SolverConfig(TypedDict):
+    """Solver configuration.
+    Note:
+        - I know that we won't use other than `fdm` scheme but just for in case, keep the `fdm` key just for in case.
+    """
+
+    fdm: FDMSolverConfig
 
 
 def default_A_ops(var: Field, order: int) -> list[list[Tensor]]:

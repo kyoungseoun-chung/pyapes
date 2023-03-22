@@ -8,18 +8,15 @@ on the other hand, `fdm` returns operation matrix, `Aop` of each discretization 
 """
 from __future__ import annotations
 
-import inspect
 from dataclasses import dataclass
-from typing import get_origin
 
 import torch
 from torch import Tensor
 
-from pyapes.core.solver.fdm import DIV_RHS
-from pyapes.core.solver.fdm import GEN_RHS
 from pyapes.core.solver.fdm import Operators
 from pyapes.core.solver.fdm import OPStype
 from pyapes.core.solver.linalg import solve
+from pyapes.core.solver.tools import SolverConfig
 from pyapes.core.variables import Field
 
 
@@ -43,7 +40,7 @@ class Solver:
         config: solver configuration. Contains solver method, tolerance, max iteration, etc.
     """
 
-    config: None | (dict[str, dict[str, str | float | int | bool]]) = None
+    config: None | SolverConfig = None
     """Solver configuration."""
 
     def set_eq(self, eq: Operators) -> None:
@@ -140,7 +137,7 @@ def _Aop(target: Field, eqs: dict[int, OPStype]) -> Tensor:
         # Compute A @ x
         # NOTE: Could not fix type issue here.
         Ax = (
-            eqs[op]["Aop"](*eqs[op]["param"], target, eqs[op]["A_coeffs"])
+            eqs[op]["Aop"](*eqs[op]["param"], target, eqs[op]["A_coeffs"])  # type: ignore
             * eqs[op]["sign"]
         )  # type: ignore
 
@@ -151,6 +148,6 @@ def _Aop(target: Field, eqs: dict[int, OPStype]) -> Tensor:
         res += Ax
 
     if eqs[0]["name"].lower() == "ddt":
-        res += eqs[0]["Aop"](*eqs[0]["param"], target)
+        res += eqs[0]["Aop"](*eqs[0]["param"], target)  # type: ignore
 
     return res
