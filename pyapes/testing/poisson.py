@@ -14,7 +14,7 @@ from torch import Tensor
 from pyapes.core.geometry.basis import FDIR
 from pyapes.core.mesh import Mesh
 from pyapes.core.variables import Field
-from pyapes.core.variables.bcs import BC_config_type
+from pyapes.core.variables.bcs import BCConfig
 
 
 def poisson_rhs_nd(mesh: Mesh, var: Field) -> Tensor:
@@ -50,7 +50,7 @@ def poisson_exact_nd(mesh: Mesh) -> Tensor:
         )
 
 
-def poisson_bcs(dim: int = 3, debug: bool = False) -> list[BC_config_type]:
+def poisson_bcs(dim: int = 3, debug: bool = False) -> list[BCConfig]:
     """Construct boundary configuration for the N-D Poisson equation."""
 
     bc_config = []

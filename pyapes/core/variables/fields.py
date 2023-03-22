@@ -5,17 +5,15 @@ from __future__ import annotations
 import copy
 from dataclasses import dataclass
 from typing import Any
-from typing import cast
 from typing import Union
 
 import torch
 from torch import Tensor
 
 from pyapes.core.mesh import Mesh
-from pyapes.core.variables.bcs import BC_config_type
 from pyapes.core.variables.bcs import BC_FACTORY
 from pyapes.core.variables.bcs import BC_type
-from pyapes.core.variables.bcs import BC_val_type
+from pyapes.core.variables.bcs import BCConfig
 
 
 @dataclass
@@ -40,7 +38,7 @@ class Field:
     Warning! This is not the same as the dimension of the mesh!"""
     mesh: Mesh
     """Mesh object."""
-    bc_config: dict[str, list[BC_config_type] | None] | None
+    bc_config: dict[str, list[BCConfig] | None] | None
     """Boundary configuration"""
     init_val: int | float | list[float] | list[int] | Tensor | list[
         Tensor
@@ -367,13 +365,15 @@ class Field:
 
                 for bc in d_bc_config:
                     # Not sure about a proper typing checking here...
-                    bc_val = cast(BC_val_type, bc["bc_val"])
-                    bc_face = cast(str, bc["bc_face"])
+                    bc_val = bc["bc_val"]
+                    bc_val_opt = bc["bc_val_opt"] if "bc_val_opt" in bc else None
+                    bc_face = bc["bc_face"]
 
                     self.bcs.append(
                         BC_FACTORY[str(bc["bc_type"])](
                             bc_id=f"d-{bc_face}",
                             bc_val=bc_val,
+                            bc_val_opt=bc_val_opt,
                             bc_face=bc_face,
                             bc_mask=self.mesh.d_mask[bc_face],
                             bc_var_name=self.name,

@@ -19,7 +19,6 @@ from typing import Callable
 from typing import get_args
 from typing import NamedTuple
 from typing import TypedDict
-from typing import Union
 
 import torch
 from torch import Tensor
@@ -30,17 +29,17 @@ from pyapes.core.geometry.basis import DIR_TO_NUM_RZ
 from pyapes.core.geometry.basis import FDIR
 from pyapes.core.geometry.basis import FDIR_RZ
 
-BC_val_type = Union[
-    int,
-    float,
-    list[int],
-    list[float],
-    Callable[[tuple[Tensor, ...], Tensor, Tensor, Tensor], Tensor],
-    None,
-]
+BC_val_type = int | float | list[int] | list[float] | Callable | None
 """BC value type."""
-BC_config_type = dict[str, Union[str, BC_val_type]]
-"""BC config type."""
+
+
+class BCConfig(TypedDict):
+    """BC config type."""
+
+    bc_face: str
+    bc_type: str
+    bc_val: BC_val_type
+    bc_val_opt: dict[str, Tensor] | None
 
 
 @dataclass
@@ -51,6 +50,8 @@ class BC(ABC):
     """BC id"""
     bc_val: BC_val_type
     """Boundary values."""
+    bc_val_opt: dict[str, Tensor] | None
+    """Boundary value options. Can be additional `Tensor` during the computation of BCs."""
     bc_face: str
     """Face to assign bc. Convention follows `dim` + `l` or `r`. e.g. `x_l`"""
     bc_mask: Tensor
@@ -200,16 +201,14 @@ class Dirichlet(BC):
         assert self.bc_val is not None, "BC: bc_val is not specified!"
 
         if callable(self.bc_val):
-            at_bc = self.bc_val(grid, self.bc_mask, var, self.bc_n_vec)
-
-            assert isinstance(
-                at_bc, Tensor | float
-            ), "BC: bc_val must return Tensor or float!"
+            at_bc = self.bc_val(grid, self.bc_mask, var, self.bc_val_opt)
             var[var_dim, self.bc_mask] = at_bc
         elif isinstance(self.bc_val, list):
             var[var_dim, self.bc_mask] = self.bc_val[var_dim]
+        elif isinstance(self.bc_val, int | float):
+            var[var_dim, self.bc_mask] = float(self.bc_val)
         else:
-            var[var_dim, self.bc_mask] = self.bc_val
+            raise TypeError("Dirichlet: bc_val must be float, int, callable or list!")
 
 
 class Neumann(BC):
@@ -232,19 +231,18 @@ class Neumann(BC):
         var_p = var[var_dim][self.bc_mask_prev]
         var_pp = var[var_dim][self.bc_mask_prev2]
 
-        # WIP: NEED TO REVISE THIS!!!
         # Neumann BC:
         # Second order forward-backward difference gives
         # p0 = 4/3 p1 - 1/3 p2 - 2/3 V dx
         # pN = 4/3 pN-1 - 1/3 pN-2 + 2/3 V dx
         if callable(self.bc_val):
-            c_bc_val = self.bc_val(grid, self.bc_mask, var, self.bc_n_vec)
+            c_bc_val = self.bc_val(grid, self.bc_mask, var, self.bc_val_opt)
         elif isinstance(self.bc_val, list):
             c_bc_val = self.bc_val[var_dim]
         elif isinstance(self.bc_val, float | int):
             c_bc_val = float(self.bc_val)
         else:
-            raise TypeError("Neumann: bc_val must be callable or list!")
+            raise TypeError("Neumann: bc_val must be float, int, callable or list!")
 
         var[var_dim][self.bc_mask] = (
             4 / 3 * var_p - 1 / 3 * var_pp + 2 / 3 * c_bc_val * dx * self.bc_n_dir
@@ -288,11 +286,12 @@ def _bc_val_type_check(bc_val: BC_val_type):
             )
 
 
-class BCContainer(TypedDict):
+class BCContainer(TypedDict, total=False):
     """Type of dictionary used to declare the boundary conditions."""
 
-    bc_val: BC_val_type
     bc_type: str
+    bc_val: BC_val_type
+    bc_val_opt: dict[str, Tensor] | None
 
 
 class CylinderBoundary(NamedTuple):
@@ -321,7 +320,7 @@ class CylinderBoundary(NamedTuple):
     zl: BCContainer | None = None
     zu: BCContainer | None = None
 
-    def __call__(self) -> list[BC_config_type]:
+    def __call__(self) -> list[BCConfig]:
         return _get_bc_dict(self, FDIR_RZ)
 
 
@@ -353,14 +352,14 @@ class BoxBoundary(NamedTuple):
     zl: BCContainer | None = None
     zu: BCContainer | None = None
 
-    def __call__(self) -> list[BC_config_type]:
+    def __call__(self) -> list[BCConfig]:
         return _get_bc_dict(self, FDIR)
 
 
 def _get_bc_dict(
     bc_config: CylinderBoundary | BoxBoundary, fdir: list[str]
-) -> list[BC_config_type]:
-    config: list[BC_config_type] = []
+) -> list[BCConfig]:
+    config: list[BCConfig] = []
 
     for face in fdir:
         bc_dict = getattr(bc_config, face)
@@ -370,6 +369,9 @@ def _get_bc_dict(
                     "bc_face": face,
                     "bc_type": bc_dict["bc_type"],
                     "bc_val": bc_dict["bc_val"],
+                    "bc_val_opt": bc_dict["bc_val_opt"]
+                    if "bc_val_opt" in bc_dict
+                    else None,
                 }
             )
 
@@ -379,11 +381,11 @@ def _get_bc_dict(
 def mixed_bcs(
     bc_val: list[BC_val_type],
     bc_type: list[str],
-) -> list[BC_config_type]:
+) -> list[BCConfig]:
     """Simple pre-defined boundary condition.
 
     Warning:
-        - Only works for `Box` type object.
+        - Only works for `Box` type object with out any `bc_val_opt`.
 
     Args:
         dim (int): dimension of mesh
@@ -394,9 +396,11 @@ def mixed_bcs(
         list[BC_config_type]: list of dictionary used to declare the boundary conditions.
     """
 
-    bc_config: list[BC_config_type] = []
+    bc_config: list[BCConfig] = []
     for i, (v, t) in enumerate(zip(bc_val, bc_type)):
-        bc_config.append({"bc_face": FDIR[i], "bc_type": t, "bc_val": v})
+        bc_config.append(
+            {"bc_face": FDIR[i], "bc_type": t, "bc_val": v, "bc_val_opt": None}
+        )
     return bc_config
 
 
@@ -404,7 +408,7 @@ def homogeneous_bcs(
     dim: int,
     bc_val: float | list[float] | list[list[float]] | None,
     bc_type: str,
-) -> list[BC_config_type]:
+) -> list[BCConfig]:
     """Simple pre-defined boundary condition.
 
     Warning:
@@ -426,6 +430,7 @@ def homogeneous_bcs(
                 "bc_face": FDIR[i],
                 "bc_type": bc_type,
                 "bc_val": bc_val[i] if isinstance(bc_val, list) else bc_val,
+                "bc_val_opt": None,
             }
         )
     return bc_config
@@ -445,7 +450,7 @@ class BC_HN:
         return homogeneous_bcs(dim, bc_val, "neumann")
 
 
-BC_type = Union[Dirichlet, Neumann, Symmetry, Periodic]
+BC_type = Dirichlet | Neumann | Symmetry | Periodic
 
 
 BC_FACTORY: dict[

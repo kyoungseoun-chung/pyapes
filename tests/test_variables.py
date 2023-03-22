@@ -61,10 +61,10 @@ def test_bc_config() -> None:
         yu={"bc_type": "symmetry", "bc_val": None},
     )
     bc_config = [
-        {"bc_face": "xl", "bc_type": "dirichlet", "bc_val": 0.44},
-        {"bc_face": "xu", "bc_type": "neumann", "bc_val": 0},
-        {"bc_face": "yl", "bc_type": "periodic", "bc_val": None},
-        {"bc_face": "yu", "bc_type": "symmetry", "bc_val": None},
+        {"bc_face": "xl", "bc_type": "dirichlet", "bc_val": 0.44, "bc_val_opt": None},
+        {"bc_face": "xu", "bc_type": "neumann", "bc_val": 0, "bc_val_opt": None},
+        {"bc_face": "yl", "bc_type": "periodic", "bc_val": None, "bc_val_opt": None},
+        {"bc_face": "yu", "bc_type": "symmetry", "bc_val": None, "bc_val_opt": None},
     ]
 
     assert f_bc() == bc_config
@@ -76,10 +76,10 @@ def test_bc_config() -> None:
         zu={"bc_type": "symmetry", "bc_val": None},
     )
     bc_config = [
-        {"bc_face": "rl", "bc_type": "dirichlet", "bc_val": 0.44},
-        {"bc_face": "ru", "bc_type": "neumann", "bc_val": 0},
-        {"bc_face": "zl", "bc_type": "periodic", "bc_val": None},
-        {"bc_face": "zu", "bc_type": "symmetry", "bc_val": None},
+        {"bc_face": "rl", "bc_type": "dirichlet", "bc_val": 0.44, "bc_val_opt": None},
+        {"bc_face": "ru", "bc_type": "neumann", "bc_val": 0, "bc_val_opt": None},
+        {"bc_face": "zl", "bc_type": "periodic", "bc_val": None, "bc_val_opt": None},
+        {"bc_face": "zu", "bc_type": "symmetry", "bc_val": None, "bc_val_opt": None},
     ]
 
     assert f_bc() == bc_config
@@ -132,12 +132,12 @@ def test_fields(domain: Box, spacing: list[float], dim: int) -> None:
 def test_cylinder_field_bcs() -> None:
     mesh = Mesh(Cylinder[0:1, 0:2], None, [5, 5])
 
-    def rr_bc(grid: tuple[Tensor, ...], mask: Tensor, *_) -> Tensor:
+    def ru_bc(grid: tuple[Tensor, ...], mask: Tensor, *_) -> Tensor:
         return grid[1][mask] * 4.4
 
     f_bc = CylinderBoundary(
         rl={"bc_type": "neumann", "bc_val": 0},
-        ru={"bc_type": "dirichlet", "bc_val": rr_bc},
+        ru={"bc_type": "dirichlet", "bc_val": ru_bc},
         zl={"bc_type": "neumann", "bc_val": 1.3},
         zu={"bc_type": "dirichlet", "bc_val": 0.44},
     )
@@ -148,7 +148,7 @@ def test_cylinder_field_bcs() -> None:
 
     rl_target = 4 / 3 * var()[0][1, 1:-1] - 1 / 3 * var()[0][2, 1:-1]
     zl_target = (
-        4 / 3 * var()[0][1:-1, 1] - 1 / 3 * var()[0][1:-1, 2] - 2 / 3 * 1.3 * mesh.dx[1]
+        4 / 3 * var()[0][1:-1, 1] - 1 / 3 * var()[0][1:-1, 2] + 2 / 3 * 1.3 * mesh.dx[1]
     )
 
     # Check ru
@@ -159,6 +159,33 @@ def test_cylinder_field_bcs() -> None:
     assert_close(var()[0][0, 1:-1], rl_target)
     # Check zl
     assert_close(var()[0][1:-1, 0], zl_target)
+
+    def zu_bc(
+        grid: tuple[Tensor, ...], mask: Tensor, _, opt: dict[str, Tensor]
+    ) -> Tensor:
+        val = torch.sum(opt["T"])
+
+        return grid[0][mask] * val
+
+    # Test bc_val_opt
+    f_bc = CylinderBoundary(
+        rl={"bc_type": "neumann", "bc_val": 0},
+        ru={"bc_type": "dirichlet", "bc_val": ru_bc},
+        zl={"bc_type": "neumann", "bc_val": 1.3},
+        zu={
+            "bc_type": "dirichlet",
+            "bc_val": zu_bc,
+            "bc_val_opt": {"T": torch.ones_like(var()[0])},
+        },
+    )
+    var = Field("d", 1, mesh, {"domain": f_bc(), "obstacle": None}, init_val="random")
+
+    for bc in var.bcs:
+        bc.apply(var(), mesh.grid, 0)
+
+    val = var()[0].numel()
+
+    assert_close(var()[0][1:-1, -1], mesh.grid[0][1:-1, -1] * val)
 
 
 @pytest.mark.parametrize(
