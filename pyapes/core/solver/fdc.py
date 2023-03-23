@@ -278,14 +278,10 @@ class Laplacian(Discretizer):
                     if bc.bc_type == "neumann" or bc.bc_type == "symmetry":
                         # Treatment for the cylindrical coordinate
                         dr = var.mesh.dx[j] if j == 0 else 0.0
-                        r = (
-                            var.mesh.grid[j][bc.bc_mask_prev]
-                            if j == 0
-                            else torch.zeros_like(var.mesh.grid[j][bc.bc_mask_prev])
-                        )
+                        r = var.mesh.grid[j][bc.bc_mask_prev]
                         alpha = (
                             torch.nan_to_num(
-                                4 / 3 * dr / r, nan=0.0, posinf=0.0, neginf=0.0
+                                2 / 3 * dr / r, nan=0.0, posinf=0.0, neginf=0.0
                             )
                             if var.mesh.coord_sys == "rz"
                             else torch.zeros_like(r)
@@ -327,14 +323,10 @@ class Laplacian(Discretizer):
                     if bc.bc_type == "neumann":
                         # Treatment for the cylindrical coordinate
                         dr = var.mesh.dx[j] if j == 0 else 0.0
-                        r = (
-                            var.mesh.grid[j][bc.bc_mask_prev]
-                            if j == 0
-                            else torch.zeros_like(var.mesh.grid[j][bc.bc_mask_prev])
-                        )
+                        r = var.mesh.grid[j][bc.bc_mask_prev]
                         alpha = (
                             torch.nan_to_num(
-                                2 / 3 * dr / r, nan=0.0, posinf=0.0, neginf=0.0
+                                1 / 3 * dr / r, nan=0.0, posinf=0.0, neginf=0.0
                             )
                             if var.mesh.coord_sys == "rz"
                             else torch.zeros_like(r)
