@@ -62,7 +62,7 @@ def default_A_ops(var: Field, order: int) -> list[list[Tensor]]:
             Am = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
             Amm = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
         else:
-            r_coord = var.mesh.X
+            r_coord = var.mesh.R
             dr = var.mesh.dx[0]
 
             scale = torch.nan_to_num(
