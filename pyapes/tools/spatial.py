@@ -105,13 +105,13 @@ class ScalarOP:
 
     @staticmethod
     def hess(var: Field) -> Hess:
-        jac = __class__.jac(var)
-
         indices = tensor_idx(var.mesh.dim)
+
+        data_hess: dict[str, Tensor] = {}
 
         hess: list[list[Tensor]] = []
 
-        data_hess: dict[str, Tensor] = {}
+        jac = torch.gradient(var()[0], spacing=var.mesh.dx.tolist(), edge_order=2)
         hess = [
             torch.gradient(j, spacing=var.mesh.dx.tolist(), edge_order=2) for j in jac
         ]
