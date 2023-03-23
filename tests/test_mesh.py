@@ -11,9 +11,18 @@ from pyapes.core.geometry import Cylinder
 from pyapes.core.mesh import Mesh
 
 
-def test_basic_mask() -> None:
+@pytest.mark.parametrize(
+    ["device"],
+    [["cpu"], ["cuda"], ["mps"]],
+)
+def test_basic_mask(device) -> None:
+    if device == "mps" and torch.backends.mps.is_available() is False:  # type: ignore
+        return
+    elif device == "cuda" and torch.cuda.is_available() is False:
+        return
+
     # With out object and for the cartesian coordinate system
-    mesh = Mesh(Box[0:1, 0:1], None, [0.1, 0.1])
+    mesh = Mesh(Box[0:1, 0:1], None, [0.1, 0.1], device=device, dtype="single")
 
     assert_close(mesh.dg[0][0].mean(), mesh.dx[0] / 2)
 
@@ -26,7 +35,13 @@ def test_basic_mask() -> None:
     assert mesh.coord_sys == "xyz"
 
     # With object
-    mesh_ob = Mesh(Box[0:1, 0:1], [Box[0.3:0.6, 0.0:0.6]], [0.1, 0.1])
+    mesh_ob = Mesh(
+        Box[0:1, 0:1],
+        [Box[0.3:0.6, 0.0:0.6]],
+        [0.1, 0.1],
+        device=device,
+        dtype="single",
+    )
 
     target = torch.zeros_like(mesh.t_mask[0])
 

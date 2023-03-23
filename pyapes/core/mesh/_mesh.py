@@ -2,7 +2,6 @@
 from functools import cached_property
 from typing import cast
 from typing import Optional
-from typing import Union
 
 import torch
 from torch import Tensor
@@ -32,9 +31,9 @@ class Mesh:
         self,
         domain: Geometry,
         obstacle: Optional[list[Geometry]],
-        spacing: Union[list[int], list[float]] = [],
+        spacing: list[int] | list[float] = [],
         device: str = "cpu",
-        dtype: Union[str, int] = "double",
+        dtype: str | int = "double",
     ):
         assert device in TORCH_DEVICE, "Mesh: device only accept cpu or cuda"
         self.device = TorchDevice(device).device
@@ -159,7 +158,16 @@ class Mesh:
         face_dim = self.d_mask_dim(d_face)
         face_dir = self.d_mask_dir(d_face)
 
-        return torch.roll(self.d_mask[d_face], -shift * face_dir, face_dim)
+        if self.device == torch.device("mps"):
+            return (
+                torch.roll(
+                    self.d_mask[d_face].to(device=torch.device("cpu")),
+                    -shift * face_dir,
+                    face_dim,
+                )
+            ).to(device=torch.device("mps"))
+        else:
+            return torch.roll(self.d_mask[d_face], -shift * face_dir, face_dim)
 
     @property
     def _depth(self) -> float:
@@ -260,8 +268,20 @@ class Mesh:
         for idx, g in enumerate(self.grid):
             g_del = torch.zeros_like(g)
 
-            g_rp = torch.roll(g.clone(), -1, idx) - g
-            g_rm = g - torch.roll(g.clone(), 1, idx)
+            if self.device == torch.device("mps"):
+                # MPS does not support torch.roll. Therefore, convert to CPU and back.
+                g_rp = (
+                    torch.roll(g.clone().to(device=torch.device("cpu")), -1, idx)
+                    - g.to(device=torch.device("cpu"))
+                ).to(device=torch.device("mps"))
+                g_rm = (
+                    g.to(device=torch.device("cpu"))
+                    - torch.roll(g.clone().to(device=torch.device("cpu")), 1, idx)
+                ).to(device=torch.device("mps"))
+
+            else:
+                g_rp = torch.roll(g.clone(), -1, idx) - g
+                g_rm = g - torch.roll(g.clone(), 1, idx)
 
             g_rp[g_rp.lt(0.0)] = 0.0
             g_rm[g_rm.lt(0.0)] = 0.0
@@ -355,35 +375,25 @@ def boundary_mask(mesh: Mesh) -> tuple[dict, dict]:
 def get_box_mask(
     x: list[Tensor],
     dx: Tensor,
-    obj: dict[str, Union[list[list[float]], str]],
+    obj: dict[str, list[list[float]] | str],
     mask: Tensor,
     dim: int,
 ) -> Tensor:
     """Get masks for boundaries."""
 
-    _nx = torch.zeros(dim, dtype=torch.long)
+    _nx = torch.zeros(dim, dtype=torch.long, device=mask.device)
     _ix = torch.zeros_like(_nx)
 
     x_p = torch.tensor(obj["x_p"], dtype=x[0].dtype, device=x[0].device)
     e_x = torch.tensor(obj["e_x"], dtype=x[0].dtype, device=x[0].device)
 
+    slicer = []
     for i in range(dim):
         x_p[i] = x[i][torch.argmin(abs(x[i] - x_p[i]))]
         _nx[i] = torch.ceil(e_x[i] / dx[i]).type(torch.long) + 1
         _ix[i] = torch.argmin(abs(x[i] - x_p[i]))
+        slicer.append(slice(_ix[i], _ix[i] + _nx[i], None))
 
-    if dim == 1:
-        mask[_ix[0] : _ix[0] + _nx[0],] = True
-    elif dim == 2:
-        mask[
-            _ix[0] : _ix[0] + _nx[0],
-            _ix[1] : _ix[1] + _nx[1],
-        ] = True
-    else:
-        mask[
-            _ix[0] : _ix[0] + _nx[0],
-            _ix[1] : _ix[1] + _nx[1],
-            _ix[2] : _ix[2] + _nx[2],
-        ] = True
+    mask[slicer] = True
 
     return mask
