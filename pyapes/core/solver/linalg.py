@@ -7,6 +7,7 @@ Following methods are currently available to solve the linear system of equation
 """
 import warnings
 from typing import Callable
+from typing import TypedDict
 
 import torch
 from torch import Tensor
@@ -18,6 +19,12 @@ from pyapes.core.solver.tools import FDMSolverConfig
 from pyapes.core.variables import Field
 
 
+class ReportType(TypedDict):
+    itr: int
+    tol: float
+    converge: bool
+
+
 def solve(
     var: Field,
     rhs: Tensor,
@@ -25,7 +32,7 @@ def solve(
     eqs: dict[int, OPStype],
     config: FDMSolverConfig,
     mesh: Mesh,
-) -> dict[str, int | float | bool]:
+) -> ReportType:
     r"""Solve Poisson equation on the rectangular grid.
 
     Warning:
@@ -66,7 +73,7 @@ def cg(
     eqs: dict[int, OPStype],
     config: FDMSolverConfig,
     mesh: Mesh,
-) -> dict[str, int | float | bool]:
+) -> ReportType:
     """Conjugate gradient descent method."""
 
     tolerance = config["tol"]
@@ -154,7 +161,7 @@ def bicgstab(
     eqs: dict[int, OPStype],
     config: FDMSolverConfig,
     mesh: Mesh,
-) -> dict[str, int | float | bool]:
+) -> ReportType:
     """Bi-conjugated gradient stabilized method.
 
     References:
@@ -300,7 +307,7 @@ def _solution_report(itr: int, tol: float, method: str) -> None:
     print(f"\ttolerance: {tol}")
 
 
-def _write_report(itr: int, tol: float, converge: bool):
+def _write_report(itr: int, tol: float, converge: bool) -> ReportType:
     """Write report of the solver contains total number of iterations, solution tolerance, and convergence."""
 
     return {"itr": itr, "tol": tol, "converge": converge}

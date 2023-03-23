@@ -15,6 +15,7 @@ from torch import Tensor
 
 from pyapes.core.solver.fdm import Operators
 from pyapes.core.solver.fdm import OPStype
+from pyapes.core.solver.linalg import ReportType
 from pyapes.core.solver.linalg import solve
 from pyapes.core.solver.tools import SolverConfig
 from pyapes.core.variables import Field
@@ -88,7 +89,7 @@ class Solver:
 
         return _Aop(var, self.eqs)
 
-    def solve(self) -> dict[str, int | float | bool]:
+    def solve(self) -> ReportType:
         """Solve the PDE."""
 
         assert (

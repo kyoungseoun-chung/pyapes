@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """Test spatial module"""
-
-
 import torch
 from torch.testing import assert_close
 
-from pyapes.core.mesh import Mesh
 from pyapes.core.geometry import Box
+from pyapes.core.mesh import Mesh
 from pyapes.core.variables import Field
 
 
@@ -31,7 +29,6 @@ def test_jac_and_hess() -> None:
 
 
 def test_derivative_data_structure() -> None:
-
     from pyapes.tools.spatial import Jac, Hess
 
     x = torch.rand(10)

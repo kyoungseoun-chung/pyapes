@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 """Tools that manipulate spatial data."""
-
 from dataclasses import dataclass
-from pyapes.core.variables import Field
-from pyapes.core.geometry.basis import NUM_TO_DIR, NUM_TO_DIR_RZ
-from pymytools.indices import tensor_idx
+
 import torch
+from pymytools.indices import tensor_idx
 from torch import Tensor
+
+from pyapes.core.geometry.basis import NUM_TO_DIR
+from pyapes.core.geometry.basis import NUM_TO_DIR_RZ
+from pyapes.core.variables import Field
 
 
 class Derivatives:
     def __init__(self):
-
         self.max = 0
 
         total_var = len(vars(self).items()) - 1
 
         for idx, (_, v) in enumerate(vars(self).items()):
-
             if idx == total_var:
                 # Exclude self.max for counting
                 break
@@ -51,7 +51,6 @@ class Derivatives:
 
 @dataclass
 class Jac(Derivatives):
-
     x: Tensor | None = None
     y: Tensor | None = None
     z: Tensor | None = None
@@ -63,7 +62,6 @@ class Jac(Derivatives):
 
 @dataclass
 class Hess(Derivatives):
-
     xx: Tensor | None = None
     xy: Tensor | None = None
     xz: Tensor | None = None
@@ -87,7 +85,6 @@ class ScalarOP:
 
     @staticmethod
     def jac(var: Field) -> Jac:
-
         assert var().shape[0] == 1, "Scalar: var must be a scalar field."
 
         jac = torch.gradient(var()[0], spacing=var.mesh.dx.tolist(), edge_order=2)
@@ -108,7 +105,6 @@ class ScalarOP:
 
     @staticmethod
     def hess(var: Field) -> Hess:
-
         jac = __class__.jac(var)
 
         indices = tensor_idx(var.mesh.dim)
