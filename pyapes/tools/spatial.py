@@ -22,7 +22,7 @@ class Derivatives:
                 # Exclude self.max for counting
                 break
 
-            if v is None:
+            if v.shape[0] == 0:
                 pass
             else:
                 self.max += 1
@@ -30,7 +30,7 @@ class Derivatives:
         self.keys = [
             k
             for idx, (k, v) in enumerate(vars(self).items())
-            if idx < total_var and v is not None
+            if idx < total_var and v.shape[0] != 0
         ]
 
     def __len__(self) -> int:
@@ -51,10 +51,10 @@ class Derivatives:
 
 @dataclass
 class Jac(Derivatives):
-    x: Tensor | None = None
-    y: Tensor | None = None
-    z: Tensor | None = None
-    r: Tensor | None = None
+    x: Tensor = torch.tensor([])
+    y: Tensor = torch.tensor([])
+    z: Tensor = torch.tensor([])
+    r: Tensor = torch.tensor([])
 
     def __post_init__(self):
         super().__init__()
@@ -62,15 +62,15 @@ class Jac(Derivatives):
 
 @dataclass
 class Hess(Derivatives):
-    xx: Tensor | None = None
-    xy: Tensor | None = None
-    xz: Tensor | None = None
-    yy: Tensor | None = None
-    yz: Tensor | None = None
-    zz: Tensor | None = None
-    rr: Tensor | None = None
-    rz: Tensor | None = None
-    zz: Tensor | None = None
+    xx: Tensor = torch.tensor([])
+    xy: Tensor = torch.tensor([])
+    xz: Tensor = torch.tensor([])
+    yy: Tensor = torch.tensor([])
+    yz: Tensor = torch.tensor([])
+    zz: Tensor = torch.tensor([])
+    rr: Tensor = torch.tensor([])
+    rz: Tensor = torch.tensor([])
+    zz: Tensor = torch.tensor([])
 
     def __post_init__(self):
         super().__init__()
