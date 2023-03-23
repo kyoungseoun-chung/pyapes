@@ -29,7 +29,7 @@ from pyapes.core.geometry.basis import DIR_TO_NUM_RZ
 from pyapes.core.geometry.basis import FDIR
 from pyapes.core.geometry.basis import FDIR_RZ
 
-BC_val_type = int | float | list[int] | list[float] | Callable | None
+BC_val_type = int | float | list[int] | list[float] | Callable | Tensor | None
 """BC value type."""
 
 
@@ -207,6 +207,8 @@ class Dirichlet(BC):
             var[var_dim, self.bc_mask] = self.bc_val[var_dim]
         elif isinstance(self.bc_val, int | float):
             var[var_dim, self.bc_mask] = float(self.bc_val)
+        elif isinstance(self.bc_val, Tensor):
+            var[var_dim, self.bc_mask] = self.bc_val
         else:
             raise TypeError("Dirichlet: bc_val must be float, int, callable or list!")
 
@@ -241,6 +243,8 @@ class Neumann(BC):
             c_bc_val = self.bc_val[var_dim]
         elif isinstance(self.bc_val, float | int):
             c_bc_val = float(self.bc_val)
+        elif isinstance(self.bc_val, Tensor):
+            c_bc_val = self.bc_val
         else:
             raise TypeError("Neumann: bc_val must be float, int, callable or list!")
 
