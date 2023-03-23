@@ -5,8 +5,12 @@ from typing import Any
 DIR = ["x", "y", "z"]
 DIR_TO_NUM: dict[str, int] = {"x": 0, "y": 1, "z": 2}
 """Direction to number in the xyz coordinate. e.g. `x -> 0, y -> 1, z -> 2`."""
+NUM_TO_DIR: dict[int, str] = {0: "x", 1: "y", 2: "z"}
+"""Number to direction"""
 DIR_TO_NUM_RZ: dict[str, int] = {"r": 0, "z": 1}
 """Direction to number in the rz coordinate."""
+NUM_TO_DIR_RZ: dict[int, str] = {0: "r", 1: "z"}
+"""Number to direction in the rz coordinate."""
 SIDE_TO_NUM: dict[str, int] = {"l": 0, "u": 1}
 """Side to number (lower and upper sides). e.g. `l -> 0, u -> 1`."""
 FDIR = ["xl", "xu", "yl", "yu", "zl", "zu"]

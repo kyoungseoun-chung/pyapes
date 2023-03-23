@@ -789,8 +789,8 @@ python-versions = "*"
 
 [[package]]
 name = "Markdown"
-version = "3.4.1"
-description = "Python implementation of Markdown."
+version = "3.4.2"
+description = "Python implementation of John Gruber's Markdown."
 category = "main"
 optional = false
 python-versions = ">=3.7"
@@ -1454,7 +1454,7 @@ matplotlib = ">=3.6.0,<4.0.0"
 
 [[package]]
 name = "pymytools"
-version = "0.1.9"
+version = "0.1.13"
 description = "Tools used in my pystops project."
 category = "main"
 optional = false
@@ -1998,7 +1998,7 @@ dev = ["flake8 (<4.0.0)", "flake8-annotations", "flake8-bugbear", "flake8-commas
 
 [[package]]
 name = "urllib3"
-version = "1.26.14"
+version = "1.26.15"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
 category = "main"
 optional = false
@@ -2114,7 +2114,7 @@ python-versions = ">=3.7"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10,<3.12"
-content-hash = "b323f00cea89c7d080cd754902cc3e05c3655c51ba942e11cb283e6e861e2042"
+content-hash = "deac81bedea2a59dbff7f7be157fb731c262a48c5f73f47e8e85591ae2b3a5c8"
 
 [metadata.files]
 absl-py = [
@@ -2772,8 +2772,8 @@ lit = [
     {file = "lit-16.0.0.tar.gz", hash = "sha256:3c4ac372122a1de4a88deb277b956f91b7209420a0bef683b1ab2d2b16dabe11"},
 ]
 Markdown = [
-    {file = "Markdown-3.4.1-py3-none-any.whl", hash = "sha256:08fb8465cffd03d10b9dd34a5c3fea908e20391a2a90b88d66362cb05beed186"},
-    {file = "Markdown-3.4.1.tar.gz", hash = "sha256:3b809086bb6efad416156e00a0da66fe47618a5d6918dd688f53f40c8e4cfeff"},
+    {file = "Markdown-3.4.2-py3-none-any.whl", hash = "sha256:590e8c8139ce62a1121b4b07fd471eced441378f19f3265540de0791851977e5"},
+    {file = "Markdown-3.4.2.tar.gz", hash = "sha256:e104be388c28462b4e83bd0ddfc68eff6022305cc4b5ab14caf8d235fae132b9"},
 ]
 markdown-it-py = [
     {file = "markdown-it-py-2.2.0.tar.gz", hash = "sha256:7c9a5e412688bc771c67432cbfebcdd686c93ce6484913dccf06cb5a0bea35a1"},
@@ -3217,8 +3217,8 @@ pymyplot = [
     {file = "pymyplot-0.2.7.tar.gz", hash = "sha256:bd5391237e59f7869db1b585ea084720121514076d90f6af49f0b233ec4556e6"},
 ]
 pymytools = [
-    {file = "pymytools-0.1.9-py3-none-any.whl", hash = "sha256:5586471414361acef36c361be8be46694e55e2fce68f6572c76fbb1007a10088"},
-    {file = "pymytools-0.1.9.tar.gz", hash = "sha256:e33f091e3321967d9a74cd42b2b22e46629e93f3b4a510524aad725dca04df46"},
+    {file = "pymytools-0.1.13-py3-none-any.whl", hash = "sha256:4dbf5a872b6ef49d6667be20cc9f23dc8c980954e082d6eb593a431469686719"},
+    {file = "pymytools-0.1.13.tar.gz", hash = "sha256:fd49d846308d9b44c1c6df8c231fc1c496558766ef517bce51bc47c0f5149b74"},
 ]
 pyparsing = [
     {file = "pyparsing-3.0.9-py3-none-any.whl", hash = "sha256:5026bae9a10eeaefb61dab2f09052b9f4307d44aee4eda64b309723d8d206bbc"},
@@ -3604,8 +3604,8 @@ uri-template = [
     {file = "uri_template-1.2.0.tar.gz", hash = "sha256:934e4d09d108b70eb8a24410af8615294d09d279ce0e7cbcdaef1bd21f932b06"},
 ]
 urllib3 = [
-    {file = "urllib3-1.26.14-py2.py3-none-any.whl", hash = "sha256:75edcdc2f7d85b137124a6c3c9fc3933cdeaa12ecb9a6a959f22797a0feca7e1"},
-    {file = "urllib3-1.26.14.tar.gz", hash = "sha256:076907bf8fd355cde77728471316625a4d2f7e713c125f51953bb5b3eecf4f72"},
+    {file = "urllib3-1.26.15-py2.py3-none-any.whl", hash = "sha256:aa751d169e23c7479ce47a0cb0da579e3ede798f994f5816a74e4f4500dcea42"},
+    {file = "urllib3-1.26.15.tar.gz", hash = "sha256:8a388717b9476f934a21484e8c8e61875ab60644d29b9b39e11e4b9dc1c6b305"},
 ]
 virtualenv = [
     {file = "virtualenv-20.20.0-py3-none-any.whl", hash = "sha256:3c22fa5a7c7aa106ced59934d2c20a2ecb7f49b4130b8bf444178a16b880fa45"},
