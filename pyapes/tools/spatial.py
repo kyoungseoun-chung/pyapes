@@ -8,10 +8,22 @@ from torch import Tensor
 
 from pyapes.core.geometry.basis import NUM_TO_DIR
 from pyapes.core.geometry.basis import NUM_TO_DIR_RZ
+from pyapes.core.solver.fdc import FDC
 from pyapes.core.variables import Field
 
 
 class Derivatives:
+    """Base class for Jacobian and Hessian. Intention is to use generic indices (x, y, z for example) to access each derivative group.
+
+    Example:
+        >>> jac = Jac(x=...)
+        >>> jac.x
+        Tensor(...)
+        >>> hess = Hess(xx=...)
+        >>> hess.xx
+        Tensor(...)
+    """
+
     def __init__(self):
         self.max = 0
 
@@ -87,7 +99,7 @@ class ScalarOP:
     def jac(var: Field) -> Jac:
         assert var().shape[0] == 1, "Scalar: var must be a scalar field."
 
-        jac = torch.gradient(var()[0], spacing=var.mesh.dx.tolist(), edge_order=2)
+        jac = FDC.grad(var, edge=True)[0]
 
         data_jac: dict[str, Tensor] = {}
 
@@ -109,12 +121,11 @@ class ScalarOP:
 
         data_hess: dict[str, Tensor] = {}
 
-        hess: list[list[Tensor]] = []
+        hess: list[Tensor] = []
 
-        jac = torch.gradient(var()[0], spacing=var.mesh.dx.tolist(), edge_order=2)
-        hess = [
-            torch.gradient(j, spacing=var.mesh.dx.tolist(), edge_order=2) for j in jac
-        ]
+        jac = FDC.grad(var, edge=True)[0]
+
+        hess = [FDC.grad(var.set_var_tensor(j), edge=True)[0] for j in jac]
 
         for i, hi in enumerate(hess):
             for j, h in enumerate(hi):
