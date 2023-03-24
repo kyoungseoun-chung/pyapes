@@ -62,7 +62,7 @@ class Discretizer(ABC):
 
         assert A_coeffs is not None, "FDC: A_A_coeffs is not defined!"
 
-        # Grad operator returns Jacobian but Laplacian, Div, and Ddt return scalar (sum over j-index)
+        # Grad operator returns Jacobian, but Laplacian, Div, and Ddt return scalar (sum over j-index)
         if self.op_type == "Grad":
             dis_var_dim = []
             for idx in range(var.dim):
@@ -108,10 +108,7 @@ class Discretizer(ABC):
             return self.__call_two_vars(args[0], args[1], edge)
 
     def __call_one_var(self, var: Field, edge: bool) -> Tensor | list[Tensor]:
-        """Return of `__call__` method for the operators that only require one variable.
-
-        * This is private method.
-        """
+        """Return of `__call__` method for the operators that only require one variable."""
 
         if self.A_coeffs is None:
             self.A_coeffs = self.build_A_coeffs(var)
@@ -130,10 +127,7 @@ class Discretizer(ABC):
     def __call_two_vars(
         self, var_j: Field | Tensor | float, var_i: Field, edge: bool
     ) -> Tensor:
-        """Return of `__call__` method for the operators that require two variables.
-
-        * This is private method.
-        """
+        """Return of `__call__` method for the operators that require two variables."""
 
         if self.A_coeffs is None:
             self.A_coeffs = self.build_A_coeffs(var_j, var_i, config=self.config)
@@ -217,6 +211,11 @@ def _treat_edge(
                 2.0 * bc_val - 5.0 * bc_val_p + 4.0 * bc_val_pp - bc_val_ppp
             ) / (var.mesh.dx[idx] ** 2)
 
+            slicer_1[idx] = slice(None)
+            slicer_2[idx] = slice(None)
+            slicer_3[idx] = slice(None)
+            slicer_4[idx] = slice(None)
+
     elif ops == "Grad":
         for idx in range(var.mesh.dim):
             slicer_1[idx] = 0
@@ -243,12 +242,18 @@ def _treat_edge(
                 3 / 2 * bc_val - 2.0 * bc_val_p + 1 / 2 * bc_val_pp
             ) / (var.mesh.dx[idx])
 
+            slicer_1[idx] = slice(None)
+            slicer_2[idx] = slice(None)
+            slicer_3[idx] = slice(None)
+
     elif ops == "Div":
         warnings.warn(
             "FDC: edge treatment of Div is supported! Div assumes user already specified the boundary in the domain."
         )
     else:
         raise RuntimeError(f"FDC: edge treatment of {ops=} is not supported!")
+
+    pass
 
 
 class Laplacian(Discretizer):
@@ -259,7 +264,7 @@ class Laplacian(Discretizer):
 
     @staticmethod
     def build_A_coeffs(var: Field) -> list[list[Tensor]]:
-        App, Ap, Ac, Am, Amm = default_A_ops(var, 2)
+        App, Ap, Ac, Am, Amm = default_A_ops(var, __class__.__name__)
 
         dx = var.dx
         # Treat boundaries
@@ -368,7 +373,7 @@ class Grad(Discretizer):
         ..math::
             \nabla \Phi = \frac{\Phi^{i+1} - \Phi^{i-1}}{2 \Delta x}
         """
-        App, Ap, Ac, Am, Amm = default_A_ops(var, 1)
+        App, Ap, Ac, Am, Amm = default_A_ops(var, __class__.__name__)
 
         if var.bcs is not None:
             for i in range(var.dim):
@@ -522,7 +527,7 @@ class Div(Discretizer):
 
         limiter = _check_limiter(config)
 
-        App, Ap, Ac, Am, Amm = default_A_ops(var_i, 1)
+        App, Ap, Ac, Am, Amm = default_A_ops(var_i, __class__.__name__)
 
         if limiter == "none":
             Ap, Ac, Am = _adv_central(adv, var_i, [Ap, Ac, Am])
@@ -639,19 +644,6 @@ def _gamma_from_adv(adv: Tensor, var: Field) -> tuple[Tensor, Tensor]:
     return gamma_min, gamma_max
 
 
-class Ddt(Discretizer):
-    def __init__(self):
-        self._op_type = __class__.__name__
-
-    @staticmethod
-    def build_A_coeffs(var: Field) -> tuple[Tensor, Tensor, Tensor]:
-        ...
-
-    @staticmethod
-    def adjust_rhs(var: Field) -> Tensor:
-        ...
-
-
 def _return_bc_val(bc: BC, var: Field, dim: int) -> Tensor | float:
     """Return boundary values."""
 
@@ -680,8 +672,6 @@ class FDC:
     """Laplacian operator: `laplacian(coeffs, var)`."""
     grad: Grad = Grad()
     """Gradient operator: `grad(var)`."""
-    ddt: Ddt = Ddt()
-    """Time discretization: `ddt(var)`. It will only adjust RHS of the PDE."""
 
     def update_config(self, scheme: str, target: str, val: str):
         """Update config values."""

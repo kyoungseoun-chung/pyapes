@@ -4,13 +4,25 @@ import torch
 from torch.testing import assert_close
 
 from pyapes.core.geometry import Box
+from pyapes.core.geometry import Cylinder
 from pyapes.core.mesh import Mesh
 from pyapes.core.variables import Field
+from pyapes.tools.spatial import DiffFlux
+from pyapes.tools.spatial import ScalarOP
+
+
+def test_diff_flux() -> None:
+    # Test cartesian
+    mesh = Mesh(Box[0:1, 0:1, 0:1], None, [3, 3, 3])
+    var = Field("test", 1, mesh, {"domain": None, "obstacle": None})
+    var.set_var_tensor(mesh.grid[0] ** 2 + 2 * mesh.grid[2] ** 2)
+
+    hess = ScalarOP.hess(var)
+
+    # Test axisymmetric
 
 
 def test_jac_and_hess() -> None:
-    from pyapes.tools.spatial import ScalarOP
-
     mesh = Mesh(Box[0:1, 0:1, 0:1], None, [3, 3, 3])
     var = Field("test", 1, mesh, {"domain": None, "obstacle": None})
     var.set_var_tensor(mesh.grid[0] ** 2 + 2 * mesh.grid[2] ** 2)

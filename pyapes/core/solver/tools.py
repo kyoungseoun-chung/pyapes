@@ -26,7 +26,7 @@ class SolverConfig(TypedDict):
     fdm: FDMSolverConfig
 
 
-def default_A_ops(var: Field, order: int) -> list[list[Tensor]]:
+def default_A_ops(var: Field, ops: str) -> list[list[Tensor]]:
     """Construct A_ops for the given order of the spatial discretization (the second order central difference scheme).
 
     Example:
@@ -47,14 +47,34 @@ def default_A_ops(var: Field, order: int) -> list[list[Tensor]]:
         list[list[Tensor]]: A_ops for the given order of the spatial discretization. The coefficients are for `i+2`, `i+1`, `i`, `i-1`, `i-2` respectively.
     """
 
-    if order == 1:
+    if ops.lower() == "grad":
         # Axisymmetric coordinate has same first order discretization as the cartesian case.
         App = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
         Ap = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
         Ac = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
         Am = [-1.0 * torch.ones_like(var()) for _ in range(var.mesh.dim)]
         Amm = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
-    elif order == 2:
+    elif ops.lower() == "div":
+        if var.mesh.coord_sys == "xyz":
+            App = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
+            Ap = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
+            Ac = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
+            Am = [-1.0 * torch.ones_like(var()) for _ in range(var.mesh.dim)]
+            Amm = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
+        else:
+            r_coord = var.mesh.R
+            dr = var.mesh.dx[0]
+
+            scale = torch.nan_to_num(dr / r_coord, nan=0.0, posinf=0.0, neginf=0.0)
+            App = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
+            Ap = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
+            Ac = [
+                scale * torch.ones_like(var()) if i == 0 else torch.zeros_like(var())
+                for i in range(var.mesh.dim)
+            ]
+            Am = [-1.0 * torch.ones_like(var()) for _ in range(var.mesh.dim)]
+            Amm = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
+    elif ops.lower() == "laplacian":
         if var.mesh.coord_sys == "xyz":
             App = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
             Ap = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
@@ -85,6 +105,6 @@ def default_A_ops(var: Field, order: int) -> list[list[Tensor]]:
             ]
             Amm = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
     else:
-        raise RuntimeError(f"Given {order=} should be either 1 or 2.")
+        raise RuntimeError(f"Given {ops=} should be either grad, div, or laplacian.")
 
     return [App, Ap, Ac, Am, Amm]

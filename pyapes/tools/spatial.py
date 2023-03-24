@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Tools that manipulate spatial data."""
+"""Tools that manipulate spatial data.
+Mostly for the discretization without boundary treatment.
+"""
 from dataclasses import dataclass
 
 import torch
@@ -86,6 +88,37 @@ class Hess(Derivatives):
 
     def __post_init__(self):
         super().__init__()
+
+
+class DiffFlux:
+    """Object to be used in the tensor diffussion term."""
+
+    @staticmethod
+    def __call__(diff: Hess, var: Field) -> Field:
+        r"""Compute the diffusive flux without boundary treatment (just forward-backward difference)
+
+        .. math::
+            D_ij \frac{\partial \Phi}{\partial x_j}
+
+        Therefore, it returns a vector field.
+
+        Args:
+            diff (Hess): Diffusion tensor
+            var (Field): Scalar input field
+        """
+
+        jac = ScalarOP.jac(var)
+        flux = Field("DiffFlux", len(jac), var.mesh, None)
+
+        if var.mesh.coord_sys == "xyz":
+            ...
+
+        elif var.mesh.coord_sys == "rz":
+            ...
+        else:
+            raise RuntimeError(f"DiffFlux: unknown coordinate system.")
+
+        return flux
 
 
 class ScalarOP:

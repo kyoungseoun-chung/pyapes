@@ -20,9 +20,14 @@ from pyapes.core.variables import Field
 
 
 class ReportType(TypedDict):
+    """Report contains solver information."""
+
     itr: int
+    """Total number of iterations until convergence."""
     tol: float
+    """Convergence tolerance."""
     converge: bool
+    """Result of convergence. If `itr<max_it`, then `converge=True`."""
 
 
 def solve(

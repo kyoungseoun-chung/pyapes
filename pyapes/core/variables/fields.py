@@ -210,7 +210,7 @@ class Field:
         self,
         val: Tensor,
         insert: int | None = None,
-    ) -> None:
+    ) -> Field:
         """Set variable with a given Tensor.
 
         Examples:
@@ -232,6 +232,7 @@ class Field:
                         self._VAR[i] = val
                 else:
                     self._VAR[i] = val
+        return self
 
     def __getitem__(self, idx: int | slice) -> torch.Tensor:
         if isinstance(idx, slice):
