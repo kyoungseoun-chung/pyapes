@@ -1,36 +1,33 @@
 #!/usr/bin/env python3
 """Collection of types used in solver module."""
+from typing import Callable
+from typing import TypedDict
 
-from typing import Callable, TypedDict
-from pyapes.variables import Field
 from torch import Tensor
+
+from pyapes.variables import Field
 
 
 class DivConfigType(TypedDict):
-
     limiter: str
     edge: bool
 
 
 class LaplacianConfigType(TypedDict):
-
     limiter: str
     edge: bool
 
 
 class GradConfigType(TypedDict):
-
     limiter: str
     edge: bool
 
 
 class DdtConfigType(TypedDict):
-
     scheme: str
 
 
 class DiscretizerConfigType(TypedDict, total=False):
-
     div: DivConfigType
     laplacian: LaplacianConfigType
     grad: GradConfigType

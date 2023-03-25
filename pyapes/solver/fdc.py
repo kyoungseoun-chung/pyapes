@@ -9,6 +9,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 
 import torch
+from pymytools.indices import tensor_idx
 from torch import Tensor
 
 from pyapes.geometry.basis import n2d_coord
@@ -17,9 +18,8 @@ from pyapes.solver.types import DiscretizerConfigType
 from pyapes.solver.types import DivConfigType
 from pyapes.variables import Field
 from pyapes.variables.bcs import BC
-from pyapes.variables.container import Hess, Jac
-
-from pymytools.indices import tensor_idx
+from pyapes.variables.container import Hess
+from pyapes.variables.container import Jac
 
 
 @dataclass
@@ -690,7 +690,6 @@ class DiffFlux:
             var (Field): Scalar input field
         """
 
-        # FIXME!
         jac = ScalarOP.jac(var)
         flux = Field("DiffFlux", len(jac), var.mesh, None)
 
@@ -750,6 +749,8 @@ class ScalarOP:
     def jac(var: Field) -> Jac:
         assert var().shape[0] == 1, "Scalar: var must be a scalar field."
 
+        FDC.grad.reset()
+
         data_jac: dict[str, Tensor] = {}
 
         n2d = n2d_coord(var.mesh.coord_sys)
@@ -765,6 +766,8 @@ class ScalarOP:
 
     @staticmethod
     def hess(var: Field) -> Hess:
+        FDC.grad.reset()
+
         indices = tensor_idx(var.mesh.dim)
 
         data_hess: dict[str, Tensor] = {}

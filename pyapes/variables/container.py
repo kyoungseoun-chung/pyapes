@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Variable container for Jacobian and Hessian."""
 from dataclasses import dataclass
+
 import torch
 from torch import Tensor
 

@@ -2,6 +2,7 @@
 """Test spatial module"""
 import pytest
 import torch
+from pymytools.diagnostics import DataLoader
 from torch.testing import assert_close
 
 from pyapes.geometry import Box
