@@ -47,6 +47,24 @@ class Derivatives:
             if idx < total_var and v.shape[0] != 0
         ]
 
+    def __getitem__(self, key: str) -> Tensor:
+        """Return the derivative group by a key. If the key is given for the Hessian, the key is always sorted in alphabetical order.
+
+        Example:
+            >>> hess["xz"]
+            hess.xz
+            >>> hess["zx"]
+            hess.xz
+            >>> hess["yx"]
+            hess.xy
+        """
+
+        item = getattr(self, "".join(sorted(key.lower())))
+        if item.shape[0] == 0:
+            raise KeyError(f"Derivative: key {key} not found.")
+        else:
+            return item
+
     def __len__(self) -> int:
         return self.max
 
@@ -93,6 +111,10 @@ class Hess(Derivatives):
 class DiffFlux:
     """Object to be used in the tensor diffussion term."""
 
+    def __new__(cls, diff: Hess, var: Field):
+        # ignore the args
+        return cls.__call__(diff, var)
+
     @staticmethod
     def __call__(diff: Hess, var: Field) -> Field:
         r"""Compute the diffusive flux without boundary treatment (just forward-backward difference)
@@ -110,13 +132,22 @@ class DiffFlux:
         jac = ScalarOP.jac(var)
         flux = Field("DiffFlux", len(jac), var.mesh, None)
 
-        if var.mesh.coord_sys == "xyz":
-            ...
+        n2d = _n2d_coord(var.mesh.coord_sys)
 
-        elif var.mesh.coord_sys == "rz":
-            ...
-        else:
-            raise RuntimeError(f"DiffFlux: unknown coordinate system.")
+        for i in range(var.mesh.dim):
+            diff_flux = torch.zeros_like(var()[0])
+            for j in range(var.mesh.dim):
+                j_key = n2d[j]
+                h_key = n2d[i] + n2d[j]
+
+                if n2d[i] == "r":
+                    d_coeff = var.mesh.grid[0] * diff[h_key]
+                else:
+                    d_coeff = diff[h_key]
+
+                diff_flux += d_coeff * jac[j_key]
+
+            flux.set_var_tensor(diff_flux, i)
 
         return flux
 
@@ -132,20 +163,17 @@ class ScalarOP:
     def jac(var: Field) -> Jac:
         assert var().shape[0] == 1, "Scalar: var must be a scalar field."
 
-        jac = FDC.grad(var, edge=True)[0]
-
         data_jac: dict[str, Tensor] = {}
 
-        if var.mesh.coord_sys == "xyz":
-            for i, j in enumerate(jac):
-                data_jac[NUM_TO_DIR[i]] = j
-        elif var.mesh.coord_sys == "rz":
-            for i, j in enumerate(jac):
-                data_jac[NUM_TO_DIR_RZ[i]] = j
-        else:
-            raise RuntimeError(
-                f"Spatial: unknown coordinate system: {var.mesh.coord_sys}"
-            )
+        n2d = _n2d_coord(var.mesh.coord_sys)
+
+        jac = FDC.grad(var, edge=True)[0]
+
+        for i, j in enumerate(jac):
+            data_jac[n2d[i]] = j
+
+        FDC.grad.reset()
+
         return Jac(**data_jac)
 
     @staticmethod
@@ -156,21 +184,29 @@ class ScalarOP:
 
         hess: list[Tensor] = []
 
+        n2d = _n2d_coord(var.mesh.coord_sys)
+
         jac = FDC.grad(var, edge=True)[0]
 
-        hess = [FDC.grad(var.set_var_tensor(j), edge=True)[0] for j in jac]
+        jac_f = var.copy()
+
+        hess = [FDC.grad(jac_f.set_var_tensor(j), edge=True)[0] for j in jac]
 
         for i, hi in enumerate(hess):
             for j, h in enumerate(hi):
-                if var.mesh.coord_sys == "xyz":
-                    if (i, j) in indices:
-                        data_hess[NUM_TO_DIR[i] + NUM_TO_DIR[j]] = h
-                elif var.mesh.coord_sys == "rz":
-                    if (i, j) in indices:
-                        data_hess[NUM_TO_DIR_RZ[i] + NUM_TO_DIR_RZ[j]] = h
-                else:
-                    raise RuntimeError(
-                        f"Spatial: unknown coordinate system: {var.mesh.coord_sys}"
-                    )
+                if (i, j) in indices:
+                    data_hess[n2d[i] + n2d[j]] = h
 
+        FDC.grad.reset()
         return Hess(**data_hess)
+
+
+def _n2d_coord(coord: str) -> dict[int, str]:
+    if coord == "xyz":
+        n2d = NUM_TO_DIR
+    elif coord == "rz":
+        n2d = NUM_TO_DIR_RZ
+    else:
+        raise RuntimeError(f"DiffFlux: unknown coordinate system.")
+
+    return n2d

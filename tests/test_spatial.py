@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Test spatial module"""
+import pytest
 import torch
 from torch.testing import assert_close
 
@@ -17,9 +18,30 @@ def test_diff_flux() -> None:
     var = Field("test", 1, mesh, {"domain": None, "obstacle": None})
     var.set_var_tensor(mesh.grid[0] ** 2 + 2 * mesh.grid[2] ** 2)
 
+    grad = torch.gradient(var()[0], spacing=mesh.dx.tolist(), edge_order=2)
+
     hess = ScalarOP.hess(var)
 
+    flux = DiffFlux(hess, var)
+
+    assert_close(flux[0], hess.xx * grad[0] + hess.xy * grad[1] + hess.xz * grad[2])
+
     # Test axisymmetric
+    mesh = Mesh(Cylinder[0:1, 0:1], None, [3, 3])
+    var = Field("test", 1, mesh, {"domain": None, "obstacle": None})
+    var.set_var_tensor(mesh.grid[0] ** 2)
+
+    grad = torch.gradient(var()[0], spacing=mesh.dx.tolist(), edge_order=2)
+
+    hess = ScalarOP.hess(var)
+
+    flux = DiffFlux(hess, var)
+
+    assert_close(
+        flux[0], mesh.grid[0] * hess.rr * grad[0] + mesh.grid[0] * hess.rz * grad[1]
+    )
+
+    assert_close(flux[1], hess.rz * grad[0] + hess.zz * grad[1])
 
 
 def test_jac_and_hess() -> None:
@@ -38,6 +60,21 @@ def test_jac_and_hess() -> None:
     assert_close(hess.xx, 2 * mesh.grid[2] ** 2)
     assert_close(hess.xy, torch.zeros_like(var()[0]))
     assert_close(hess.xz, 4 * mesh.grid[0] * mesh.grid[2])
+
+    mesh = Mesh(Box[0:1, 0:1], None, [3, 3])
+    var = Field("test", 1, mesh, {"domain": None, "obstacle": None})
+    var.set_var_tensor(mesh.grid[0] ** 2)
+
+    jac = ScalarOP.jac(var)
+    hess = ScalarOP.hess(var)
+
+    assert_close(hess.xy, hess["yx"])
+
+    with pytest.raises(KeyError):
+        jac["z"]
+
+    with pytest.raises(KeyError):
+        hess["zz"]
 
 
 def test_derivative_data_structure() -> None:
