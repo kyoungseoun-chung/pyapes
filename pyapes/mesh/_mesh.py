@@ -6,14 +6,14 @@ from typing import Optional
 import torch
 from torch import Tensor
 
-from pyapes.core.backend import DType
-from pyapes.core.backend import DTYPE_DOUBLE
-from pyapes.core.backend import DTYPE_SINGLE
-from pyapes.core.backend import TORCH_DEVICE
-from pyapes.core.backend import TorchDevice
-from pyapes.core.geometry import GeoTypeIdentifier
-from pyapes.core.geometry.basis import DIR_TO_NUM
-from pyapes.core.geometry.basis import Geometry
+from pyapes.backend import DType
+from pyapes.backend import DTYPE_DOUBLE
+from pyapes.backend import DTYPE_SINGLE
+from pyapes.backend import TORCH_DEVICE
+from pyapes.backend import TorchDevice
+from pyapes.geometry import GeoTypeIdentifier
+from pyapes.geometry.basis import DIR_TO_NUM
+from pyapes.geometry.basis import Geometry
 
 
 class Mesh:

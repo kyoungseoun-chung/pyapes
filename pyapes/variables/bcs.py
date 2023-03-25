@@ -23,11 +23,11 @@ from typing import TypedDict
 import torch
 from torch import Tensor
 
-from pyapes.core.backend import DType
-from pyapes.core.geometry.basis import DIR_TO_NUM
-from pyapes.core.geometry.basis import DIR_TO_NUM_RZ
-from pyapes.core.geometry.basis import FDIR
-from pyapes.core.geometry.basis import FDIR_RZ
+from pyapes.backend import DType
+from pyapes.geometry.basis import DIR_TO_NUM
+from pyapes.geometry.basis import DIR_TO_NUM_RZ
+from pyapes.geometry.basis import FDIR
+from pyapes.geometry.basis import FDIR_RZ
 
 BC_val_type = int | float | list[int] | list[float] | Callable | Tensor | None
 """BC value type."""

@@ -8,15 +8,15 @@ import torch
 from torch import Tensor
 from torch.testing import assert_close  # type: ignore
 
-from pyapes.core.geometry import Box
-from pyapes.core.mesh import Mesh
-from pyapes.core.mesh.tools import inner_slicer
-from pyapes.core.solver.fdc import FDC
-from pyapes.core.solver.fdm import FDM
-from pyapes.core.solver.ops import Solver
-from pyapes.core.variables import Field
-from pyapes.core.variables.bcs import homogeneous_bcs
+from pyapes.geometry import Box
+from pyapes.mesh import Mesh
+from pyapes.mesh.tools import inner_slicer
+from pyapes.solver.fdc import FDC
+from pyapes.solver.fdm import FDM
+from pyapes.solver.ops import Solver
 from pyapes.testing.burgers import burger_exact_nd
+from pyapes.variables import Field
+from pyapes.variables.bcs import homogeneous_bcs
 
 
 def test_fdc_edge() -> None:
@@ -215,7 +215,7 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
     var_i.set_var_tensor(2 * mesh.X**2)
 
     solver = Solver(None)
-    fdm = FDM({"div": {"limiter": "upwind"}})
+    fdm = FDM({"div": {"limiter": "upwind", "edge": False}})
 
     # Poisson equation.
     solver.set_eq(fdm.laplacian(2.0, var_i) == 0.0)
@@ -246,6 +246,7 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
 
     target = t_div[~mesh.t_mask] + t_laplacian[~mesh.t_mask]
 
+    assert "div" in fdm.config
     assert fdm.config["div"]["limiter"] == "upwind"
     assert_close(solver.Aop(var_i)[0][~mesh.t_mask], target)
 
@@ -293,6 +294,7 @@ def test_solver_fdm_ops(domain: Box, spacing: list[float]) -> None:
     target = d_t_var + (t_div + t_laplacian)
     t_rhs = rhs
 
+    assert "div" in fdm.config
     assert fdm.config["div"]["limiter"] == "upwind"
     assert_close(solver.Aop(var_i)[0][~mesh.t_mask], target[~mesh.t_mask])
     if solver.rhs is not None:

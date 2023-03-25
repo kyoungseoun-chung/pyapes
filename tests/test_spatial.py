@@ -4,12 +4,12 @@ import pytest
 import torch
 from torch.testing import assert_close
 
-from pyapes.core.geometry import Box
-from pyapes.core.geometry import Cylinder
-from pyapes.core.mesh import Mesh
-from pyapes.core.variables import Field
-from pyapes.tools.spatial import DiffFlux
-from pyapes.tools.spatial import ScalarOP
+from pyapes.geometry import Box
+from pyapes.geometry import Cylinder
+from pyapes.mesh import Mesh
+from pyapes.solver.fdc import DiffFlux
+from pyapes.solver.fdc import ScalarOP
+from pyapes.variables import Field
 
 
 def test_diff_flux() -> None:
@@ -22,7 +22,7 @@ def test_diff_flux() -> None:
 
     hess = ScalarOP.hess(var)
 
-    flux = DiffFlux(hess, var)
+    flux = DiffFlux()(hess, var)
 
     assert_close(flux[0], hess.xx * grad[0] + hess.xy * grad[1] + hess.xz * grad[2])
 
@@ -35,7 +35,7 @@ def test_diff_flux() -> None:
 
     hess = ScalarOP.hess(var)
 
-    flux = DiffFlux(hess, var)
+    flux = DiffFlux()(hess, var)
 
     assert_close(
         flux[0], mesh.grid[0] * hess.rr * grad[0] + mesh.grid[0] * hess.rz * grad[1]

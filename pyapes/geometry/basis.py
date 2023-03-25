@@ -19,6 +19,17 @@ FDIR_RZ = ["rl", "ru", "zl", "zu"]
 """Face identifier in the rz coordinate. e.g. `rl` (face at r lower) and `ru` (face at r upper)."""
 
 
+def n2d_coord(coord: str) -> dict[int, str]:
+    if coord == "xyz":
+        n2d = NUM_TO_DIR
+    elif coord == "rz":
+        n2d = NUM_TO_DIR_RZ
+    else:
+        raise RuntimeError(f"DiffFlux: unknown coordinate system.")
+
+    return n2d
+
+
 class GeoTypeIdentifier(list):
     """Class that helps to identify the list of types."""
 

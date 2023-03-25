@@ -10,19 +10,19 @@ import torch
 from torch import Tensor
 from torch.testing import assert_close  # type: ignore
 
-from pyapes.core.geometry import Box
-from pyapes.core.geometry import Cylinder
-from pyapes.core.mesh import Mesh
-from pyapes.core.solver.fdm import FDM
-from pyapes.core.solver.ops import Solver
-from pyapes.core.variables import Field
-from pyapes.core.variables.bcs import CylinderBoundary
-from pyapes.core.variables.bcs import homogeneous_bcs
-from pyapes.core.variables.bcs import mixed_bcs
+from pyapes.geometry import Box
+from pyapes.geometry import Cylinder
+from pyapes.mesh import Mesh
+from pyapes.solver.fdm import FDM
+from pyapes.solver.ops import Solver
 from pyapes.testing.burgers import burger_exact_nd
 from pyapes.testing.poisson import poisson_bcs
 from pyapes.testing.poisson import poisson_exact_nd
 from pyapes.testing.poisson import poisson_rhs_nd
+from pyapes.variables import Field
+from pyapes.variables.bcs import CylinderBoundary
+from pyapes.variables.bcs import homogeneous_bcs
+from pyapes.variables.bcs import mixed_bcs
 
 DISPLAY_PLOT: bool = False
 
@@ -404,7 +404,7 @@ def wip_burger_1d() -> None:
             }
         }
     )
-    fdm = FDM({"div": {"limiter": "none"}})
+    fdm = FDM({"div": {"limiter": "none", "edge": False}})
 
     # Viscosity
     nu = 0.1

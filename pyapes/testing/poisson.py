@@ -11,10 +11,10 @@ from math import pi
 import torch
 from torch import Tensor
 
-from pyapes.core.geometry.basis import FDIR
-from pyapes.core.mesh import Mesh
-from pyapes.core.variables import Field
-from pyapes.core.variables.bcs import BCConfig
+from pyapes.geometry.basis import FDIR
+from pyapes.mesh import Mesh
+from pyapes.variables import Field
+from pyapes.variables.bcs import BCConfig
 
 
 def poisson_rhs_nd(mesh: Mesh, var: Field) -> Tensor:

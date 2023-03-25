@@ -13,12 +13,12 @@ from dataclasses import dataclass
 import torch
 from torch import Tensor
 
-from pyapes.core.solver.fdm import Operators
-from pyapes.core.solver.fdm import OPStype
-from pyapes.core.solver.linalg import ReportType
-from pyapes.core.solver.linalg import solve
-from pyapes.core.solver.tools import SolverConfig
-from pyapes.core.variables import Field
+from pyapes.solver.fdm import Operators
+from pyapes.solver.fdm import OPStype
+from pyapes.solver.linalg import ReportType
+from pyapes.solver.linalg import solve
+from pyapes.solver.tools import SolverConfig
+from pyapes.variables import Field
 
 
 @dataclass(repr=False)

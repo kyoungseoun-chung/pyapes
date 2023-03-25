@@ -5,13 +5,13 @@ import torch
 from torch import Tensor
 from torch.testing import assert_close  # type: ignore
 
-from pyapes.core.geometry import Box
-from pyapes.core.geometry.cylinder import Cylinder
-from pyapes.core.mesh import Mesh
-from pyapes.core.variables import Field
-from pyapes.core.variables.bcs import BoxBoundary
-from pyapes.core.variables.bcs import CylinderBoundary
-from pyapes.core.variables.bcs import homogeneous_bcs
+from pyapes.geometry import Box
+from pyapes.geometry.cylinder import Cylinder
+from pyapes.mesh import Mesh
+from pyapes.variables import Field
+from pyapes.variables.bcs import BoxBoundary
+from pyapes.variables.bcs import CylinderBoundary
+from pyapes.variables.bcs import homogeneous_bcs
 
 
 @pytest.mark.parametrize(

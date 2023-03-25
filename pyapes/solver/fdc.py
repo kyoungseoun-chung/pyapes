@@ -7,14 +7,19 @@ import warnings
 from abc import ABC
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Optional
 
 import torch
 from torch import Tensor
 
-from pyapes.core.solver.tools import default_A_ops
-from pyapes.core.variables import Field
-from pyapes.core.variables.bcs import BC
+from pyapes.geometry.basis import n2d_coord
+from pyapes.solver.tools import default_A_ops
+from pyapes.solver.types import DiscretizerConfigType
+from pyapes.solver.types import DivConfigType
+from pyapes.variables import Field
+from pyapes.variables.bcs import BC
+from pyapes.variables.container import Hess, Jac
+
+from pymytools.indices import tensor_idx
 
 
 @dataclass
@@ -29,20 +34,20 @@ class Discretizer(ABC):
     rhs_adj: Tensor | None = None
     """RHS adjustment tensor."""
     _op_type: str = "Discretizer"
-    _config: dict[str, str] | None = None
+    _config: DiscretizerConfigType | None = None
 
     @property
     def op_type(self) -> str:
         return self._op_type
 
     @property
-    def config(self) -> dict[str, str] | None:
+    def config(self) -> DiscretizerConfigType | None:
         return self._config
 
     @staticmethod
     @abstractmethod
     def build_A_coeffs(
-        *args: Field | Tensor | float, config: dict[str, str] | None = None
+        *args: Field | Tensor | float, config: DiscretizerConfigType | None = None
     ) -> list[list[Tensor]]:
         """Build the operation matrix coefficients to be used for the discretization.
         `var: Field` is required due to the boundary conditions. Should always return three tensors in `Ap`, `Ac`, and `Am` order.
@@ -52,7 +57,7 @@ class Discretizer(ABC):
     @staticmethod
     @abstractmethod
     def adjust_rhs(
-        *args: Field | Tensor | float, config: dict[str, str] | None = None
+        *args: Field | Tensor | float, config: DiscretizerConfigType | None = None
     ) -> Tensor:
         """Return a tensor that is used to adjust `rhs` of the PDE."""
         ...
@@ -86,7 +91,7 @@ class Discretizer(ABC):
         self.A_coeffs = None
         self.rhs_adj = None
 
-    def set_config(self, config: dict[str, str]) -> None:
+    def set_config(self, config: DiscretizerConfigType) -> None:
         """Set the configuration for the discretization."""
 
         self._config = config
@@ -510,7 +515,9 @@ class Div(Discretizer):
 
     @staticmethod
     def build_A_coeffs(
-        var_j: Field | float | Tensor, var_i: Field, config: dict[str, str]
+        var_j: Field | float | Tensor,
+        var_i: Field,
+        config: DiscretizerConfigType,
     ) -> list[list[Tensor]]:
         r"""Build the coefficients for the discretization of the gradient operator using the second-order central finite difference method. `i` and `j` indicates the Einstein summation convention. Here, `j` comes first to be consistent with the equation:
 
@@ -525,7 +532,9 @@ class Div(Discretizer):
 
         adv = _div_var_j_to_tensor(var_j, var_i)
 
-        limiter = _check_limiter(config)
+        assert "div" in config, "FDC Div: config should contain 'div' key."
+
+        limiter = _check_limiter(config["div"])
 
         App, Ap, Ac, Am, Amm = default_A_ops(var_i, __class__.__name__)
 
@@ -542,13 +551,16 @@ class Div(Discretizer):
 
     @staticmethod
     def adjust_rhs(
-        var_j: Field | Tensor | float, var_i: Field, config: dict[str, str]
+        var_j: Field | Tensor | float, var_i: Field, config: DiscretizerConfigType
     ) -> Tensor:
         rhs_adj = torch.zeros_like(var_i())
 
         if var_i.bcs is not None:
             adv = _div_var_j_to_tensor(var_j, var_i)
-            limiter = _check_limiter(config)
+
+            assert "div" in config, "FDC Div: config should contain 'div' key."
+
+            limiter = _check_limiter(config["div"])
 
             if limiter == "none":
                 for i in range(var_i.dim):
@@ -567,7 +579,7 @@ class Div(Discretizer):
         return rhs_adj
 
 
-def _check_limiter(config: dict[str, str] | None) -> str:
+def _check_limiter(config: DivConfigType | None) -> str:
     """Check the limiter type."""
     if config is not None and "limiter" in config:
         return config["limiter"].lower()  # make sure it is lower case
@@ -661,17 +673,62 @@ def _return_bc_val(bc: BC, var: Field, dim: int) -> Tensor | float:
     return at_bc
 
 
+class DiffFlux:
+    """Object to be used in the tensor diffussion term."""
+
+    @staticmethod
+    def __call__(diff: Hess, var: Field) -> Field:
+        r"""Compute the diffusive flux without boundary treatment (just forward-backward difference)
+
+        .. math::
+            D_ij \frac{\partial \Phi}{\partial x_j}
+
+        Therefore, it returns a vector field.
+
+        Args:
+            diff (Hess): Diffusion tensor
+            var (Field): Scalar input field
+        """
+
+        # FIXME!
+        jac = ScalarOP.jac(var)
+        flux = Field("DiffFlux", len(jac), var.mesh, None)
+
+        n2d = n2d_coord(var.mesh.coord_sys)
+
+        for i in range(var.mesh.dim):
+            diff_flux = torch.zeros_like(var()[0])
+            for j in range(var.mesh.dim):
+                j_key = n2d[j]
+                h_key = n2d[i] + n2d[j]
+
+                if n2d[i] == "r":
+                    d_coeff = var.mesh.grid[0] * diff[h_key]
+                else:
+                    d_coeff = diff[h_key]
+
+                diff_flux += d_coeff * jac[j_key]
+
+            flux.set_var_tensor(diff_flux, i)
+
+        return flux
+
+
 class FDC:
     """Collection of Finite Difference discretization. The operation is explicit, therefore, all methods return a tensor."""
 
-    config: Optional[dict[str, dict[str, str]]] = None
-    """Configuration for the discretization."""
     div: Div = Div()
     """Divergence operator: `div(var_j, var_i)`."""
     laplacian: Laplacian = Laplacian()
     """Laplacian operator: `laplacian(coeffs, var)`."""
     grad: Grad = Grad()
     """Gradient operator: `grad(var)`."""
+    diffFlux: DiffFlux = DiffFlux()
+
+    def __init__(self, config: DiscretizerConfigType | None = None):
+        """Init FDC class."""
+
+        self.config = config
 
     def update_config(self, scheme: str, target: str, val: str):
         """Update config values."""
@@ -680,3 +737,52 @@ class FDC:
             self.config[scheme][target] = val
         else:
             self.config = {scheme: {target: val}}
+
+
+class ScalarOP:
+    """Manipulation of a scalar field (scalar operations)
+
+    Note:
+        - `jac` and `hess` operations both use the `torch.gradient` function with edge order of 2.
+    """
+
+    @staticmethod
+    def jac(var: Field) -> Jac:
+        assert var().shape[0] == 1, "Scalar: var must be a scalar field."
+
+        data_jac: dict[str, Tensor] = {}
+
+        n2d = n2d_coord(var.mesh.coord_sys)
+
+        jac = FDC.grad(var, edge=True)[0]
+
+        for i, j in enumerate(jac):
+            data_jac[n2d[i]] = j
+
+        FDC.grad.reset()
+
+        return Jac(**data_jac)
+
+    @staticmethod
+    def hess(var: Field) -> Hess:
+        indices = tensor_idx(var.mesh.dim)
+
+        data_hess: dict[str, Tensor] = {}
+
+        hess: list[Tensor] = []
+
+        n2d = n2d_coord(var.mesh.coord_sys)
+
+        jac = FDC.grad(var, edge=True)[0]
+
+        jac_f = var.copy()
+
+        hess = [FDC.grad(jac_f.set_var_tensor(j), edge=True)[0] for j in jac]
+
+        for i, hi in enumerate(hess):
+            for j, h in enumerate(hi):
+                if (i, j) in indices:
+                    data_hess[n2d[i] + n2d[j]] = h
+
+        FDC.grad.reset()
+        return Hess(**data_hess)

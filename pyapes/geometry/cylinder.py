@@ -1,24 +1,21 @@
 #!/usr/bin/env python3
-"""Box geometry."""
-#!/usr/bin/env python3
-from pyapes.core.geometry.basis import bound_edge_and_corner
-from pyapes.core.geometry.basis import GeoBounder
-from pyapes.core.geometry.basis import Geometry
+"""Cylinder geometry."""
+from math import pi
+
+from pyapes.geometry.basis import bound_edge_and_corner
+from pyapes.geometry.basis import GeoBounder
+from pyapes.geometry.basis import Geometry
 
 
-BOX_DIM = [1, 2, 3]
+class Cylinder(Geometry, metaclass=GeoBounder):
+    """Cylinder geometry. Due to the axisymmetric nature of the cylinder, the object is always two dimensional.
 
-
-class Box(Geometry, metaclass=GeoBounder):
-    """Box geometry.
-
-    >>> Box([0, 0, 0], [1, 1, 1])       # Option 1
-    >>> Box[0:1, 0:1, 0:1]              # Option 2
+    >>> Cylinder([0, 0, 0], [1, 1, 1])       # Option 1
+    >>> Cylinder[0:1, 0:1, 0:1]              # Option 2
 
     Note:
-        - Box `lower` and `upper` is the list of either ints or floats. However,
-          once the class is instantiated, given bounds will be converted to
-          the list of floats.
+        - Here, leading dimension is the radius (r) and the second dimension is the axis (z).
+
 
     Args:
         lower: lower bound of the Box
@@ -30,7 +27,13 @@ class Box(Geometry, metaclass=GeoBounder):
         lower: list[float] or tuple[float, ...],
         upper: list[float] or tuple[float, ...],
     ):
-        assert len(lower) == len(upper), "Box: length of inputs has to be matched!"
+        assert (
+            len(lower) == 2 and len(upper) == 2
+        ), "Cylinder: a length of inputs has to be 2 since it is axisymmetric (r-z)!)"
+
+        assert (
+            lower[0] >= 0
+        ), "Cylinder: lower bound of radius has to be larger (or equal) to 0!"
 
         # Make sure to be a list and contains float
         self._lower = [float(i) for i in lower]
@@ -38,7 +41,7 @@ class Box(Geometry, metaclass=GeoBounder):
 
         # Box element discriminator
         self.ex, self.xp, self.face, self._dim = bound_edge_and_corner(
-            self.lower, self.upper
+            self.lower, self.upper, "rz"
         )
 
         self._config: dict[int, dict[str, list[float] | str]] = {}
@@ -49,7 +52,7 @@ class Box(Geometry, metaclass=GeoBounder):
 
     @property
     def dim(self) -> int:
-        """Box dimension."""
+        """Cylinder dimension."""
         return self._dim
 
     @property
@@ -59,11 +62,15 @@ class Box(Geometry, metaclass=GeoBounder):
 
     @property
     def size(self) -> float:
-        """Set size of the box."""
+        r"""Set size (volume) of the cylinder.
 
-        self._size = 1.0
-        for l, u in zip(self.lower, self.upper):
-            self._size *= float(u - l)
+        .. math::
+            V = \pi r^2 * z
+        """
+
+        self._size = (
+            pi * (self.upper[0] - self.lower[0]) ** 2 * (self.upper[1] - self.lower[1])
+        )
 
         return self._size
 
@@ -74,10 +81,6 @@ class Box(Geometry, metaclass=GeoBounder):
     @property
     def Y(self) -> float:
         return self._lower[1]
-
-    @property
-    def Z(self) -> float:
-        return self._lower[2]
 
     @property
     def config(self) -> dict[int, dict[str, list[float] | str]]:

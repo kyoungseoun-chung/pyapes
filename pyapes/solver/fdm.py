@@ -11,48 +11,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from dataclasses import field
 from typing import Any
-from typing import Callable
-from typing import TypedDict
 
 import torch
 from torch import Tensor
 
-from pyapes.core.mesh import Mesh
-from pyapes.core.solver.fdc import FDC
-from pyapes.core.variables import Field
-from pyapes.core.variables.bcs import BC_type
-
-GEN_RHS = Callable[[Field], Tensor]
-DIV_RHS = Callable[[Field | Tensor | float, Field, dict[str, str]], Tensor]
-
-
-class OPStype(TypedDict):
-    """Typed dict for the operation types."""
-
-    name: str
-    """Operator names"""
-    Aop: Callable[
-        [Tensor | float | None, Field, list[list[Tensor]]], Tensor
-    ] | Callable[
-        [Field | Tensor | float, dict[str, str], Field, list[list[Tensor]]],
-        Tensor,
-    ]
-    """Linear system operator. `Aop` is equivalent to `Ax` in `Ax = b`."""
-    target: Field
-    """Target field to be discretized."""
-    param: tuple[float | Tensor | None, ...] | tuple[
-        Field | Tensor | float, dict[str, str]
-    ]
-    """Additional parameters other than target. e.g. `coeff` in `laplacian(coeff, var)`."""
-    sign: float | int
-    """Sign to be applied."""
-    other: dict[str, float] | None
-    """Additional information. e.g. `dt` in `Ddt`."""
-    A_coeffs: list[list[Tensor]]
-    """Coefficients of the discretization."""
-    adjust_rhs: GEN_RHS | DIV_RHS
-    # adjust_rhs: Any
-    """Tensor used to adjust rhs."""
+from pyapes.mesh import Mesh
+from pyapes.solver.fdc import FDC
+from pyapes.solver.types import DiscretizerConfigType
+from pyapes.solver.types import OPStype
+from pyapes.variables import Field
+from pyapes.variables.bcs import BC_type
 
 
 @dataclass(eq=False)
@@ -67,7 +35,7 @@ class Operators:
     # Init relevant attributes
     _ops: dict[int, OPStype] = field(default_factory=dict)
     _rhs: Tensor | None = None
-    _config: dict[str, str] = field(default_factory=dict)
+    _config: DiscretizerConfigType | None = None
 
     @property
     def ops(self) -> dict[int, OPStype]:
@@ -92,7 +60,7 @@ class Operators:
         """Primary Field variable to be discretized."""
         raise NotImplementedError
 
-    def update_config(self, config: dict[str, str]) -> None:
+    def update_config(self, config: DiscretizerConfigType) -> None:
         """Update solver configuration.
 
         Args:
@@ -101,7 +69,7 @@ class Operators:
         self._config = config
 
     @property
-    def config(self) -> dict[str, str]:
+    def config(self) -> DiscretizerConfigType | None:
         return self._config
 
     def __eq__(self, other: Field | Tensor | float) -> Operators:
@@ -167,7 +135,7 @@ class Laplacian(Operators):
         else:
             raise TypeError("FDM: invalid input type!")
 
-        A_coeffs = FDC.laplacian.build_A_coeffs(var)
+        A_coeffs = FDC(self.config).laplacian.build_A_coeffs(var)
 
         self._var = var
         self._ops[0] = {
@@ -194,9 +162,9 @@ class Laplacian(Operators):
         """Compute `Ax` of the linear system `Ax = b`. If param is not None, the whole operation is multiplied by param."""
 
         if param is None:
-            return FDC().laplacian.apply(A_coeffs, var)
+            return FDC.laplacian.apply(A_coeffs, var)
         else:
-            return FDC().laplacian.apply(A_coeffs, var) * param
+            return FDC.laplacian.apply(A_coeffs, var) * param
 
 
 class Grad(Operators):
@@ -298,6 +266,8 @@ class Div(Operators):
         self._var_j = var_j
         self._var_i = var_i
 
+        assert self.config is not None, "FDM Div: config must be provided!"
+
         A_coeffs = FDC.div.build_A_coeffs(var_j, var_i, self.config)
 
         self._ops[0] = {
@@ -320,7 +290,7 @@ class Div(Operators):
     @staticmethod
     def Aop(
         var_j: Field | Tensor | float,
-        config: dict[str, str],
+        config: DiscretizerConfigType,
         var_i: Field,
         A_coeffs: list[list[Tensor]],
     ) -> Tensor:
@@ -416,7 +386,7 @@ class FDM:
     # ddt: Ddt = Ddt()
     """Time discretization: `ddt(var)`."""
 
-    def __init__(self, config: dict[str, dict[str, str]] | None = None) -> None:
+    def __init__(self, config: DiscretizerConfigType | None = None) -> None:
         """Initialize FDM. If `config` is provided, `config` will be set via `self.set_config` function.
 
         Args:
@@ -424,18 +394,7 @@ class FDM:
         """
 
         if config is not None:
-            self.set_config(config)
+            self.config = config
 
-    def set_config(self, config: dict[str, dict[str, str]]) -> None:
-        """Set the configuration options for the discretization operators.
-        The configuration should contain keys to identify the discretization scheme for each operator. e.g `config = {"div": {"scheme": "central"}}`.
-
-        Args:
-            config: configuration options for the discretization operators.
-
-        """
-
-        self.config = config
-
-        # Currently only `Div`` operator requires config
-        self.div.update_config(config["div"])
+            # Currently only `Div`` operator requires config
+            self.div.update_config(config)

@@ -12,11 +12,11 @@ from typing import TypedDict
 import torch
 from torch import Tensor
 
-from pyapes.core.mesh import Mesh
-from pyapes.core.mesh.tools import boundary_slicer
-from pyapes.core.solver.fdm import OPStype
-from pyapes.core.solver.tools import FDMSolverConfig
-from pyapes.core.variables import Field
+from pyapes.mesh import Mesh
+from pyapes.mesh.tools import boundary_slicer
+from pyapes.solver.fdm import OPStype
+from pyapes.solver.tools import FDMSolverConfig
+from pyapes.variables import Field
 
 
 class ReportType(TypedDict):

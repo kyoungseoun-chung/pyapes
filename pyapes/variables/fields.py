@@ -10,10 +10,10 @@ from typing import Union
 import torch
 from torch import Tensor
 
-from pyapes.core.mesh import Mesh
-from pyapes.core.variables.bcs import BC_FACTORY
-from pyapes.core.variables.bcs import BC_type
-from pyapes.core.variables.bcs import BCConfig
+from pyapes.mesh import Mesh
+from pyapes.variables.bcs import BC_FACTORY
+from pyapes.variables.bcs import BC_type
+from pyapes.variables.bcs import BCConfig
 
 
 @dataclass

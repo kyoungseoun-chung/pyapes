@@ -10,7 +10,7 @@ from math import pi
 import torch
 from torch import Tensor
 
-from pyapes.core.mesh import Mesh
+from pyapes.mesh import Mesh
 
 
 def burger_exact_nd(mesh: Mesh, nu: float, t: float) -> Tensor:

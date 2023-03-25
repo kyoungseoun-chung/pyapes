@@ -6,9 +6,9 @@ import pytest
 import torch
 from torch.testing import assert_close  # type: ignore
 
-from pyapes.core.geometry import Box
-from pyapes.core.geometry import Cylinder
-from pyapes.core.mesh import Mesh
+from pyapes.geometry import Box
+from pyapes.geometry import Cylinder
+from pyapes.mesh import Mesh
 
 
 @pytest.mark.parametrize(

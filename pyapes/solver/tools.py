@@ -7,7 +7,7 @@ from typing import TypedDict
 import torch
 from torch import Tensor
 
-from pyapes.core.variables import Field
+from pyapes.variables import Field
 
 
 class FDMSolverConfig(TypedDict):
