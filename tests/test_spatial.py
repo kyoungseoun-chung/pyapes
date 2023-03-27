@@ -2,14 +2,14 @@
 """Test spatial module"""
 import pytest
 import torch
-from pymytools.diagnostics import DataLoader
 from torch.testing import assert_close
 
 from pyapes.geometry import Box
 from pyapes.geometry import Cylinder
 from pyapes.mesh import Mesh
 from pyapes.solver.fdc import DiffFlux
-from pyapes.solver.fdc import ScalarOP
+from pyapes.solver.fdc import hessian
+from pyapes.solver.fdc import jacobian
 from pyapes.variables import Field
 
 
@@ -21,7 +21,7 @@ def test_diff_flux() -> None:
 
     grad = torch.gradient(var()[0], spacing=mesh.dx.tolist(), edge_order=2)
 
-    hess = ScalarOP.hess(var)
+    hess = hessian(var)
 
     flux = DiffFlux()(hess, var)
 
@@ -34,7 +34,7 @@ def test_diff_flux() -> None:
 
     grad = torch.gradient(var()[0], spacing=mesh.dx.tolist(), edge_order=2)
 
-    hess = ScalarOP.hess(var)
+    hess = hessian(var)
 
     flux = DiffFlux()(hess, var)
 
@@ -50,14 +50,14 @@ def test_jac_and_hess() -> None:
     var = Field("test", 1, mesh, {"domain": None, "obstacle": None})
     var.set_var_tensor(mesh.grid[0] ** 2 + 2 * mesh.grid[2] ** 2)
 
-    jac = ScalarOP.jac(var)
+    jac = jacobian(var)
     assert_close(jac.x, 2 * mesh.grid[0])
     assert_close(jac.y, torch.zeros_like(var()[0]))
     assert_close(jac.z, 4 * mesh.grid[2])
 
     var.set_var_tensor((mesh.grid[0] ** 2) * (mesh.grid[2] ** 2))
 
-    hess = ScalarOP.hess(var)
+    hess = hessian(var)
     assert_close(hess.xx, 2 * mesh.grid[2] ** 2)
     assert_close(hess.xy, torch.zeros_like(var()[0]))
     assert_close(hess.xz, 4 * mesh.grid[0] * mesh.grid[2])
@@ -66,8 +66,8 @@ def test_jac_and_hess() -> None:
     var = Field("test", 1, mesh, {"domain": None, "obstacle": None})
     var.set_var_tensor(mesh.grid[0] ** 2)
 
-    jac = ScalarOP.jac(var)
-    hess = ScalarOP.hess(var)
+    jac = jacobian(var)
+    hess = hessian(var)
 
     assert_close(hess.xy, hess["yx"])
 
@@ -79,7 +79,7 @@ def test_jac_and_hess() -> None:
 
 
 def test_derivative_data_structure() -> None:
-    from pyapes.tools.spatial import Jac, Hess
+    from pyapes.variables.container import Jac, Hess
 
     x = torch.rand(10)
     y = torch.rand(10)

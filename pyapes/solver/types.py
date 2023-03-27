@@ -14,12 +14,14 @@ class DivConfigType(TypedDict):
 
 
 class LaplacianConfigType(TypedDict):
-    limiter: str
     edge: bool
 
 
 class GradConfigType(TypedDict):
-    limiter: str
+    edge: bool
+
+
+class DiffFluxConfigType(TypedDict):
     edge: bool
 
 
@@ -31,6 +33,7 @@ class DiscretizerConfigType(TypedDict, total=False):
     div: DivConfigType
     laplacian: LaplacianConfigType
     grad: GradConfigType
+    diffFlux: DiffFluxConfigType
     ddt: DdtConfigType
 
 

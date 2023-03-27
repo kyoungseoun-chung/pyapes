@@ -515,7 +515,7 @@ class Div(Discretizer):
 
     @staticmethod
     def build_A_coeffs(
-        var_j: Field | float | Tensor,
+        var_j: Field | float | Tensor | Hess,
         var_i: Field,
         config: DiscretizerConfigType,
     ) -> list[list[Tensor]]:
@@ -530,7 +530,10 @@ class Div(Discretizer):
             config (dict[str, str]): configuration dictionary. It should contain the following keys: `limiter`.
         """
 
-        adv = _div_var_j_to_tensor(var_j, var_i)
+        if isinstance(var_j, Hess):
+            adv = torch.ones_like(var_i[0])
+        else:
+            adv = _div_var_j_to_tensor(var_j, var_i)
 
         assert "div" in config, "FDC Div: config should contain 'div' key."
 
@@ -690,8 +693,8 @@ class DiffFlux:
             var (Field): Scalar input field
         """
 
-        jac = ScalarOP.jac(var)
-        flux = Field("DiffFlux", len(jac), var.mesh, None)
+        jac_var = jacobian(var)
+        flux = Field("DiffFlux", len(jac_var), var.mesh, None)
 
         n2d = n2d_coord(var.mesh.coord_sys)
 
@@ -706,7 +709,7 @@ class DiffFlux:
                 else:
                     d_coeff = diff[h_key]
 
-                diff_flux += d_coeff * jac[j_key]
+                diff_flux += d_coeff * jac_var[j_key]
 
             flux.set_var_tensor(diff_flux, i)
 
@@ -729,6 +732,11 @@ class FDC:
 
         self.config = config
 
+        if self.config is not None:
+            for c, _ in self.config.items():
+                scheme: Discretizer = getattr(self, c)
+                scheme.set_config(self.config)
+
     def update_config(self, scheme: str, target: str, val: str):
         """Update config values."""
 
@@ -737,55 +745,52 @@ class FDC:
         else:
             self.config = {scheme: {target: val}}
 
+        assert isinstance(self.config, DiscretizerConfigType)
 
-class ScalarOP:
-    """Manipulation of a scalar field (scalar operations)
+        for c, _ in self.config.items():
+            s: Discretizer = getattr(self, c)
+            s.set_config(self.config)
 
-    Note:
-        - `jac` and `hess` operations both use the `torch.gradient` function with edge order of 2.
-    """
 
-    @staticmethod
-    def jac(var: Field) -> Jac:
-        assert var().shape[0] == 1, "Scalar: var must be a scalar field."
+def jacobian(var: Field) -> Jac:
+    """Compute the Jacobian of a scalar field."""
+    assert var().shape[0] == 1, "Scalar: var must be a scalar field."
 
-        FDC.grad.reset()
+    data_jac: dict[str, Tensor] = {}
 
-        data_jac: dict[str, Tensor] = {}
+    n2d = n2d_coord(var.mesh.coord_sys)
 
-        n2d = n2d_coord(var.mesh.coord_sys)
+    jac = FDC.grad(var, edge=True)[0]
 
-        jac = FDC.grad(var, edge=True)[0]
+    for i, j in enumerate(jac):
+        data_jac[n2d[i]] = j
 
-        for i, j in enumerate(jac):
-            data_jac[n2d[i]] = j
+    FDC.grad.reset()
 
-        FDC.grad.reset()
+    return Jac(**data_jac)
 
-        return Jac(**data_jac)
 
-    @staticmethod
-    def hess(var: Field) -> Hess:
-        FDC.grad.reset()
+def hessian(var: Field) -> Hess:
+    """Compute the Hessian of a scalar field."""
 
-        indices = tensor_idx(var.mesh.dim)
+    indices = tensor_idx(var.mesh.dim)
 
-        data_hess: dict[str, Tensor] = {}
+    data_hess: dict[str, Tensor] = {}
 
-        hess: list[Tensor] = []
+    hess: list[Tensor] = []
 
-        n2d = n2d_coord(var.mesh.coord_sys)
+    n2d = n2d_coord(var.mesh.coord_sys)
 
-        jac = FDC.grad(var, edge=True)[0]
+    jac = FDC.grad(var, edge=True)[0]
 
-        jac_f = var.copy()
+    jac_f = var.copy()
 
-        hess = [FDC.grad(jac_f.set_var_tensor(j), edge=True)[0] for j in jac]
+    hess = [FDC.grad(jac_f.set_var_tensor(j), edge=True)[0] for j in jac]
 
-        for i, hi in enumerate(hess):
-            for j, h in enumerate(hi):
-                if (i, j) in indices:
-                    data_hess[n2d[i] + n2d[j]] = h
+    for i, hi in enumerate(hess):
+        for j, h in enumerate(hi):
+            if (i, j) in indices:
+                data_hess[n2d[i] + n2d[j]] = h
 
-        FDC.grad.reset()
-        return Hess(**data_hess)
+    FDC.grad.reset()
+    return Hess(**data_hess)

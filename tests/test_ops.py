@@ -16,18 +16,29 @@ torch.set_default_dtype(torch.float64)
 def test_div_diff_flux() -> None:
     """Test for div(D * grad(var))"""
 
-    from pyapes.solver.fdc import FDC
-    from pyapes.tools.spatial import DiffFlux, ScalarOP
+    from pyapes.solver.fdc import FDC, hessian, jacobian
 
     mesh = Mesh(Cylinder[0:1, 0:1], None, [3, 3])
     var = Field("test", 1, mesh, {"domain": None, "obstacle": None})
     var.set_var_tensor(mesh.grid[0] ** 2)
 
-    hess = ScalarOP.hess(var)
+    hess = hessian(var)
+    grad = jacobian(var)
 
-    FDC.div(hess, FDC.grad(var))
+    fdc = FDC({"grad": {"edge": True}, "div": {"limiter": "none", "edge": True}})
 
-    div = FDC.div(DiffFlux(hess, var))
+    diffFlux = fdc.diffFlux(hess, var)
+    diffFlux_r = mesh.grid[0] * hess.rr * grad.r + mesh.grid[0] * hess.rz * grad.z
+    diffFlux_z = hess.rz * grad.r + hess.zz * grad.z
+
+    assert_close(diffFlux[0], diffFlux_r)
+    assert_close(diffFlux[1], diffFlux_z)
+
+    div = fdc.div(1.0, fdc.diffFlux(hess, var))
+
+    div_x = torch.gradient(diffFlux_r, spacing=mesh.dx.tolist(), edge_order=2)
+
+    pass
 
 
 def test_ops_comp_grad():
