@@ -655,7 +655,7 @@ class Div(Discretizer):
                     "FDC: Upwind limiter is not implemented for Hessians and Jacobians advection term."
                 )
             else:
-                Ap, Ac, Am = _adv_upwind(adv, var_i)
+                Ap, Ac, Am = _adv_upwind(adv, var_i, [Ap, Ac, Am])
         elif limiter == "quick":
             raise NotImplementedError("FDC Div: quick scheme is not implemented yet.")
         else:
@@ -744,7 +744,36 @@ def _adv_central(
     return [Ap, Ac, Am]
 
 
-def _adv_upwind(adv: Tensor, var: Field) -> list[list[Tensor]]:
+def _adv_upwind(
+    adv: Tensor | Hess | Jac, var: Field, A_ops: list[list[Tensor]]
+) -> list[list[Tensor]]:
+    n2d = n2d_coord(var.mesh.coord_sys)
+
+    Ap, Ac, Am = A_ops
+
+    zeros = torch.zeros_like(var()[0])
+
+    for i in range(var.dim):
+        for j in range(var.mesh.dim):
+            if isinstance(adv, Jac):
+                advection = adv[n2d[i]]
+            elif isinstance(adv, Tensor):
+                advection = adv[i]
+            else:
+                raise NotImplementedError(
+                    "FDC: Upwind limiter is not implemented for Hessians advection term."
+                )
+            gamma_min = torch.min(advection, zeros)
+            gamma_max = torch.max(advection, zeros)
+
+            Ap[j][i] = 2.0 * gamma_min
+            Ac[j][i] *= 2.0 * advection
+            Am[j][i] = 2.0 * gamma_max
+
+    return [Ap, Ac, Am]
+
+
+def _adv_upwind_old(adv: Tensor, var: Field) -> list[list[Tensor]]:
     """Upwind discretization of the advection term."""
 
     gamma_min, gamma_max = _gamma_from_adv(adv, var)
@@ -919,7 +948,7 @@ def hessian(var: Field) -> Hess:
 
     jac = fdc.grad(var_dummy.set_var_tensor(var[0]))[0]
 
-    jac_f = var.copy()
+    jac_f = var_dummy.copy()
 
     hess = [fdc.grad(jac_f.set_var_tensor(j))[0] for j in jac]
 

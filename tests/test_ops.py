@@ -27,7 +27,7 @@ def test_div_diff_flux() -> None:
     hess = hessian(var)
     jac = jacobian(var)
 
-    fdc = FDC({"grad": {"edge": True}, "div": {"limiter": "none", "edge": True}})
+    fdc = FDC({"grad": {"edge": True}, "div": {"limiter": "upwind", "edge": True}})
 
     diffFlux = fdc.diffFlux(hess, var)
     diffFlux_r = mesh.grid[0] * hess.rr * jac.r + mesh.grid[0] * hess.rz * jac.z
