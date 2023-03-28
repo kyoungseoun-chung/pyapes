@@ -891,6 +891,9 @@ def jacobian(var: Field) -> Jac:
 
     fdc = FDC({"grad": {"edge": True}})
 
+    var_jac = var.copy()
+    var_jac.bcs = []
+
     jac = fdc.grad(var)[0]
 
     for i, j in enumerate(jac):
@@ -914,7 +917,10 @@ def hessian(var: Field) -> Hess:
 
     fdc = FDC({"grad": {"edge": True}})
 
-    jac = fdc.grad(var)[0]
+    var_jac = var.copy()
+    var_jac.bcs = []
+
+    jac = fdc.grad(var_jac)[0]
 
     jac_f = var.copy()
 
