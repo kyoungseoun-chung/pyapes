@@ -725,7 +725,6 @@ def _adv_central(
 
     advection = torch.zeros_like(var()[0])
 
-    # BUG: What if var().shape[0] == 1?
     for i in range(var.dim):
         for j in range(var.mesh.dim):
             if isinstance(adv, Jac):
@@ -769,22 +768,6 @@ def _adv_upwind(
             Ap[j][i] = 2.0 * gamma_min
             Ac[j][i] *= 2.0 * advection
             Am[j][i] = 2.0 * gamma_max
-
-    return [Ap, Ac, Am]
-
-
-def _adv_upwind_old(adv: Tensor, var: Field) -> list[list[Tensor]]:
-    """Upwind discretization of the advection term."""
-
-    gamma_min, gamma_max = _gamma_from_adv(adv, var)
-
-    # Here 2.0 is multiplied to achieve consistent implementation of _grad_central_adjust (all coeffs are divided by 2.0 * dx there)
-    Ap = [2.0 * gamma_min for _ in range(var.mesh.dim)]
-    Ac = [2.0 * gamma_max - gamma_min for _ in range(var.mesh.dim)]
-    Am = [-2.0 * gamma_max for _ in range(var.mesh.dim)]
-
-    for i in range(var.dim):
-        _grad_central_adjust(var, [Ap, Ac, Am], i, (gamma_min, gamma_max))
 
     return [Ap, Ac, Am]
 
@@ -834,6 +817,174 @@ def _return_bc_val(bc: BC, var: Field, dim: int) -> Tensor | float:
     return at_bc
 
 
+class Friction:
+    @staticmethod
+    def __call__(jacH: Jac, var: Field) -> Tensor:
+        if var.mesh.coord_sys != "rz":
+            raise NotImplementedError(
+                "FP: Friction is only implemented for rz coordinate system."
+            )
+
+        Hr = jacH.r
+        Hz = jacH.z
+
+        pdf = var[0]
+        dx = var.mesh.dx
+
+        Arp = (torch.roll(Hr, -1, 0) - Hr) / (0.5 * dx[0])
+        Arm = (Hr - torch.roll(Hr, 1, 0)) / (0.5 * dx[0])
+
+        Azp = (torch.roll(Hz, -1, 1) - Hz) / (0.5 * dx[1])
+        Azm = (Hz - torch.roll(Hz, 1, 1)) / (0.5 * dx[1])
+
+        Prp = (torch.roll(pdf, -1, 0) - pdf) / (0.5 * dx[0])
+        Prm = (pdf - torch.roll(pdf, 1, 0)) / (0.5 * dx[0])
+
+        Pzp = (torch.roll(pdf, -1, 1) - pdf) / (0.5 * dx[1])
+        Pzm = (pdf - torch.roll(pdf, 1, 1)) / (0.5 * dx[1])
+
+        r_p = (torch.roll(var.mesh.grid[0], -1, 0) + var.mesh.grid[0]) / 2
+        r_m = (var.mesh.grid[0] + torch.roll(var.mesh.grid[0], 1, 0)) / 2
+        r = var.mesh.grid[0]
+
+        friction = (Azp * Pzp - Azm * Pzm) / (dx[1]) + (
+            r_p * Arp * Prp - r_m * Arm * Prm
+        ) / (r * dx[0])
+
+        # BC?
+
+        return friction
+
+
+class Diffusion:
+    r"""Divergence of an anisotropic diffusion tensor using the symmetric finite difference discretization.
+
+    Note:
+        - D_rz term is evaluated using the bilinear interpolation of the values at the cell center.
+
+    .. math::
+
+        \nabla \cdot (\mathbf{D} \cdot \nabla \Phi)
+    """
+
+    @staticmethod
+    def __call__(hessG: Hess, var: Field) -> Tensor:
+        if var.mesh.coord_sys != "rz":
+            raise NotImplementedError(
+                "FP: Diffusion is only implemented for rz coordinate system."
+            )
+
+        Drr = hessG.rr
+        Dzz = hessG.zz
+        Drz = hessG.rz
+
+        pdf = var[0]
+        dx = var.mesh.dx
+
+        Drr_Pr_rpz = (
+            (torch.roll(Drr, -1, 0) + Drr)
+            / 2
+            * (torch.roll(pdf, -1, 0) - pdf)
+            / (0.5 * dx[0])
+        )
+
+        Drr_Pr_rmz = (
+            (torch.roll(Drr, 1, 0) + Drr)
+            / 2
+            * (pdf - torch.roll(pdf, 1, 0))
+            / (0.5 * dx[0])
+        )
+
+        Dzz_Pz_rzp = (
+            (torch.roll(Dzz, -1, 1) + Dzz)
+            / 2
+            * (torch.roll(pdf, -1, 1) - pdf)
+            / (0.5 * dx[1])
+        )
+
+        Dzz_Pz_rzm = (
+            (torch.roll(Dzz, 1, 1) + Dzz)
+            / 2
+            * (pdf - torch.roll(pdf, 1, 1))
+            / (0.5 * dx[1])
+        )
+
+        Drz_pp = _c_interp(Drz, 1, 1)
+        Drz_pm = _c_interp(Drz, 1, 0)
+        Drz_mp = _c_interp(Drz, 0, 1)
+        Drz_mm = _c_interp(Drz, 0, 0)
+
+        Drz_Pr_rzp = 0.25 * Drz_pp * (
+            _flux(pdf, (1, 0), (0, 0), dx[0]) + _flux(pdf, (1, 1), (0, 1), dx[0])
+        ) + 0.25 * Drz_mp * (
+            _flux(pdf, (0, 0), (-1, 0), dx[0]) + _flux(pdf, (0, 1), (-1, 1), dx[0])
+        )
+
+        Drz_Pr_rzm = 0.25 * Drz_pm * (
+            _flux(pdf, (1, -1), (0, -1), dx[0]) + _flux(pdf, (1, 0), (0, 0), dx[0])
+        ) + 0.25 * Drz_mm * (
+            _flux(pdf, (0, -1), (-1, -1), dx[0]) + _flux(pdf, (0, 0), (-1, 0), dx[0])
+        )
+
+        Drz_Pz_rpz = 0.25 * Drz_pp * (
+            _flux(pdf, (0, 1), (0, 0), dx[1]) + _flux(pdf, (1, 1), (1, 0), dx[1])
+        ) + 0.25 * Drz_mp * (
+            _flux(pdf, (0, 0), (0, -1), dx[1]) + _flux(pdf, (1, 0), (1, -1), dx[1])
+        )
+
+        Drz_Pz_rmz = 0.25 * Drz_pm * (
+            _flux(pdf, (-1, 1), (-1, 0), dx[1]) + _flux(pdf, (0, 1), (0, 0), dx[1])
+        ) + 0.25 * Drz_mm * (
+            _flux(pdf, (-1, 0), (-1, -1), dx[1]) + _flux(pdf, (0, 0), (0, -1), dx[1])
+        )
+
+        r_p = (torch.roll(var.mesh.grid[0], -1, 0) + var.mesh.grid[0]) / 2
+        r_m = (var.mesh.grid[0] + torch.roll(var.mesh.grid[0], 1, 0)) / 2
+        r = var.mesh.grid[0]
+
+        diffusion = (
+            (Dzz_Pz_rzp - Dzz_Pz_rzm) / dx[1]
+            + (Drz_Pr_rzp - Drz_Pr_rzm) / dx[1]
+            + (r_p * Drz_Pz_rpz - r_m * Drz_Pz_rmz) / (r * dx[0])
+            + (r_p * Drr_Pr_rpz - r_m * Drr_Pr_rmz) / (r * dx[0])
+        )
+
+        # BC?
+
+        return diffusion
+
+
+def _flux(
+    var: Tensor, idx_p: tuple[int, int], idx_m: tuple[int, int], dx: Tensor
+) -> Tensor:
+    """Gradient at the cell surface."""
+
+    ip = (-idx_p[0], -idx_p[1])
+    im = (-idx_m[0], -idx_m[1])
+
+    return (torch.roll(var, ip, (0, 1)) - torch.roll(var, im, (0, 1))) / (0.5 * dx)
+
+
+def _c_interp(var: Tensor, upper_i: int, upper_j: int) -> Tensor:
+    """Compute bi-linear interpolation of the values at the cell center.
+
+    Note:
+        - `upper_i` and `upper_j` indicates the upper right corner of the cell.
+
+    Args:
+        var (Tensor): Variable to be interpolated
+        upper_i (int): Upper index in the i direction
+        upper_j (int): Upper index in the j direction
+    """
+
+    return (
+        torch.roll(var, (-upper_i, -upper_j), (0, 1))
+        + torch.roll(var, (-upper_i, -upper_j + 1), (0, 1))
+        + torch.roll(var, (-upper_i + 1, -upper_j), (0, 1))
+        + torch.roll(var, (-upper_i + 1, -upper_j + 1), (0, 1))
+    ) / 4
+
+
 class DiffFlux:
     """Object to be used in the tensor diffussion term."""
 
@@ -872,6 +1023,13 @@ class DiffFlux:
             flux.set_var_tensor(diff_flux, i)
 
         return flux
+
+
+class FP:
+    """Simple Fokker-Planck operator. All operators return a Tensor not Field"""
+
+    friction: Friction = Friction()
+    diffusion: Diffusion = Diffusion()
 
 
 class FDC:
