@@ -18,27 +18,42 @@ def test_div_diff_flux() -> None:
 
     from pyapes.solver.fdc import FDC, hessian, jacobian
 
-    mesh = Mesh(Cylinder[0:1, 0:1], None, [3, 3])
+    mesh = Mesh(Cylinder[0:1, 0:1], None, [5, 5])
     var = Field("test", 1, mesh, {"domain": None, "obstacle": None})
     var.set_var_tensor(mesh.grid[0] ** 2)
 
     hess = hessian(var)
-    grad = jacobian(var)
+    jac = jacobian(var)
 
     fdc = FDC({"grad": {"edge": True}, "div": {"limiter": "none", "edge": True}})
 
     diffFlux = fdc.diffFlux(hess, var)
-    diffFlux_r = mesh.grid[0] * hess.rr * grad.r + mesh.grid[0] * hess.rz * grad.z
-    diffFlux_z = hess.rz * grad.r + hess.zz * grad.z
+    diffFlux_r = mesh.grid[0] * hess.rr * jac.r + mesh.grid[0] * hess.rz * jac.z
+    diffFlux_z = hess.rz * jac.r + hess.zz * jac.z
 
     assert_close(diffFlux[0], diffFlux_r)
     assert_close(diffFlux[1], diffFlux_z)
 
-    div = fdc.div(1.0, fdc.diffFlux(hess, var))
+    div_diff_grad = fdc.div(1.0, fdc.diffFlux(hess, var))
 
     div_x = torch.gradient(diffFlux_r, spacing=mesh.dx.tolist(), edge_order=2)
+    div_x = torch.nan_to_num(
+        div_x[0] + diffFlux_r / mesh.grid[0], nan=0.0, posinf=0.0, neginf=0.0
+    )
 
-    pass
+    assert_close(div_diff_grad[0], div_x)
+
+    fdc.div.reset()
+
+    div_var = fdc.div(jac, var)
+
+    div_var_x = torch.gradient(var[0], spacing=mesh.dx.tolist(), edge_order=2)
+
+    div_var_x = div_var_x[0] * jac.r + torch.nan_to_num(
+        jac.r * var[0] / mesh.grid[0], nan=0.0, posinf=0.0, neginf=0.0
+    )
+
+    assert_close(div_var[0], div_var_x)
 
 
 def test_ops_comp_grad():

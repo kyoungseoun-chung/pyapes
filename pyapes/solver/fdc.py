@@ -47,7 +47,8 @@ class Discretizer(ABC):
     @staticmethod
     @abstractmethod
     def build_A_coeffs(
-        *args: Field | Tensor | float, config: DiscretizerConfigType | None = None
+        *args: Field | Tensor | float | Jac | Hess,
+        config: DiscretizerConfigType | None = None,
     ) -> list[list[Tensor]]:
         """Build the operation matrix coefficients to be used for the discretization.
         `var: Field` is required due to the boundary conditions. Should always return three tensors in `Ap`, `Ac`, and `Am` order.
@@ -57,7 +58,8 @@ class Discretizer(ABC):
     @staticmethod
     @abstractmethod
     def adjust_rhs(
-        *args: Field | Tensor | float, config: DiscretizerConfigType | None = None
+        *args: Field | Tensor | float | Jac | Hess,
+        config: DiscretizerConfigType | None = None,
     ) -> Tensor:
         """Return a tensor that is used to adjust `rhs` of the PDE."""
         ...
@@ -66,6 +68,13 @@ class Discretizer(ABC):
         """Apply the discretization to the input `Field` variable."""
 
         assert A_coeffs is not None, "FDC: A_A_coeffs is not defined!"
+        if self.config is not None:
+            edge = self.config[self.op_type.lower()]["edge"]
+        else:
+            edge = False
+            warnings.warn(
+                f"FDC: config is not defined! Using default config ({edge=})."
+            )
 
         # Grad operator returns Jacobian, but Laplacian, Div, and Ddt return scalar (sum over j-index)
         if self.op_type == "Grad":
@@ -76,12 +85,35 @@ class Discretizer(ABC):
                     grad_d.append(_A_coeff_var_sum(A_coeffs, var, idx, dim))
                 dis_var_dim.append(torch.stack(grad_d))
             discretized = torch.stack(dis_var_dim)
-        else:
+
+            if edge:
+                for dim in range(discretized.shape[0]):
+                    _treat_edge(discretized, var, self.op_type, dim)
+
+        elif self.op_type == "Div":
+            """Div always returns a scalar field. (`discretized.shape[0] == 1`)"""
+
+            discretized = torch.zeros_like(var()[0]).unsqueeze(0)
+
+            for idx in range(var.mesh.dim):
+                disc = _A_coeff_var_sum(A_coeffs, var, idx, idx)
+                if edge:
+                    _treat_edge(disc, var, self.op_type, idx, self.var_addition)
+                discretized[0] += disc
+        elif self.op_type == "Laplacian":
             discretized = torch.zeros_like(var())
 
             for idx in range(var.dim):
                 for dim in range(var.mesh.dim):
                     discretized[idx] += _A_coeff_var_sum(A_coeffs, var, idx, dim)
+
+            if edge:
+                for dim in range(var.dim):
+                    _treat_edge(discretized, var, self.op_type, dim)
+                return discretized
+
+        else:
+            raise TypeError(f"FDC: ({self.op_type=} is not supported!")
 
         return discretized
 
@@ -97,22 +129,22 @@ class Discretizer(ABC):
         self._config = config
 
     def __call__(
-        self, *args: Field | Tensor | float, edge: bool = False
+        self, *args: Field | Tensor | float | Jac | Hess
     ) -> Tensor | list[Tensor]:
         """By calling the class with the input `Field` variable, the discretization is conducted."""
 
         if len(args) == 1:
             assert isinstance(args[0], Field), "FDC: only `Field` is allowed for var!"
-            return self.__call_one_var(args[0], edge)
+            return self.__call_one_var(args[0])
         else:
             assert isinstance(
-                args[0], Field | Tensor | float
-            ), "FDC: for var_j, Field, Tensor or float is allowed!"
+                args[0], Field | Tensor | float | Jac | Hess
+            ), "FDC: for var_j, Field, Tensor, float, Jac, and Hess are allowed!"
             assert isinstance(args[1], Field), "FDC: only `Field` is allowed for var_i!"
 
-            return self.__call_two_vars(args[0], args[1], edge)
+            return self.__call_two_vars(args[0], args[1])
 
-    def __call_one_var(self, var: Field, edge: bool) -> Tensor | list[Tensor]:
+    def __call_one_var(self, var: Field) -> Tensor | list[Tensor]:
         """Return of `__call__` method for the operators that only require one variable."""
 
         if self.A_coeffs is None:
@@ -121,16 +153,10 @@ class Discretizer(ABC):
         if self.rhs_adj is None:
             self.rhs_adj = self.adjust_rhs(var)
 
-        if edge:
-            discretized = self.apply(self.A_coeffs, var)
-            for dim in range(var.dim):
-                _treat_edge(discretized, var, self.op_type, dim)
-            return discretized
-        else:
-            return self.apply(self.A_coeffs, var)
+        return self.apply(self.A_coeffs, var)
 
     def __call_two_vars(
-        self, var_j: Field | Tensor | float, var_i: Field, edge: bool
+        self, var_j: Field | Tensor | float | Jac | Hess, var_i: Field
     ) -> Tensor:
         """Return of `__call__` method for the operators that require two variables."""
 
@@ -140,13 +166,9 @@ class Discretizer(ABC):
         if self.rhs_adj is None:
             self.rhs_adj = self.adjust_rhs(var_j, var_i, config=self.config)
 
-        if edge:
-            discretized = self.apply(self.A_coeffs, var_i)
-            for dim in range(var_i.dim):
-                _treat_edge(discretized, var_i, self.op_type, dim)
-            return discretized
-        else:
-            return self.apply(self.A_coeffs, var_i)
+        self.var_addition = var_j
+
+        return self.apply(self.A_coeffs, var_i)
 
 
 def _A_coeff_var_sum(
@@ -154,22 +176,39 @@ def _A_coeff_var_sum(
 ) -> Tensor:
     """Sum the coefficients and the variable.
     Here, `len(A_coeffs) = 5` to implement `quick` scheme for `div` operator in the future.
+
+    Args:
+        A_coeffs (list[list[Tensor]]): A list of coefficient tensors.
+        var (Field): The input `Field` variable.
+        idx (int): The index of the variable in `var.dim`.
+        dim (int): The dimension of the mesh domain.
     """
 
     assert (
         len(A_coeffs) == 5
     ), "FDC: the total number of coefficient tensor should be 5!"
 
-    summed = torch.zeros_like(var()[idx])
+    summed = torch.zeros_like(var[0])
 
     for i, c in enumerate(A_coeffs):
-        summed += c[dim][idx] * torch.roll(var()[idx], -2 + i, dim)
+        if var.dim == 1:
+            coeff = c[dim][0]
+            v_idx = 0
+        else:
+            coeff = c[dim][idx]
+            v_idx = idx
+
+        summed += coeff * torch.roll(var[v_idx], -2 + i, dim)
 
     return summed
 
 
 def _treat_edge(
-    discretized: Tensor | list[Tensor], var: Field, ops: str, dim: int
+    discretized: Tensor | list[Tensor],
+    var: Field,
+    ops: str,
+    dim: int,
+    var_add: Field | Tensor | float | Jac | Hess | None = None,
 ) -> None:
     """Treat edge of discretized variable using the forward/backward difference.
     Here the edge means the domain (mesh) boundary.
@@ -252,9 +291,78 @@ def _treat_edge(
             slicer_3[idx] = slice(None)
 
     elif ops == "Div":
-        warnings.warn(
-            "FDC: edge treatment of Div is supported! Div assumes user already specified the boundary in the domain."
+        assert isinstance(discretized, Tensor)
+
+        n2d = n2d_coord(var.mesh.coord_sys)
+
+        if isinstance(var_add, Field):
+            adv = var_add[dim]
+        elif isinstance(var_add, Tensor):
+            if var_add.shape == var().shape:
+                adv = var_add[dim]
+            else:
+                adv = var_add
+        elif isinstance(var_add, float):
+            adv = torch.ones_like(var[dim]) * var_add
+        elif isinstance(var_add, Jac):
+            adv = var_add[n2d[dim]]
+        elif var_add is None:
+            adv = torch.ones_like(var[dim])
+        else:
+            raise NotImplementedError("FDC: var_j Hess is not implemented yet!")
+
+        if var().shape[0] == 1:
+            target = var[0]
+        else:
+            target = var[dim]
+
+        slicer_1[dim] = 0
+        slicer_2[dim] = 1
+        slicer_3[dim] = 2
+
+        bc_val = target[slicer_1]
+        bc_val_p = target[slicer_2]
+        bc_val_pp = target[slicer_3]
+
+        discretized[slicer_1] = (
+            -(3 / 2 * bc_val - 2.0 * bc_val_p + 1 / 2 * bc_val_pp)
+            / (var.mesh.dx[dim])
+            * adv[slicer_1]
         )
+
+        if var.mesh.coord_sys == "rz" and dim == 0:
+            rz_add = torch.nan_to_num(
+                bc_val / var.mesh.R[slicer_1], nan=0.0, posinf=0.0, neginf=0.0
+            )
+            discretized[slicer_1] += rz_add
+
+        slicer_1[dim] = -1
+        slicer_2[dim] = -2
+        slicer_3[dim] = -3
+
+        bc_val = target[slicer_1]
+        bc_val_p = target[slicer_2]
+        bc_val_pp = target[slicer_3]
+
+        discretized[slicer_1] = (
+            (3 / 2 * bc_val - 2.0 * bc_val_p + 1 / 2 * bc_val_pp)
+            / (var.mesh.dx[dim])
+            * adv[slicer_1]
+        )
+
+        if var.mesh.coord_sys == "rz" and dim == 0:
+            rz_add = torch.nan_to_num(
+                bc_val * adv[slicer_1] / var.mesh.R[slicer_1],
+                nan=0.0,
+                posinf=0.0,
+                neginf=0.0,
+            )
+            discretized[slicer_1] += rz_add
+
+        slicer_1[dim] = slice(None)
+        slicer_2[dim] = slice(None)
+        slicer_3[dim] = slice(None)
+
     else:
         raise RuntimeError(f"FDC: edge treatment of {ops=} is not supported!")
 
@@ -448,6 +556,7 @@ def _grad_central_adjust(
         A_ops (tuple[list[Tensor], ...]): tuple of lists of tensors containing the coefficients of the discretization. `len(A_ops) == 3` since we need `Ap`, `Ac`, and `Am` coefficients.
         dim (int): variable dimension. It should be in the range of `var.dim`. Defaults to 0.
         it is not the dimension of the mesh!
+        gamma: advection term that accounts the divergence operation
     """
 
     if gamma is None:
@@ -515,7 +624,7 @@ class Div(Discretizer):
 
     @staticmethod
     def build_A_coeffs(
-        var_j: Field | float | Tensor | Hess,
+        var_j: Field | float | Tensor | Hess | Jac,
         var_i: Field,
         config: DiscretizerConfigType,
     ) -> list[list[Tensor]]:
@@ -530,10 +639,10 @@ class Div(Discretizer):
             config (dict[str, str]): configuration dictionary. It should contain the following keys: `limiter`.
         """
 
-        if isinstance(var_j, Hess):
-            adv = torch.ones_like(var_i[0])
-        else:
+        if isinstance(var_j, Field | Tensor | float):
             adv = _div_var_j_to_tensor(var_j, var_i)
+        else:
+            adv = var_j
 
         assert "div" in config, "FDC Div: config should contain 'div' key."
 
@@ -544,7 +653,12 @@ class Div(Discretizer):
         if limiter == "none":
             Ap, Ac, Am = _adv_central(adv, var_i, [Ap, Ac, Am])
         elif limiter == "upwind":
-            Ap, Ac, Am = _adv_upwind(adv, var_i)
+            if isinstance(adv, Jac | Hess):
+                raise NotImplementedError(
+                    "FDC: Upwind limiter is not implemented for Hessians and Jacobians advection term."
+                )
+            else:
+                Ap, Ac, Am = _adv_upwind(adv, var_i)
         elif limiter == "quick":
             raise NotImplementedError("FDC Div: quick scheme is not implemented yet.")
         else:
@@ -558,6 +672,7 @@ class Div(Discretizer):
     ) -> Tensor:
         rhs_adj = torch.zeros_like(var_i())
 
+        # FIXME: var_j hessian is not supported yet
         if var_i.bcs is not None:
             adv = _div_var_j_to_tensor(var_j, var_i)
 
@@ -594,7 +709,7 @@ def _check_limiter(config: DivConfigType | None) -> str:
 
 
 def _adv_central(
-    adv: Tensor, var: Field, A_ops: list[list[Tensor]]
+    adv: Tensor | Hess | Jac, var: Field, A_ops: list[list[Tensor]]
 ) -> list[list[Tensor]]:
     """Discretization of the advection tern using central difference.
 
@@ -609,13 +724,25 @@ def _adv_central(
     # A_[mesh.dim][var.dim]
     Ap, Ac, Am = A_ops
 
+    n2d = n2d_coord(var.mesh.coord_sys)
+
+    advection = torch.zeros_like(var()[0])
+
+    # BUG: What if var().shape[0] == 1?
     for i in range(var.dim):
         for j in range(var.mesh.dim):
-            Ap[j][i] *= adv[i]
-            Ac[j][i] *= adv[i]
-            Am[j][i] *= adv[i]
+            if isinstance(adv, Jac):
+                advection = adv[n2d[i]]
+            elif isinstance(adv, Hess):
+                advection = adv[n2d[i] + n2d[j]]
+            else:
+                advection = adv[i]
+            Ap[j][i] *= advection
+            Ac[j][i] *= advection
+            Am[j][i] *= advection
 
-        _grad_central_adjust(var, [Ap, Ac, Am], i, (adv,))
+        # NOTE: This is not working for the case of `isinstance(adv, Hess)`!!
+        _grad_central_adjust(var, [Ap, Ac, Am], i, (advection,))
 
     return [Ap, Ac, Am]
 
@@ -636,7 +763,7 @@ def _adv_upwind(adv: Tensor, var: Field) -> list[list[Tensor]]:
     return [Ap, Ac, Am]
 
 
-def _div_var_j_to_tensor(var_j: Field | Tensor | float, var_i: Field) -> Tensor:
+def _div_var_j_to_tensor(var_j: Field | Tensor | float | Jac, var_i: Field) -> Tensor:
     """In `Div` operator, convert `var_j` to a `Tensor`. Also check the shape of `var_j` so that is has the same shape of target variable `var_i`."""
 
     if isinstance(var_j, float):
@@ -645,8 +772,13 @@ def _div_var_j_to_tensor(var_j: Field | Tensor | float, var_i: Field) -> Tensor:
         adv = var_j
         # Shape check
         assert adv.shape == var_i().shape, "FDC Div: adv shape must match var_i shape"
-    else:
+    elif isinstance(var_j, Field):
         adv = var_j()
+    else:
+        n2d = n2d_coord(var_i.mesh.coord_sys)
+        adv = torch.zeros((len(var_j), *var_i().shape[1:]))
+        for i in range(len(var_j)):
+            adv[i] = var_j[n2d[i]]
 
     return adv
 
@@ -760,12 +892,14 @@ def jacobian(var: Field) -> Jac:
 
     n2d = n2d_coord(var.mesh.coord_sys)
 
-    jac = FDC.grad(var, edge=True)[0]
+    fdc = FDC({"grad": {"edge": True}})
+
+    jac = fdc.grad(var)[0]
 
     for i, j in enumerate(jac):
         data_jac[n2d[i]] = j
 
-    FDC.grad.reset()
+    fdc.grad.reset()
 
     return Jac(**data_jac)
 
@@ -781,11 +915,13 @@ def hessian(var: Field) -> Hess:
 
     n2d = n2d_coord(var.mesh.coord_sys)
 
-    jac = FDC.grad(var, edge=True)[0]
+    fdc = FDC({"grad": {"edge": True}})
+
+    jac = fdc.grad(var)[0]
 
     jac_f = var.copy()
 
-    hess = [FDC.grad(jac_f.set_var_tensor(j), edge=True)[0] for j in jac]
+    hess = [fdc.grad(jac_f.set_var_tensor(j))[0] for j in jac]
 
     for i, hi in enumerate(hess):
         for j, h in enumerate(hi):

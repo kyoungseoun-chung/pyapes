@@ -135,7 +135,7 @@ class Laplacian(Operators):
         else:
             raise TypeError("FDM: invalid input type!")
 
-        A_coeffs = FDC(self.config).laplacian.build_A_coeffs(var)
+        A_coeffs = FDC({"laplacian": {"edge": False}}).laplacian.build_A_coeffs(var)
 
         self._var = var
         self._ops[0] = {
@@ -161,10 +161,12 @@ class Laplacian(Operators):
     ) -> Tensor:
         """Compute `Ax` of the linear system `Ax = b`. If param is not None, the whole operation is multiplied by param."""
 
+        fdc = FDC({"laplacian": {"edge": False}})
+
         if param is None:
-            return FDC.laplacian.apply(A_coeffs, var)
+            return fdc.laplacian.apply(A_coeffs, var)
         else:
-            return FDC.laplacian.apply(A_coeffs, var) * param
+            return fdc.laplacian.apply(A_coeffs, var) * param
 
 
 class Grad(Operators):
@@ -195,7 +197,7 @@ class Grad(Operators):
         else:
             raise TypeError("FDM: invalid input type!")
 
-        A_coeffs = FDC.grad.build_A_coeffs(var)
+        A_coeffs = FDC({"grad": {"edge": False}}).grad.build_A_coeffs(var)
 
         self._var = var
         self._ops[0] = {
@@ -219,10 +221,13 @@ class Grad(Operators):
         param: float | Tensor | None, var: Field, A_coeffs: list[list[Tensor]]
     ) -> Tensor:
         """Compute `Ax` of the linear system `Ax = b`. If param is not None, the whole operation is multiplied by param."""
+
+        fdc = FDC({"grad": {"edge": False}})
+
         if param is None:
-            return FDC().grad.apply(A_coeffs, var)
+            return fdc.grad.apply(A_coeffs, var)
         else:
-            return FDC().grad.apply(A_coeffs, var) * param
+            return fdc.grad.apply(A_coeffs, var) * param
 
 
 class Div(Operators):
@@ -268,7 +273,7 @@ class Div(Operators):
 
         assert self.config is not None, "FDM Div: config must be provided!"
 
-        A_coeffs = FDC.div.build_A_coeffs(var_j, var_i, self.config)
+        A_coeffs = FDC(self.config).div.build_A_coeffs(var_j, var_i, self.config)
 
         self._ops[0] = {
             "name": self.__class__.__name__,
@@ -296,13 +301,15 @@ class Div(Operators):
     ) -> Tensor:
         """Compute `Ax` for the linear system of `Ax=b`. If `var_j` is either `Tensor` or `float`, assume that the advection term is constant. Therefore, reuse `A_coeffs`. Otherwise, update `A_coeffs` every step to compute `Ax`."""
 
+        fdc = FDC(config)
+
         if isinstance(var_j, Tensor | float):
             # Reuse A_coeffs
-            return FDC().div.apply(A_coeffs, var_i)
+            return fdc.div.apply(A_coeffs, var_i)
         else:
             # Update A_coeffs
-            _A_coeffs = FDC.div.build_A_coeffs(var_j, var_i, config)
-            return FDC().div.apply(_A_coeffs, var_i)
+            _A_coeffs = fdc.div.build_A_coeffs(var_j, var_i, config)
+            return fdc.div.apply(_A_coeffs, var_i)
 
 
 class Ddt(Operators):

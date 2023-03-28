@@ -65,7 +65,7 @@ def default_A_ops(var: Field, ops: str) -> list[list[Tensor]]:
             r_coord = var.mesh.R
             dr = var.mesh.dx[0]
 
-            scale = torch.nan_to_num(dr / r_coord, nan=0.0, posinf=0.0, neginf=0.0)
+            scale = torch.nan_to_num(2 * dr / r_coord, nan=0.0, posinf=0.0, neginf=0.0)
             App = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
             Ap = [torch.ones_like(var()) for _ in range(var.mesh.dim)]
             Ac = [
@@ -74,6 +74,8 @@ def default_A_ops(var: Field, ops: str) -> list[list[Tensor]]:
             ]
             Am = [-1.0 * torch.ones_like(var()) for _ in range(var.mesh.dim)]
             Amm = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
+            if var.dim == 1:
+                pass
     elif ops.lower() == "laplacian":
         if var.mesh.coord_sys == "xyz":
             App = [torch.zeros_like(var()) for _ in range(var.mesh.dim)]
