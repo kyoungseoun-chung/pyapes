@@ -734,9 +734,9 @@ def _adv_central(
                 advection = adv[n2d[i] + n2d[j]]
             else:
                 advection = adv[i]
-            Ap[j][i] *= advection
+            Ap[j][i] *= torch.roll(advection, -1, dims=j)
             Ac[j][i] *= advection
-            Am[j][i] *= advection
+            Am[j][i] *= torch.roll(advection, 1, dims=j)
 
         # NOTE: This is not working for the case of `isinstance(adv, Hess)`!!
         _grad_central_adjust(var, [Ap, Ac, Am], i, (advection,))

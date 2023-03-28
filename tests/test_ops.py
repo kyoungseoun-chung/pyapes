@@ -49,9 +49,9 @@ def test_div_diff_flux() -> None:
 
     div_var = fdc.div(jac, var)
 
-    div_var_x = torch.gradient(var[0], spacing=mesh.dx.tolist(), edge_order=2)
+    div_var_x = torch.gradient(var[0] * jac.r, spacing=mesh.dx.tolist(), edge_order=2)
 
-    div_var_x = div_var_x[0] * jac.r + torch.nan_to_num(
+    div_var_x = div_var_x[0] + torch.nan_to_num(
         jac.r * var[0] / mesh.grid[0], nan=0.0, posinf=0.0, neginf=0.0
     )
 
