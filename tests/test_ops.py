@@ -8,15 +8,17 @@ from torch.testing import assert_close  # type: ignore
 
 from pyapes.geometry import Cylinder
 from pyapes.mesh import Mesh
+from pyapes.solver.fdc import FDC
+from pyapes.solver.fdc import hessian
+from pyapes.solver.fdc import jacobian
 from pyapes.variables import Field
+
 
 torch.set_default_dtype(torch.float64)
 
 
 def test_div_diff_flux() -> None:
     """Test for div(D * grad(var))"""
-
-    from pyapes.solver.fdc import FDC, hessian, jacobian
 
     mesh = Mesh(Cylinder[0:1, 0:1], None, [5, 5])
     var = Field("test", 1, mesh, {"domain": None, "obstacle": None})

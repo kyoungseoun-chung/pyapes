@@ -144,14 +144,13 @@ class Discretizer(ABC):
 
             return self.__call_two_vars(args[0], args[1])
 
+    # NOTE: Currently always reconstruct the coefficients. Need better idea?
     def __call_one_var(self, var: Field) -> Tensor | list[Tensor]:
         """Return of `__call__` method for the operators that only require one variable."""
 
-        if self.A_coeffs is None:
-            self.A_coeffs = self.build_A_coeffs(var)
+        self.A_coeffs = self.build_A_coeffs(var)
 
-        if self.rhs_adj is None:
-            self.rhs_adj = self.adjust_rhs(var)
+        self.rhs_adj = self.adjust_rhs(var)
 
         return self.apply(self.A_coeffs, var)
 
@@ -160,11 +159,9 @@ class Discretizer(ABC):
     ) -> Tensor:
         """Return of `__call__` method for the operators that require two variables."""
 
-        if self.A_coeffs is None:
-            self.A_coeffs = self.build_A_coeffs(var_j, var_i, config=self.config)
+        self.A_coeffs = self.build_A_coeffs(var_j, var_i, config=self.config)
 
-        if self.rhs_adj is None:
-            self.rhs_adj = self.adjust_rhs(var_j, var_i, config=self.config)
+        self.rhs_adj = self.adjust_rhs(var_j, var_i, config=self.config)
 
         self.var_addition = var_j
 
