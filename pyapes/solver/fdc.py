@@ -891,10 +891,8 @@ def jacobian(var: Field) -> Jac:
 
     fdc = FDC({"grad": {"edge": True}})
 
-    var_jac = var.copy()
-    var_jac.bcs = []
-
-    jac = fdc.grad(var)[0]
+    var_dummy = Field("container", 1, var.mesh, None)
+    jac = fdc.grad(var_dummy.set_var_tensor(var[0]))[0]
 
     for i, j in enumerate(jac):
         data_jac[n2d[i]] = j
@@ -917,10 +915,9 @@ def hessian(var: Field) -> Hess:
 
     fdc = FDC({"grad": {"edge": True}})
 
-    var_jac = var.copy()
-    var_jac.bcs = []
+    var_dummy = Field("container", 1, var.mesh, None)
 
-    jac = fdc.grad(var_jac)[0]
+    jac = fdc.grad(var_dummy.set_var_tensor(var[0]))[0]
 
     jac_f = var.copy()
 
