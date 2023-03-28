@@ -650,7 +650,7 @@ class Div(Discretizer):
         if limiter == "none":
             Ap, Ac, Am = _adv_central(adv, var_i, [Ap, Ac, Am])
         elif limiter == "upwind":
-            if isinstance(adv, Jac | Hess):
+            if isinstance(adv, Hess):
                 raise NotImplementedError(
                     "FDC: Upwind limiter is not implemented for Hessians and Jacobians advection term."
                 )
