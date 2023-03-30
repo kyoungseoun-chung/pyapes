@@ -34,11 +34,11 @@ class Friction:
         Azp = (torch.roll(Hz, -1, 1) + Hz) / (2.0)
         Azm = (Hz + torch.roll(Hz, 1, 1)) / (2.0)
 
-        Prp = (torch.roll(pdf, -1, 0) - pdf) / (0.5 * dx[0])
-        Prm = (pdf - torch.roll(pdf, 1, 0)) / (0.5 * dx[0])
+        Prp = (torch.roll(pdf, -1, 0) - pdf) / dx[0]
+        Prm = (pdf - torch.roll(pdf, 1, 0)) / dx[0]
 
-        Pzp = (torch.roll(pdf, -1, 1) - pdf) / (0.5 * dx[1])
-        Pzm = (pdf - torch.roll(pdf, 1, 1)) / (0.5 * dx[1])
+        Pzp = (torch.roll(pdf, -1, 1) - pdf) / dx[1]
+        Pzm = (pdf - torch.roll(pdf, 1, 1)) / dx[1]
 
         r_p = (torch.roll(var.mesh.grid[0], -1, 0) + var.mesh.grid[0]) / 2
         r_m = (var.mesh.grid[0] + torch.roll(var.mesh.grid[0], 1, 0)) / 2
@@ -103,21 +103,29 @@ class Diffusion:
         pdf = var[0]
         dx = var.mesh.dx
 
-        # (D+ + D-)/2 * (P+ - P-)/(0.5 * dx) -> (D+ + D-) * (P+ - P-) / dx
+        # (D+ + D-)/2 * (P+ - P-)/dx -> (D+ + D-) * (P+ - P-) / dx
         Drr_Pr_rpz = (
-            (torch.roll(Drr, -1, 0) + Drr) * (torch.roll(pdf, -1, 0) - pdf) / dx[0]
+            (torch.roll(Drr, -1, 0) + Drr)
+            * (torch.roll(pdf, -1, 0) - pdf)
+            / (2.0 * dx[0])
         )
 
         Drr_Pr_rmz = (
-            (torch.roll(Drr, 1, 0) + Drr) * (pdf - torch.roll(pdf, 1, 0)) / dx[0]
+            (torch.roll(Drr, 1, 0) + Drr)
+            * (pdf - torch.roll(pdf, 1, 0))
+            / (2.0 * dx[0])
         )
 
         Dzz_Pz_rzp = (
-            (torch.roll(Dzz, -1, 1) + Dzz) * (torch.roll(pdf, -1, 1) - pdf) / dx[1]
+            (torch.roll(Dzz, -1, 1) + Dzz)
+            * (torch.roll(pdf, -1, 1) - pdf)
+            / (2.0 * dx[1])
         )
 
         Dzz_Pz_rzm = (
-            (torch.roll(Dzz, 1, 1) + Dzz) * (pdf - torch.roll(pdf, 1, 1)) / dx[1]
+            (torch.roll(Dzz, 1, 1) + Dzz)
+            * (pdf - torch.roll(pdf, 1, 1))
+            / (2.0 * dx[1])
         )
 
         Drz_pp = _c_interp(Drz, 1, 1)
@@ -167,15 +175,15 @@ class Diffusion:
         )[0, :] / dx[1]
 
         # r = R
-        # diffusion[-1, :] = (
-        #     ((Dzz_Pz_rzp - Dzz_Pz_rzm) / dx[1] + (Drz_Pr_rzp - Drz_Pr_rzm) / dx[1])[
-        #         -1, :
-        #     ]
-        #     + ((-r_m * Drz_Pz_rmz) / (r * dx[0]))[-1, :]
-        #     + ((-r_m * Drr_Pr_rmz) / (r * dx[0]))[-1, :]
-        # )
+        diffusion[-1, :] = (
+            ((Dzz_Pz_rzp - Dzz_Pz_rzm) / dx[1] + (Drz_Pr_rzp - Drz_Pr_rzm) / dx[1])[
+                -1, :
+            ]
+            + ((-r_m * Drz_Pz_rmz) / (r * dx[0]))[-1, :]
+            + ((-r_m * Drr_Pr_rmz) / (r * dx[0]))[-1, :]
+        )
 
-        diffusion[-1, :] = 0.0
+        # diffusion[-1, :] = 0.0
 
         # z = 0
         diffusion[:, 0] = ((Dzz_Pz_rzp) / dx[1] + (Drz_Pr_rzp) / dx[1])[
@@ -214,7 +222,7 @@ def _flux(
     ip = (-idx_p[0], -idx_p[1])
     im = (-idx_m[0], -idx_m[1])
 
-    return (torch.roll(var, ip, (0, 1)) - torch.roll(var, im, (0, 1))) / (0.5 * dx)
+    return (torch.roll(var, ip, (0, 1)) - torch.roll(var, im, (0, 1))) / dx
 
 
 def _c_interp(var: Tensor, upper_i: int, upper_j: int) -> Tensor:
