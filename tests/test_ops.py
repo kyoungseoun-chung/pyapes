@@ -52,6 +52,14 @@ def test_fp() -> None:
     from pymyplot import plt
     from pymyplot.colors import TOLCmap
 
+    _, ax = plt.subplots(2, 3)
+    ax[0][0].contourf(pdf.mesh.R, pdf.mesh.Z, H_pot[0], cmap=TOLCmap.sunset())
+    ax[0][1].contourf(pdf.mesh.R, pdf.mesh.Z, G_pot[0], cmap=TOLCmap.sunset())
+    ax[0][2].contourf(pdf.mesh.R, pdf.mesh.Z, pdf[0], cmap=TOLCmap.sunset())
+    ax[1][0].contourf(pdf.mesh.R, pdf.mesh.Z, jacH.r, cmap=TOLCmap.sunset())
+    ax[1][1].contourf(pdf.mesh.R, pdf.mesh.Z, jacH.z, cmap=TOLCmap.sunset())
+    ax[1][2].contourf(pdf.mesh.R, pdf.mesh.Z, friction, cmap=TOLCmap.sunset())
+
     _, ax = plt.subplots(1, 4)
     ax[0].contourf(mesh.R, mesh.Z, f_fvc, cmap=TOLCmap.sunset())
     ax[1].contourf(mesh.R, mesh.Z, friction, cmap=TOLCmap.sunset())

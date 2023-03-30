@@ -28,23 +28,23 @@ class Friction:
         pdf = var[0]
         dx = var.mesh.dx
 
-        Arp = (torch.roll(Hr, -1, 0) + Hr) / (2.0)
-        Arm = (Hr + torch.roll(Hr, 1, 0)) / (2.0)
+        Arp = (torch.roll(Hr, -1, 0) + Hr) / 2.0
+        Arm = (Hr + torch.roll(Hr, 1, 0)) / 2.0
 
-        Azp = (torch.roll(Hz, -1, 1) + Hz) / (2.0)
-        Azm = (Hz + torch.roll(Hz, 1, 1)) / (2.0)
+        Azp = (torch.roll(Hz, -1, 1) + Hz) / 2.0
+        Azm = (Hz + torch.roll(Hz, 1, 1)) / 2.0
 
-        Prp = (torch.roll(pdf, -1, 0) - pdf) / dx[0]
-        Prm = (pdf - torch.roll(pdf, 1, 0)) / dx[0]
+        Prp = (torch.roll(pdf, -1, 0) + pdf) / 2.0
+        Prm = (pdf + torch.roll(pdf, 1, 0)) / 2.0
 
-        Pzp = (torch.roll(pdf, -1, 1) - pdf) / dx[1]
-        Pzm = (pdf - torch.roll(pdf, 1, 1)) / dx[1]
+        Pzp = (torch.roll(pdf, -1, 1) + pdf) / 2.0
+        Pzm = (pdf + torch.roll(pdf, 1, 1)) / 2.0
 
-        r_p = (torch.roll(var.mesh.grid[0], -1, 0) + var.mesh.grid[0]) / 2
-        r_m = (var.mesh.grid[0] + torch.roll(var.mesh.grid[0], 1, 0)) / 2
-        r = var.mesh.grid[0]
+        r_p = (torch.roll(var.mesh.R, -1, 0) + var.mesh.R) / 2
+        r_m = (var.mesh.R + torch.roll(var.mesh.R, 1, 0)) / 2
+        r = var.mesh.R
 
-        friction = (Azp * Pzp - Azm * Pzm) / (dx[1]) + (
+        friction = (Azp * Pzp - Azm * Pzm) / dx[1] + (
             r_p * Arp * Prp - r_m * Arm * Prm
         ) / (r * dx[0])
 
@@ -52,25 +52,31 @@ class Friction:
         # r = 0, Arm = 0
         friction[0, :] = (Azp * Pzp - Azm * Pzm)[0, :] / (dx[1])
         # r = R, Arp = 0
-        friction[-1, :] = (Azp * Pzp - Azm * Pzm)[-1, :] / (dx[1]) + (
+        friction[-1, :] = (Azp * Pzp - Azm * Pzm)[-1, :] / (dx[1]) + 2.0 * (
             (-r_m * Arm * Prm) / (r * dx[0])
         )[-1, :]
 
         # z = 0
-        friction[:, 0] = (Azp * Pzp)[:, 0] / (dx[1]) + torch.nan_to_num(
-            (r_p * Arp * Prp - r_m * Arm * Prm) / (r * dx[0]),
-            nan=0.0,
-            posinf=0.0,
-            neginf=0.0,
-        )[:, 0]
+        friction[:, 0] = (
+            2.0 * (Azp * Pzp)[:, 0] / (dx[1])
+            + torch.nan_to_num(
+                (r_p * Arp * Prp - r_m * Arm * Prm) / (r * dx[0]),
+                nan=0.0,
+                posinf=0.0,
+                neginf=0.0,
+            )[:, 0]
+        )
 
         # z = Z
-        friction[:, -1] = (-Azm * Pzm)[:, -1] / (dx[1]) + torch.nan_to_num(
-            (r_p * Arp * Prp - r_m * Arm * Prm) / (r * dx[0]),
-            nan=0.0,
-            posinf=0.0,
-            neginf=0.0,
-        )[:, -1]
+        friction[:, -1] = (
+            2.0 * (-Azm * Pzm)[:, -1] / (dx[1])
+            + torch.nan_to_num(
+                (r_p * Arp * Prp - r_m * Arm * Prm) / (r * dx[0]),
+                nan=0.0,
+                posinf=0.0,
+                neginf=0.0,
+            )[:, -1]
+        )
 
         return friction
 
@@ -170,7 +176,7 @@ class Diffusion:
 
         # BC?
         # r = 0
-        diffusion[0, :] = (Dzz_Pz_rzp - Dzz_Pz_rzm)[0, :] / dx[1] + (
+        diffusion[0, :] = (Dzz_Pz_rzp - Dzz_Pz_rzm)[0, :] / dx[1] + 2.0 * (
             Drz_Pr_rzp - Drz_Pr_rzm
         )[0, :] / dx[1]
 
@@ -179,37 +185,35 @@ class Diffusion:
             ((Dzz_Pz_rzp - Dzz_Pz_rzm) / dx[1] + (Drz_Pr_rzp - Drz_Pr_rzm) / dx[1])[
                 -1, :
             ]
-            + ((-r_m * Drz_Pz_rmz) / (r * dx[0]))[-1, :]
-            + ((-r_m * Drr_Pr_rmz) / (r * dx[0]))[-1, :]
+            + 2.0 * ((-r_m * Drz_Pz_rmz) / (r * dx[0]))[-1, :]
+            + 2.0 * ((-r_m * Drr_Pr_rmz) / (r * dx[0]))[-1, :]
         )
 
         # diffusion[-1, :] = 0.0
 
         # z = 0
-        diffusion[:, 0] = ((Dzz_Pz_rzp) / dx[1] + (Drz_Pr_rzp) / dx[1])[
-            :, 0
-        ] + torch.nan_to_num(
-            (r_p * Drz_Pz_rpz - r_m * Drz_Pz_rmz) / (r * dx[0])
-            + (r_p * Drr_Pr_rpz - r_m * Drr_Pr_rmz) / (r * dx[0]),
-            nan=0.0,
-            posinf=0.0,
-            neginf=0.0,
-        )[
-            :, 0
-        ]
+        diffusion[:, 0] = (
+            2.0 * ((Dzz_Pz_rzp) / dx[1] + (Drz_Pr_rzp) / dx[1])[:, 0]
+            + torch.nan_to_num(
+                (r_p * Drz_Pz_rpz - r_m * Drz_Pz_rmz) / (r * dx[0])
+                + (r_p * Drr_Pr_rpz - r_m * Drr_Pr_rmz) / (r * dx[0]),
+                nan=0.0,
+                posinf=0.0,
+                neginf=0.0,
+            )[:, 0]
+        )
 
         # z = Z
-        diffusion[:, -1] = ((-Dzz_Pz_rzm) / dx[1] + (-Drz_Pr_rzm) / dx[1])[
-            :, -1
-        ] + torch.nan_to_num(
-            (r_p * Drz_Pz_rpz - r_m * Drz_Pz_rmz) / (r * dx[0])
-            + (r_p * Drr_Pr_rpz - r_m * Drr_Pr_rmz) / (r * dx[0]),
-            nan=0.0,
-            posinf=0.0,
-            neginf=0.0,
-        )[
-            :, -1
-        ]
+        diffusion[:, -1] = (
+            2.0 * ((-Dzz_Pz_rzm) / dx[1] + (-Drz_Pr_rzm) / dx[1])[:, -1]
+            + torch.nan_to_num(
+                (r_p * Drz_Pz_rpz - r_m * Drz_Pz_rmz) / (r * dx[0])
+                + (r_p * Drr_Pr_rpz - r_m * Drr_Pr_rmz) / (r * dx[0]),
+                nan=0.0,
+                posinf=0.0,
+                neginf=0.0,
+            )[:, -1]
+        )
 
         return diffusion
 
