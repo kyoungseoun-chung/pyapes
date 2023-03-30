@@ -235,10 +235,18 @@ class Field:
         return self
 
     def __getitem__(self, idx: int | slice) -> torch.Tensor:
+        """Get item using `[]` operator. The idx should be in `var.dim` dimension."""
         if isinstance(idx, slice):
             return self.VAR
         else:
             return self.VAR[idx]
+
+    def __setitem__(self, idx: int | slice, val: Tensor) -> None:
+        """Set item using `[]` operator. The idx should be in `var.dim` dimension."""
+        if isinstance(idx, slice):
+            self.VAR = val
+        else:
+            self.VAR[idx] = val
 
     def __call__(self) -> Tensor:
         """Return variable."""
@@ -328,14 +336,16 @@ class Field:
 
         return self
 
-    def volume_integral(self) -> Tensor:
+    def volume_integral(self, target: Tensor | None = None) -> Tensor:
         """Compute volume integral of the `VAR`"""
 
+        if target is None:
+            target = torch.ones_like(self.VAR[0])
         val = torch.zeros(self.dim, device=self.VAR.device, dtype=self.VAR.dtype)
 
         for i in range(self.dim):
             val[i] = (
-                torch.sum(self.VAR[i] * self.mesh.dx.prod())
+                torch.sum(target * self.VAR[i] * self.mesh.dx.prod())
                 if self.mesh.coord_sys == "xyz"
                 else torch.sum(
                     2.0

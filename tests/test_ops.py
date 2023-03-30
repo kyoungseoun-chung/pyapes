@@ -40,20 +40,23 @@ def test_fp() -> None:
     assert den == pytest.approx(1.0, rel=1e-3)
 
     rfp = RFP()
+    fdc = FDC({"div": {"limiter": "none", "edge": True}})
     jacH = jacobian(H_pot.set_var_tensor(t_H))
     hessG = hessian(G_pot.set_var_tensor(t_G))
 
     friction = rfp.friction(jacH, pdf)
+    f_fvc = fdc.div(jacH, pdf)[0]
     diffusion = rfp.diffusion(hessG, pdf)
+    d_fvc = fdc.div(1.0, fdc.diffFlux(hessG, pdf))[0]
 
     from pymyplot import plt
     from pymyplot.colors import TOLCmap
 
-    _, ax = plt.subplots(1, 4, subplot_kw={"projection": "3d"})
-    ax[0].plot_surface(mesh.R, mesh.Z, pdf[0], cmap=TOLCmap.sunset())
-    ax[1].plot_surface(mesh.R, mesh.Z, friction, cmap=TOLCmap.sunset())
-    ax[2].plot_surface(mesh.R, mesh.Z, diffusion, cmap=TOLCmap.sunset())
-    ax[3].plot_surface(mesh.R, mesh.Z, friction + diffusion, cmap=TOLCmap.sunset())
+    _, ax = plt.subplots(1, 4)
+    ax[0].contourf(mesh.R, mesh.Z, f_fvc, cmap=TOLCmap.sunset())
+    ax[1].contourf(mesh.R, mesh.Z, friction, cmap=TOLCmap.sunset())
+    ax[2].contourf(mesh.R, mesh.Z, d_fvc, cmap=TOLCmap.sunset())
+    ax[3].contourf(mesh.R, mesh.Z, diffusion, cmap=TOLCmap.sunset())
     plt.show()
 
 

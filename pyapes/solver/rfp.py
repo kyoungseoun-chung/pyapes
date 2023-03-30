@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """FDC discretization especially for the Rosenbluth Fokker-Planck equation"""
-
 import torch
 from torch import Tensor
 
-from pyapes.variables.container import Jac, Hess
 from pyapes.variables import Field
+from pyapes.variables.container import Hess
+from pyapes.variables.container import Jac
 
 
 class Friction:
@@ -28,11 +28,11 @@ class Friction:
         pdf = var[0]
         dx = var.mesh.dx
 
-        Arp = (torch.roll(Hr, -1, 0) - Hr) / (0.5 * dx[0])
-        Arm = (Hr - torch.roll(Hr, 1, 0)) / (0.5 * dx[0])
+        Arp = (torch.roll(Hr, -1, 0) + Hr) / (2.0)
+        Arm = (Hr + torch.roll(Hr, 1, 0)) / (2.0)
 
-        Azp = (torch.roll(Hz, -1, 1) - Hz) / (0.5 * dx[1])
-        Azm = (Hz - torch.roll(Hz, 1, 1)) / (0.5 * dx[1])
+        Azp = (torch.roll(Hz, -1, 1) + Hz) / (2.0)
+        Azm = (Hz + torch.roll(Hz, 1, 1)) / (2.0)
 
         Prp = (torch.roll(pdf, -1, 0) - pdf) / (0.5 * dx[0])
         Prm = (pdf - torch.roll(pdf, 1, 0)) / (0.5 * dx[0])
