@@ -2,7 +2,9 @@
 """Test roll vs conv1d discretization"""
 import time
 
+import pytest
 import torch
+from pymytools.diagnostics import DataLoader
 from torch.nn.functional import conv1d
 from torch.testing import assert_close  # type: ignore
 
@@ -11,10 +13,48 @@ from pyapes.mesh import Mesh
 from pyapes.solver.fdc import FDC
 from pyapes.solver.fdc import hessian
 from pyapes.solver.fdc import jacobian
+from pyapes.solver.rfp import RFP
 from pyapes.variables import Field
 
 
 torch.set_default_dtype(torch.float64)
+
+
+def test_fp() -> None:
+    dl = DataLoader()
+    res = dl.read_hdf5("tests/data/pots.h5", ["H", "G", "pdf"])
+
+    # Target values
+    t_H = res["H"]
+    t_G = res["G"]
+    t_pdf = res["pdf"]
+
+    mesh = Mesh(Cylinder[0:5, -5:5], None, [32, 64])
+
+    pdf = Field("pdf", 1, mesh, {"domain": None, "obstacle": None})
+    H_pot = Field("H", 1, mesh, {"domain": None, "obstacle": None})
+    G_pot = Field("G", 1, mesh, {"domain": None, "obstacle": None})
+    pdf.set_var_tensor(t_pdf)
+    den = pdf.volume_integral()
+
+    assert den == pytest.approx(1.0, rel=1e-3)
+
+    rfp = RFP()
+    jacH = jacobian(H_pot.set_var_tensor(t_H))
+    hessG = hessian(G_pot.set_var_tensor(t_G))
+
+    friction = rfp.friction(jacH, pdf)
+    diffusion = rfp.diffusion(hessG, pdf)
+
+    from pymyplot import plt
+    from pymyplot.colors import TOLCmap
+
+    _, ax = plt.subplots(1, 4, subplot_kw={"projection": "3d"})
+    ax[0].plot_surface(mesh.R, mesh.Z, pdf[0], cmap=TOLCmap.sunset())
+    ax[1].plot_surface(mesh.R, mesh.Z, friction, cmap=TOLCmap.sunset())
+    ax[2].plot_surface(mesh.R, mesh.Z, diffusion, cmap=TOLCmap.sunset())
+    ax[3].plot_surface(mesh.R, mesh.Z, friction + diffusion, cmap=TOLCmap.sunset())
+    plt.show()
 
 
 def test_div_diff_flux() -> None:

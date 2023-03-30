@@ -328,6 +328,26 @@ class Field:
 
         return self
 
+    def volume_integral(self) -> Tensor:
+        """Compute volume integral of the `VAR`"""
+
+        val = torch.zeros(self.dim, device=self.VAR.device, dtype=self.VAR.dtype)
+
+        for i in range(self.dim):
+            val[i] = (
+                torch.sum(self.VAR[i] * self.mesh.dx.prod())
+                if self.mesh.coord_sys == "xyz"
+                else torch.sum(
+                    2.0
+                    * torch.pi
+                    * self.VAR[i]
+                    * self.mesh.grid[0]
+                    * self.mesh.dx.prod()
+                )
+            )
+
+        return val
+
     def get_bc(self, bc_id: str) -> BC_type | None:
         """Get bc object by bc_id. bc_id should have convention `d-xl` for domain boundary on `xl` side.
 
