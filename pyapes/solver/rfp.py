@@ -8,6 +8,7 @@ from pyapes.variables.container import Hess
 from pyapes.variables.container import Jac
 
 
+# TODO: NEED TO REVISE BCS
 class Friction:
     """Friction term
 

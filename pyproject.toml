@@ -11,7 +11,11 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = ">=3.10,<3.12"
 pymyplot = "^0.2.7"
-torch = "^2.0.0"
+torch = [
+    { version = "^2.0.0", markers = "sys_platform=='darwin'" },
+    { markers = "sys_platform=='win32'", url = "https://download.pytorch.org/whl/cu118/torch-2.0.0%2Bcu118-cp310-cp310-win_amd64.whl" },
+]
+
 pymytools = "^0.1.15"
 
 [tool.poetry.dev-dependencies]
